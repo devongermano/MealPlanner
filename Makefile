@@ -7,7 +7,7 @@ SEED      ?= 0
 N         ?= 12
 ARTIFACTS ?= artifacts
 
-.PHONY: plan doctor shop menu test test-fast test-serial install baseline
+.PHONY: plan doctor shop menu test test-fast test-serial install baseline contracts contracts-check
 
 # ---- everyday commands ----------------------------------------------------- #
 # Full week plan: writes plan.md + the three deliverables into $(ARTIFACTS)/
@@ -48,6 +48,19 @@ test-fast:
 # Serial fallback: timing investigations, or debugging worker-dependent flakes.
 test-serial:
 	$(PY) -m pytest services/solver/tests -q
+
+# Contract codegen (Track B / M2 blocker — ARCHITECTURE.md "the one
+# non-negotiable wiring rule"): pydantic schemas -> openapi.json -> TS in
+# packages/contracts. Both artifacts are CHECKED IN; contracts-check is the
+# drift gate CI runs (.github/workflows/contracts.yml). Requires node/npm
+# and the [service] extra: pip install -e "services/solver[dev,service]".
+contracts:
+	cd packages/contracts && npm install --no-audit --no-fund \
+		&& PYTHON="$(abspath $(PY))" npm run gen
+
+contracts-check:
+	cd packages/contracts && npm install --no-audit --no-fund \
+		&& PYTHON="$(abspath $(PY))" npm run check
 
 # M0.14 (PRD §8.5): record measured perf baselines on this machine.
 # The date is injected here — the engine (and the baseline script's
