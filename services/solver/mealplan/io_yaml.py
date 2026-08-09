@@ -29,6 +29,7 @@ SCHEMA_VERSION = 1
 KNOWN_SCHEMA_VERSIONS = (1,)
 
 ROLES = ("main", "starch", "veg", "accent", "drink")
+BUDGET_MODES = ("shared", "per_person", "by_consumption", "off")
 
 INGREDIENT_REQUIRED = ("p", "f", "c", "perishable", "pack_g",
                        "keeps_days", "cost")
@@ -122,6 +123,16 @@ def validate_ingredients_doc(doc: Any, fname: str = "ingredients.yaml"
                 issues.append(ValidationIssue(
                     "missing_field", f"{where}, field '{f_}'",
                     f"required field '{f_}' is missing"))
+        # numeric fields must actually BE numbers — a stray string ("high",
+        # "30g") would otherwise sail through validation and crash the
+        # derivation with a raw TypeError (violating the all-errors contract)
+        for f_ in ("p", "f", "c", "cost", "keeps_days"):
+            v = d.get(f_)
+            if f_ in d and (not isinstance(v, (int, float))
+                            or isinstance(v, bool)):
+                issues.append(ValidationIssue(
+                    "bad_number", f"{where}, field '{f_}'",
+                    f"'{f_}' must be a number (got {v!r})"))
         # kcal is never stored (M0.9) — it derives from macros, always
         if "kcal" in d:
             issues.append(ValidationIssue(
@@ -149,10 +160,15 @@ def validate_ingredients_doc(doc: Any, fname: str = "ingredients.yaml"
                 "bad_freezable", f"{where}, field 'freezable'",
                 f"freezable must be a boolean (got {fz!r})"))
         pg = d.get("pack_g")
-        if isinstance(pg, (int, float)) and pg <= 0:
-            issues.append(ValidationIssue(
-                "nonpositive_grams", f"{where}, field 'pack_g'",
-                f"pack_g must be > 0 (got {pg})"))
+        if "pack_g" in d:
+            if not isinstance(pg, (int, float)) or isinstance(pg, bool):
+                issues.append(ValidationIssue(
+                    "bad_number", f"{where}, field 'pack_g'",
+                    f"pack_g must be a number (got {pg!r})"))
+            elif pg <= 0:
+                issues.append(ValidationIssue(
+                    "nonpositive_grams", f"{where}, field 'pack_g'",
+                    f"pack_g must be > 0 (got {pg})"))
     return issues
 
 
@@ -203,11 +219,30 @@ def validate_components_doc(doc: Any, known_ingredients: Optional[set] = None,
                 "forbidden_field", f"{where}, field 'tags'",
                 "tags are derived from ingredient tags and must never be "
                 "declared on a component"))
+        # numeric fields must actually BE numbers (see ingredients — same
+        # all-errors contract: report here, never crash the engine later)
+        for f_ in ("yield_g", "active_min", "keeps_days"):
+            v = c.get(f_)
+            if f_ in c and (not isinstance(v, (int, float))
+                            or isinstance(v, bool)):
+                issues.append(ValidationIssue(
+                    "bad_number", f"{where}, field '{f_}'",
+                    f"'{f_}' must be a number (got {v!r})"))
         yg = c.get("yield_g")
-        if isinstance(yg, (int, float)) and yg <= 0:
+        if isinstance(yg, (int, float)) and not isinstance(yg, bool) and yg <= 0:
             issues.append(ValidationIssue(
                 "nonpositive_grams", f"{where}, field 'yield_g'",
                 f"yield_g must be > 0 (got {yg})"))
+        # unit_g (optional): must be a positive number when present. M0.8's
+        # snap-and-clamp grid guarantee leans on the unit-alignment check
+        # below, which can only run against a positive numeric unit_g — a
+        # string or nonpositive value must be an ERROR, not a silent skip.
+        ug = c.get("unit_g")
+        if "unit_g" in c and (not isinstance(ug, (int, float))
+                              or isinstance(ug, bool) or ug <= 0):
+            issues.append(ValidationIssue(
+                "bad_unit_g", f"{where}, field 'unit_g'",
+                f"unit_g must be a positive number (got {ug!r})"))
         sg = c.get("serve_g")
         if sg is not None:
             if not isinstance(sg, dict) or "min" not in sg or "max" not in sg:
@@ -216,6 +251,11 @@ def validate_components_doc(doc: Any, known_ingredients: Optional[set] = None,
                     "serve_g must be a mapping with 'min' and 'max'"))
             else:
                 lo, hi = sg.get("min"), sg.get("max")
+                for k_, v_ in (("min", lo), ("max", hi)):
+                    if not isinstance(v_, (int, float)) or isinstance(v_, bool):
+                        issues.append(ValidationIssue(
+                            "bad_number", f"{where}, field 'serve_g.{k_}'",
+                            f"serve_g.{k_} must be a number (got {v_!r})"))
                 if (isinstance(lo, (int, float)) and isinstance(hi, (int, float))
                         and lo > hi):
                     issues.append(ValidationIssue(
@@ -364,6 +404,31 @@ def validate_people_doc(doc: Any, fname: str = "people.yaml"
             issues.append(ValidationIssue(
                 "bad_use_freezer", f"{fname}: settings, field 'use_freezer'",
                 f"use_freezer must be a boolean (got {uf!r})"))
+    # budget (optional; defaults to {"mode": "off"} at load). mode is an
+    # enum; 'by_consumption' means NO ceiling — cost splits by consumption
+    # share (costing.attribute), which render applies to every mode anyway.
+    # 'period' is RESERVED (model.RESERVED_FIELDS): only 'week' is a known
+    # value — M0/M1 plans are weekly by construction.
+    bud = doc.get("budget")
+    if bud is not None:
+        bwhere = f"{fname}: budget"
+        if not isinstance(bud, dict):
+            issues.append(ValidationIssue(
+                "bad_document", bwhere,
+                f"budget must be a mapping (got {type(bud).__name__})"))
+        else:
+            mode = bud.get("mode", "off")
+            if mode not in BUDGET_MODES:
+                issues.append(ValidationIssue(
+                    "bad_enum", f"{bwhere}, field 'mode'",
+                    f"budget mode must be one of {'|'.join(BUDGET_MODES)} "
+                    f"(got {mode!r})"))
+            period = bud.get("period")
+            if period is not None and period != "week":
+                issues.append(ValidationIssue(
+                    "bad_enum", f"{bwhere}, field 'period'",
+                    f"budget period must be 'week' — plans are weekly "
+                    f"(got {period!r})"))
     return issues
 
 

@@ -108,10 +108,12 @@ def test_unaligned_bounds_library_fails_load(tmp_path):
 
 
 def test_examples_corpus_is_unit_aligned(lib):
-    """The corpus fix: mango_jalapeno_wings max 500 -> 495 (11 x 45g wings).
-    Every discrete component's bounds sit on its own unit grid."""
+    """Corpus LINT (property over whatever the live corpus holds — PRD §9):
+    every discrete component's bounds sit on its own unit grid, and the
+    corpus exercises the discrete path at all."""
     _, comps, _, _ = lib
-    assert comps["mango_jalapeno_wings"]["serve_g"]["max"] == 495
+    discrete = [cid for cid, c in comps.items() if c.get("unit_g")]
+    assert discrete, "corpus has no discrete (unit_g) component"
     for cid, c in comps.items():
         u = c.get("unit_g")
         if u:
@@ -120,53 +122,67 @@ def test_examples_corpus_is_unit_aligned(lib):
 
 
 # --------------------------------------------------------------------------- #
-#  M0.8 — pinned portions
+#  M0.8 — pinned portions (synthetic library — the corpus is live data,
+#  PRD §9; 'balls': unit_g 40, serve_g {min: 80, max: 400})
 # --------------------------------------------------------------------------- #
-def test_pin_below_min_clamps_up(lib):
-    _, comps, people, _ = lib
-    p = people["devon"]
-    ids = list(comps)
-    # turkey_meatballs: unit_g 40, serve_g {min: 80, max: 400}
-    ok, pl, miss = engine.plate(p, comps, ids, locked={"turkey_meatballs": 30})
-    assert pl.get("turkey_meatballs") == 80  # clamped up to serve_min
+def _pin_lib():
+    comps = {
+        "meat": dict(id="meat", name="meat", cuisine="test", role="main",
+                     yield_g=1000, serve_g={"min": 100, "max": 500},
+                     keeps_days=5, active_min=20, ingredients={"stuff": 500},
+                     per100={"kcal": 145.0, "protein": 25.0, "fat": 5.0,
+                             "carb": 0.0}, tags=[]),
+        "rice": dict(id="rice", name="rice", cuisine="test", role="starch",
+                     yield_g=1000, serve_g={"min": 50, "max": 500},
+                     keeps_days=7, active_min=10, ingredients={"stuff": 500},
+                     per100={"kcal": 112.5, "protein": 2.0, "fat": 0.5,
+                             "carb": 25.0}, tags=[]),
+        "balls": dict(id="balls", name="balls", cuisine="test", role="main",
+                      yield_g=1000, unit_g=40,
+                      serve_g={"min": 80, "max": 400},
+                      keeps_days=5, active_min=20, ingredients={"stuff": 500},
+                      per100={"kcal": 180.0, "protein": 15.0, "fat": 9.0,
+                              "carb": 9.0}, tags=[]),
+    }
+    person = dict(name="p1", targets={"protein": 120, "fat": 40, "carb": 150},
+                  tolerance=0.2, exclude=[], dislikes=[])
+    return comps, person
 
 
-def test_pin_above_max_clamps_down(lib):
-    _, comps, people, _ = lib
-    p = people["devon"]
-    ids = list(comps)
-    ok, pl, miss = engine.plate(p, comps, ids, locked={"turkey_meatballs": 900})
-    assert pl.get("turkey_meatballs") == 400  # clamped down to serve_max
+def test_pin_below_min_clamps_up():
+    comps, p = _pin_lib()
+    ok, pl, miss = engine.plate(p, comps, list(comps), locked={"balls": 30})
+    assert pl.get("balls") == 80  # clamped up to serve_min
 
 
-def test_pin_off_grid_snaps_to_unit(lib):
-    _, comps, people, _ = lib
-    p = people["devon"]
-    ids = list(comps)
-    ok, pl, miss = engine.plate(p, comps, ids, locked={"turkey_meatballs": 130})
-    assert pl.get("turkey_meatballs") == 120  # round(130/40)=3 units
+def test_pin_above_max_clamps_down():
+    comps, p = _pin_lib()
+    ok, pl, miss = engine.plate(p, comps, list(comps), locked={"balls": 900})
+    assert pl.get("balls") == 400  # clamped down to serve_max
 
 
-def test_allow_out_of_bounds_honors_pin_and_warns(lib):
-    _, comps, people, _ = lib
-    p = people["devon"]
-    ids = list(comps)
-    res = engine.plate(p, comps, ids, locked={"turkey_meatballs": 30},
+def test_pin_off_grid_snaps_to_unit():
+    comps, p = _pin_lib()
+    ok, pl, miss = engine.plate(p, comps, list(comps), locked={"balls": 130})
+    assert pl.get("balls") == 120  # round(130/40)=3 units
+
+
+def test_allow_out_of_bounds_honors_pin_and_warns():
+    comps, p = _pin_lib()
+    res = engine.plate(p, comps, list(comps), locked={"balls": 30},
                        allow_out_of_bounds=True)
     ok, pl, miss = res           # still unpacks like the classic 3-tuple
-    assert pl.get("turkey_meatballs") == 30  # raw pin honored
+    assert pl.get("balls") == 30  # raw pin honored
     assert any(w["code"] == "pin_out_of_bounds"
-               and w["component"] == "turkey_meatballs"
+               and w["component"] == "balls"
                for w in res.warnings)
 
 
-def test_in_bounds_pin_produces_no_warning(lib):
-    _, comps, people, _ = lib
-    p = people["devon"]
-    ids = list(comps)
-    res = engine.plate(p, comps, ids, locked={"turkey_meatballs": 160},
+def test_in_bounds_pin_produces_no_warning():
+    comps, p = _pin_lib()
+    res = engine.plate(p, comps, list(comps), locked={"balls": 160},
                        allow_out_of_bounds=True)
-    assert res[1].get("turkey_meatballs") == 160
+    assert res[1].get("balls") == 160
     assert not res.warnings
 
 

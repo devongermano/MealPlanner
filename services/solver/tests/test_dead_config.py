@@ -67,18 +67,22 @@ def _menu_ids(out):
 
 
 def test_cli_force_puts_components_on_the_menu(capsys):
-    """seed 0 / n 8 on the examples corpus does NOT naturally choose
-    picadillo or birria_chuck; --force must put them on the menu."""
+    """--force must put components on the menu that the free search did not
+    choose. Self-adapting (PRD §9: the founder corpus is live data, not a
+    fixture): run the free menu first, then force two components it left
+    out — no component names are pinned."""
     cli.main(["menu", "--library", str(EXAMPLES), "--seed", "0", "--n", "8"])
     baseline = _menu_ids(capsys.readouterr().out)
-    assert "picadillo" not in baseline and "birria_chuck" not in baseline, \
-        "fixture assumption broke: pick components absent from the free menu"
+    ing, comps, people, settings = io_yaml.load(EXAMPLES)
+    left_out = sorted(set(comps) - set(baseline))[:2]
+    assert len(left_out) == 2, \
+        "fixture assumption broke: the free menu selected the whole library"
 
     cli.main(["menu", "--library", str(EXAMPLES), "--seed", "0", "--n", "8",
-              "--force", "picadillo,birria_chuck"])
+              "--force", ",".join(left_out)])
     forced = _menu_ids(capsys.readouterr().out)
-    assert "picadillo" in forced
-    assert "birria_chuck" in forced
+    for cid in left_out:
+        assert cid in forced, (cid, forced)
 
 
 def test_cli_force_unknown_component_is_an_error_naming_it():
@@ -172,8 +176,11 @@ def test_meals_per_day_valid_and_absent_are_fine():
         assert not [i for i in issues if i.severity == "error"], extra
 
 
-def test_meals_per_day_is_the_reserved_set():
-    assert model.RESERVED_FIELDS == {"meals_per_day"}
+def test_reserved_set_is_exactly_the_documented_three():
+    """meals_per_day (Person, M1 eat sheets), period (Budget, weekly-only in
+    M0/M1), cooked (Pantry, M1+ availability join) — each reserved WITH a
+    rationale in model.py. Growing this set is a deliberate act."""
+    assert model.RESERVED_FIELDS == {"meals_per_day", "period", "cooked"}
 
 
 # --------------------------------------------------------------------------- #
@@ -209,9 +216,11 @@ def test_examples_corpus_carries_no_removed_fields():
         assert "max_components_per_day" not in p.raw, pname
     for cid, c in comps.items():
         assert "batch_g" not in c.raw, cid
-    # matching effective prototype behavior: the hardcoded 2 wins over the
-    # yaml's old 1
-    assert settings["min_lean_anchors"] == 2
+    # the setting is live and sane on the corpus (its exact value is corpus
+    # data, free to change — the default-of-2 behavior is pinned by
+    # test_min_lean_anchors_default_is_two on synthetic fixtures)
+    mla = settings["min_lean_anchors"]
+    assert isinstance(mla, int) and mla >= 1
 
 
 # --------------------------------------------------------------------------- #
@@ -353,16 +362,19 @@ def _referenced(name, src):
 
 
 def test_no_dead_config_gate():
-    """Every schema field on Ingredient / Component / Person / Settings must
-    be referenced by engine/costing/cli code (or the derivation), be an
-    explicitly validation-consumed field, or sit in model.RESERVED_FIELDS.
-    Future dead config fails here."""
+    """Every schema field on EVERY schema dataclass — Ingredient, Component,
+    Person, Settings, Budget, Pantry — must be referenced by
+    engine/costing/cli code (or the derivation), be an explicitly
+    validation-consumed field, or sit in model.RESERVED_FIELDS. Future dead
+    config fails here. (Budget and Pantry were originally outside this loop,
+    which let Budget.period ride along dead — the exact hole the gate
+    exists to close.)"""
     engine_src = _engine_side_source()
     validation_src = inspect.getsource(io_yaml)
-    assert model.RESERVED_FIELDS == {"meals_per_day"}
+    assert model.RESERVED_FIELDS == {"meals_per_day", "period", "cooked"}
 
     for cls in (model.Ingredient, model.Component, model.Person,
-                model.Settings):
+                model.Settings, model.Budget, model.Pantry):
         for f in dc_fields(cls):
             name = f.name
             if name == "raw":

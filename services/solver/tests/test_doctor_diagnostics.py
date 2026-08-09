@@ -78,16 +78,20 @@ def test_binding_macro_outsized_carb_target_binds_carb():
 # --------------------------------------------------------------------------- #
 #  2. volume floor
 # --------------------------------------------------------------------------- #
-def test_volume_floor_jimbo_examples_reproduces_2121_finding():
-    """The reproduced prototype finding: jimbo's targets need ~2,121g/day
-    (~4.7 lb) on the examples library. The generic bisect must land in
-    [2050, 2200] and name carbs as what binds at the floor."""
+def test_volume_floor_runs_end_to_end_on_live_corpus():
+    """The generic bisect runs end to end on the LIVE examples corpus:
+    a finite floor with a named binding macro for every person. Exact
+    values are corpus data and deliberately NOT pinned (PRD §9: the founder
+    household is not a test fixture — the ~2,121g historical finding lives
+    in PRD-SCRUTINY.md; the floor-ordering property is pinned on the
+    synthetic watery_vs_dense fixtures below and in test_capabilities)."""
     ing, comps, people, settings = io_yaml.load(EXAMPLES)
-    vf = engine.volume_floor(people["jimbo"], comps)
-    assert vf["floor_g"] is not None
-    assert 2050 <= vf["floor_g"] <= 2200, vf
-    assert vf["binding"] and vf["binding"]["macro"] == "carb"
-    assert vf["binding"]["direction"] == "short"
+    for pname, p in people.items():
+        vf = engine.volume_floor(p, comps)
+        assert vf["floor_g"] is not None, (pname, vf)
+        assert 500 <= vf["floor_g"] <= 8000, (pname, vf)
+        if vf["binding"] is not None:
+            assert vf["binding"]["macro"] in ("protein", "fat", "carb")
 
 
 def test_volume_floor_watery_carbs_higher_than_dense():
@@ -223,6 +227,7 @@ def test_doctor_returns_structured_data_and_new_sections():
         assert pname in data["binding_macro"]
         assert pname in data["volume_floor"]
         assert pname in data["carb_headroom"]
-    assert data["volume_floor"]["jimbo"]["floor_g"] == pytest.approx(2121,
-                                                                     abs=100)
+        # structured mirror carries a real result (values are corpus data,
+        # not pinned — PRD §9)
+        assert data["volume_floor"][pname]["floor_g"] is not None
     assert data["lean_coverage"]["lean_anchors"]

@@ -76,6 +76,41 @@ def solve_counts():
     return dict(SOLVE_COUNTS)
 
 
+# --------------------------------------------------------------------------- #
+#  score weights (PRD §8.3): named, configurable, PROVISIONAL — never hidden
+# --------------------------------------------------------------------------- #
+# EVERY value below is provisional (P9): these are v1's magic penalties made
+# visible as one named registry instead of hiding as design. They were tuned
+# by feel against the founder corpus and measured against nothing. score_menu
+# accepts a ``score_weights`` override mapping (merged over these defaults);
+# plate() reads its objective constants from here too. A settings-file
+# surface for overrides is an M1 config concern — the M0 contract is that
+# the weights are named, documented, and swappable, not baked into
+# expressions.
+SCORE_WEIGHTS = {
+    # score_menu — menu-wide structural proxies
+    "time_over_budget_per_min": 12,      # provisional (P9)
+    "role_floor_mains": 4000,            # provisional (P9)
+    "role_floor_starches": 4000,         # provisional (P9)
+    "role_floor_accents": 1500,          # provisional (P9)
+    "cuisine_variety_reward": 900,       # provisional (P9)
+    "uncookable_session_pair": 6000,     # provisional (P9)
+    "budget_overage_per_dollar": 120,    # provisional (P9)
+    "cost_per_dollar": 1.5,              # provisional (P9)
+    # score_menu — per-person structural proxies
+    "person_mains_floor": 6000,          # provisional (P9)
+    "person_starch_floor": 6000,         # provisional (P9)
+    "carb_headroom_shortfall": 15000,    # provisional (P9)
+    "person_accents_floor": 2500,        # provisional (P9)
+    "lean_anchor_floor": 15000,          # provisional (P9)
+    "uncovered_lean_day": 4000,          # provisional (P9)
+    # plate LP objective
+    "dislike_multiplier": 6.0,           # provisional (P9): soft down-weight
+    "plate_slack_dominance": 10_000,     # provisional (P9): violations dominate
+    "plate_weight_tiebreak": 0.001,      # provisional (P9): variety tie-break
+}
+
+
 def eligible(comp, person):
     return not (set(comp["tags"]) & set(person.get("exclude", [])))
 
@@ -126,7 +161,7 @@ def plate(person, comps, ids, weights=None, tol=None, locked=None,
     tol = person["tolerance"] if tol is None else tol
     weights = dict(weights or {})
     for d in person.get("dislikes") or []:      # SOFT: weighted down, not banned
-        weights[d] = weights.get(d, 1.0) * 6.0
+        weights[d] = weights.get(d, 1.0) * SCORE_WEIGHTS["dislike_multiplier"]
     usable = [i for i in ids if eligible(comps[i], person)]
     if not usable:
         return PlateResult(False, {},
@@ -165,9 +200,11 @@ def plate(person, comps, ids, weights=None, tol=None, locked=None,
             v for i, v in g.items() if not isinstance(v, (int, float))
         )
         # violations dominate; weights break ties toward requested variety
-        m += 10_000 * pulp.lpSum(x for pr in slack.values() for x in pr) + pulp.lpSum(
+        m += SCORE_WEIGHTS["plate_slack_dominance"] * pulp.lpSum(
+            x for pr in slack.values() for x in pr
+        ) + pulp.lpSum(
             weights.get(i, 1.0) * g[i] for i in usable if not isinstance(g[i], (int, float))
-        ) * 0.001
+        ) * SCORE_WEIGHTS["plate_weight_tiebreak"]
         return m, g, slack
 
     # ---- pinned portions (M0.8): snap to unit grid + clamp into bounds ------
@@ -552,7 +589,7 @@ def doctor(comps, people, settings, ing=None):
 # --------------------------------------------------------------------------- #
 #  layer 1 — menu selection (shared perishables, variety, time budget)
 # --------------------------------------------------------------------------- #
-def score_menu(comps, ing, chosen, settings, people=None):
+def score_menu(comps, ing, chosen, settings, people=None, score_weights=None):
     """CHEAP score — no LP. Structural proxies only, so local search can run hot.
     Actual macro feasibility is verified separately, on the shortlist.
 
@@ -561,7 +598,12 @@ def score_menu(comps, ing, chosen, settings, people=None):
     perishable-waste term at 1 batch/component while cost used
     estimate_batches; waste was constant in demand). Without ``people``
     there is no demand to estimate from and the scale is 1 batch throughout.
+
+    PRD §8.3: every penalty/reward constant is a named PROVISIONAL weight in
+    ``SCORE_WEIGHTS``; ``score_weights`` merges overrides on top.
     """
+    W = dict(SCORE_WEIGHTS)
+    W.update(score_weights or {})
     batches = (estimate_batches(comps, people, settings, chosen)
                if people else {i: 1 for i in chosen})
     rows, wp, _ = purchase(comps, ing, chosen, batches)
@@ -571,11 +613,13 @@ def score_menu(comps, ing, chosen, settings, people=None):
     for i in chosen:
         roles[comps[i]["role"]] = roles.get(comps[i]["role"], 0) + 1
     pen = 0
-    pen += max(0, active - settings["active_min_budget"]) * 12   # over time budget, hard
-    pen += 0 if roles.get("main", 0) >= 3 else 4000
-    pen += 0 if roles.get("starch", 0) >= 2 else 4000
-    pen += 0 if roles.get("accent", 0) >= 2 else 1500
-    pen -= cuisines * 900                                        # reward variety
+    # over the hands-on time budget: hard, per minute
+    pen += max(0, active - settings["active_min_budget"]) \
+        * W["time_over_budget_per_min"]
+    pen += 0 if roles.get("main", 0) >= 3 else W["role_floor_mains"]
+    pen += 0 if roles.get("starch", 0) >= 2 else W["role_floor_starches"]
+    pen += 0 if roles.get("accent", 0) >= 2 else W["role_floor_accents"]
+    pen -= cuisines * W["cuisine_variety_reward"]      # reward variety
 
     # M0.6 raw freshness: a menu whose components need cook sessions their
     # raw ingredients cannot survive to is structurally broken — availability
@@ -583,8 +627,8 @@ def score_menu(comps, ing, chosen, settings, people=None):
     # (component, session) pair. Weight is provisional (P9).
     n_sessions = len(sessions_for(settings))
     for i in chosen:
-        pen += 6000 * (n_sessions - len(cookable_sessions(comps[i], settings,
-                                                          ing)))
+        pen += W["uncookable_session_pair"] * (
+            n_sessions - len(cookable_sessions(comps[i], settings, ing)))
 
     # BUDGET. Not hardcoded — read from library/people.yaml or the CLI. Over the
     # ceiling is penalised steeply; under it, cheaper is mildly better so the search
@@ -592,8 +636,8 @@ def score_menu(comps, ing, chosen, settings, people=None):
     cap = budget_ceiling(settings, people or {})
     est = menu_cost(comps, ing, chosen, batches=batches)   # same scale as waste
     if cap:
-        pen += max(0, est - cap) * 120
-    pen += est * 1.5
+        pen += max(0, est - cap) * W["budget_overage_per_dollar"]
+    pen += est * W["cost_per_dollar"]
 
     # Per-person structural proxies. These are what actually predict LP feasibility,
     # and they cost nothing to evaluate.
@@ -608,11 +652,11 @@ def score_menu(comps, ing, chosen, settings, people=None):
             mains = [i for i in elig if comps[i]["role"] == "main"]
             starch = [i for i in elig if comps[i]["role"] == "starch"]
             acc = [i for i in elig if comps[i]["role"] in ("accent", "veg")]
-            pen += 0 if len(mains) >= 3 else 6000
+            pen += 0 if len(mains) >= 3 else W["person_mains_floor"]
             # >=3 starches, not 2. Discovered the hard way: on the day before a cook
             # session some starches have expired, and a 588g/day carb target cannot be
             # met from two starches at realistic serving sizes.
-            pen += 0 if len(starch) >= 3 else 6000
+            pen += 0 if len(starch) >= 3 else W["person_starch_floor"]
             # CARB HEADROOM, day-correct (M0.11). This is the constraint that
             # actually binds for a 4700 kcal day, and it is not fat: you have
             # to physically eat ~590g of carbs. For every day, the ceiling is
@@ -625,11 +669,12 @@ def score_menu(comps, ing, chosen, settings, people=None):
                 sum(comps[i]["serve_g"]["max"] * comps[i]["per100"]["carb"] / 100
                     for i in elig if avail[i][d])
                 for d in range(days_n))
-            pen += 0 if worst_carb >= p["targets"]["carb"] else 15000
+            pen += 0 if worst_carb >= p["targets"]["carb"] \
+                else W["carb_headroom_shortfall"]
             # everyone needs at least one accent they can actually eat — that's the
             # per-plate fine-tuning lever. An accent only ONE of you can eat is not
             # waste, it's the entire point of separating accents out.
-            pen += 0 if len(acc) >= 2 else 2500
+            pen += 0 if len(acc) >= 2 else W["person_accents_floor"]
             # need enough protein-per-fat headroom to reach protein before fat caps out
             need_ratio = p["targets"]["protein"] / max(p["targets"]["fat"], 1)
             lean = [i for i in mains
@@ -641,7 +686,7 @@ def score_menu(comps, ing, chosen, settings, people=None):
             # effective prototype behavior; its yaml said 1 but the code
             # hardcoded 2, and matching behavior wins).
             pen += 0 if len(lean) >= settings["min_lean_anchors"] \
-                else 15000
+                else W["lean_anchor_floor"]
             # REAL stagger check (M0.11): the prototype's boolean expression
             # here (plan.py:397-398 — len(set-of-bools), a no-op) is replaced
             # by actual coverage: every day on which ZERO of this person's
@@ -649,7 +694,7 @@ def score_menu(comps, ing, chosen, settings, people=None):
             # Per-day weight is PROVISIONAL (P9).
             uncovered = sum(1 for d in range(days_n)
                             if not any(avail[i][d] for i in lean))
-            pen += 4000 * uncovered
+            pen += W["uncovered_lean_day"] * uncovered
     return wp + pen, dict(waste_perishable=wp, active_min=active,
                           cuisines=cuisines, roles=roles)
 

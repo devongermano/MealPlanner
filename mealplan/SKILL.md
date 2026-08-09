@@ -101,14 +101,16 @@ Re-derive these with `doctor` rather than trusting them, but they've held so far
 `doctor` reports direction: `f forced 12g OVER` means the opposite of `c 12g SHORT`.
 Read it before reacting.
 
-In rough order of what to try:
+In rough order of what to try (structural fixes FIRST — PRD §8.3):
 
-1. Loosen `tolerance` in `library/people.yaml`. Cheapest knob.
-2. Add the *class* of component that's missing — lean protein for a forced-over-fat,
-   dense starch for a carb shortfall.
-3. Move `cook_days`. `[0,3]` (Sun/Wed) leaves day 7 stranded; `[0,4]` (Sun/Thu)
+1. Add the *class* of component that's missing — lean protein for a forced-over-fat,
+   dense starch for a carb shortfall. `doctor` names the gap and its direction.
+2. Move `cook_days`. `[0,3]` (Sun/Wed) leaves day 7 stranded; `[0,4]` (Sun/Thu)
    generally works better with 3-5 day shelf lives.
-4. Raise a `serve_g.max` — but only if a person would really eat that much.
+3. Raise a `serve_g.max` — but only if a person would really eat that much.
+4. LAST resort: loosen `tolerance` in `library/people.yaml`. It is the cheapest
+   knob precisely because it redefines success instead of fixing the plan
+   (PRD §8.3 — corrected in M0.17; this file previously listed it first).
 
 ## Reporting back
 

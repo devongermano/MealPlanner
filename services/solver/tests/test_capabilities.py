@@ -35,6 +35,8 @@ import pytest
 
 from mealplan import costing, engine, io_yaml
 
+import refenv
+
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 GOLDEN = Path(__file__).resolve().parent / "golden"
 
@@ -395,15 +397,57 @@ def test_determinism_golden_full_pipeline_byte_stable(solo_pipeline):
     week assembly, session attribution, purchasing) — and any silent behavior
     change: same inputs + seed must reproduce the recorded plan byte for byte
     on the pinned reference environment (PRD §9; tests/golden/README.md).
+    Off the reference environment this test SKIPS and
+    test_golden_pipeline_properties_all_platforms carries the guarantee —
+    the sanctioned green path PRD §9 requires.
 
     A legitimate engine change shows up here as a diff to be reviewed and
     deliberately re-recorded — never auto-regenerated."""
+    if not refenv.is_reference_env():
+        pytest.skip(refenv.off_reference_reason())
     got = golden_payload(solo_pipeline)
     ref = (GOLDEN / "solo_lifter_pipeline.json").read_text()
     assert got == ref, (
         "pipeline output diverged from tests/golden/solo_lifter_pipeline.json"
         " — if the change is intended, regenerate deliberately per"
         " tests/golden/README.md")
+
+
+def test_golden_pipeline_properties_all_platforms(solo_pipeline):
+    """The every-platform half of the golden policy (PRD §9): where the byte
+    compare only runs on the pinned reference environment, these PROPERTIES
+    of the same frozen pipeline hold on any OS/arch/CBC build. CATCHES:
+    gross pipeline breakage everywhere, without byte-claims a foreign CBC
+    could legally falsify by picking a different equal-cost optimum."""
+    p = solo_pipeline
+    settings, comps = p["settings"], p["comps"]
+    assert p["feasible"] is True and p["broke"] == {}
+    assert p["menu"] and set(p["menu"]) <= set(comps)
+    assert set(p["weeks"]) == set(p["people"])
+    for pname, wk in p["weeks"].items():
+        assert len(wk) == settings["days"], pname
+        assert any(pl for pl in wk), f"{pname}: all-empty week"
+    assert p["demand"] and all(g > 0 for g in p["demand"].values())
+    sp = p["session_plan"]
+    assert sp["unattributed"] == []      # a feasible golden feeds every day
+    assert sp["minutes"] == sum(s["minutes"] for s in sp["sessions"])
+    for name, need, units, pack, left, per, keeps in p["purchase"]:
+        assert units * pack >= need, name
+    assert p["waste_total"] >= p["waste_perishable"] >= 0
+    # determinism ON this machine (whatever it is): the same frozen inputs
+    # re-run must serialize identically to the fixture's run
+    ing2, comps2, people2, settings2 = load("solo_lifter")
+    menu2, _, feas2, broke2 = engine.choose_menu(
+        comps2, ing2, people2, settings2, **GOLDEN_MENU_KW)
+    weeks2, demand2 = engine.build_week(comps2, people2, settings2, menu2,
+                                        seed=GOLDEN_SEED, ing=ing2)
+    sp2 = costing.session_plan(comps2, ing2, settings2, weeks2)
+    rows2, wp2, wt2 = costing.purchase(comps2, ing2, menu2, sp2["batches"])
+    rerun = dict(ing=ing2, comps=comps2, people=people2, settings=settings2,
+                 menu=menu2, feasible=feas2, broke=broke2, weeks=weeks2,
+                 demand=demand2, session_plan=sp2, purchase=rows2,
+                 waste_perishable=wp2, waste_total=wt2)
+    assert golden_payload(rerun) == golden_payload(p)
 
 
 # --------------------------------------------------------------------------- #

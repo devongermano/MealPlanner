@@ -89,13 +89,16 @@ def test_all_zero_macros_with_negligible_flag_does_not_warn():
 
 
 def test_examples_corpus_is_atwater_clean():
+    """Corpus LINT (schema-shape only, no value pins — PRD §9): no stored
+    kcal anywhere, and every intentionally-zero-macro ingredient carries
+    the negligible flag (implied by the absence of all_zero_macros
+    warnings)."""
     doc = yaml.safe_load((EXAMPLES / "ingredients.yaml").read_text())
     issues = validate_ingredients_doc(doc)
     assert not errors_of(issues), [str(i) for i in issues]
     assert not [w for w in warnings_of(issues) if w.code == "all_zero_macros"]
     for iid, d in doc["ingredients"].items():
         assert "kcal" not in d, iid
-    assert doc["ingredients"]["spices"].get("negligible") is True
 
 
 # --------------------------------------------------------------------------- #
@@ -139,6 +142,16 @@ def test_edible_fraction_in_range_is_accepted(ok):
     assert not errors_of(validate_ingredients_doc(doc))
 
 
-def test_examples_chicken_wings_edible_fraction():
+def test_examples_corpus_exercises_edible_fraction():
+    """Corpus LINT: the live corpus actually uses the M0.7 feature — at
+    least one bone-in ingredient declares a partial edible_fraction, and
+    every declared value is in (0, 1]. Which ingredient and what value are
+    corpus data, deliberately not pinned (PRD §9)."""
     doc = yaml.safe_load((EXAMPLES / "ingredients.yaml").read_text())
-    assert doc["ingredients"]["chicken_wings"]["edible_fraction"] == 0.66
+    declared = {iid: d["edible_fraction"]
+                for iid, d in doc["ingredients"].items()
+                if "edible_fraction" in d}
+    assert declared, "no ingredient declares edible_fraction"
+    assert all(0 < v <= 1 for v in declared.values()), declared
+    assert any(v < 1 for v in declared.values()), \
+        "expected at least one partial (bone-in) edible_fraction"

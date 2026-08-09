@@ -339,12 +339,19 @@ def test_freezable_must_be_bool():
 #  examples corpus carries the new fields
 # --------------------------------------------------------------------------- #
 def test_examples_have_shop_days_and_freezable_meats():
+    """Corpus LINT (schema-shape, no value pins — PRD §9): the live corpus
+    carries the M0.6 fields — shop_days valid and canonical, freezable used
+    on SOME perishables but not blanket-applied to all of them (the
+    behavioral freezable/blocked split is pinned on the synthetic
+    family_four fixture in test_capabilities)."""
     ing, comps, people, settings = io_yaml.load(EXAMPLES)
-    assert settings["shop_days"] == [0]
-    for iid in ("ground_beef_85", "chicken_breast", "chicken_thigh",
-                "ground_turkey_93", "shrimp_raw", "beef_chuck",
-                "flank_steak", "pork_shoulder"):
-        assert ing[iid].get("freezable") is True, iid
-    # produce is not blanket-frozen
-    assert not ing["spinach"].get("freezable")
-    assert not ing["avocado"].get("freezable")
+    sd = settings["shop_days"]
+    assert sd == sorted(set(sd))
+    assert all(isinstance(d, int) and 0 <= d < settings["days"] for d in sd)
+    perishable_frozen = [iid for iid, i in ing.items()
+                         if i.get("perishable") and i.get("freezable")]
+    perishable_fresh = [iid for iid, i in ing.items()
+                        if i.get("perishable") and not i.get("freezable")]
+    assert perishable_frozen, "no perishable ingredient is freezable"
+    assert perishable_fresh, \
+        "every perishable is freezable — produce should not be blanket-frozen"

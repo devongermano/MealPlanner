@@ -36,7 +36,13 @@ from .units import KCAL, MACROS
 # - meals_per_day (Person): presentation-level meal structure for the M1 eat
 #   sheets (PRD §8.1). The M0 engine plans whole days; splitting a day's
 #   plate into meals is rendering, not solving.
-RESERVED_FIELDS = frozenset({"meals_per_day"})
+# - period (Budget): budget period label, validated to the one known value
+#   ('week') — M0/M1 plans are weekly by construction, so nothing consumes
+#   it; reserved for a future non-weekly budget period.
+# - cooked (Pantry): cooked-component leftovers — validated in M0 (schema +
+#   references + dates); the planning integration (availability join) is
+#   M1+ (see Pantry docstring and TASKS.md).
+RESERVED_FIELDS = frozenset({"meals_per_day", "period", "cooked"})
 
 
 class _RawView:
@@ -248,8 +254,13 @@ class Settings(_RawView):
         for k, v in SETTINGS_DEFAULTS.items():
             if raw.get(k) is None:
                 raw[k] = list(v) if isinstance(v, list) else v
-        # canonical form everywhere downstream: sorted, deduped
+        # canonical form everywhere downstream: sorted, deduped. cook_days
+        # gets the same treatment as shop_days — session attribution's
+        # "earliest session wins" (PRD §8.2) must mean earliest DAY, never
+        # first-in-YAML-list-order: [4, 0] and [0, 4] are the same schedule.
         raw["shop_days"] = sorted(set(raw["shop_days"]))
+        if isinstance(raw.get("cook_days"), list):
+            raw["cook_days"] = sorted(set(raw["cook_days"]))
         return cls(days=raw["days"],
                    active_min_budget=raw.get("active_min_budget"),
                    batch_time_factor=raw["batch_time_factor"],

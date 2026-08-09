@@ -26,12 +26,15 @@ from .units import kcal_of
 #  sessions & raw freshness (M0.4 / M0.6)
 # --------------------------------------------------------------------------- #
 def sessions_for(settings):
-    """Cook-session start days (0-indexed). A component cooked in session s
-    is edible on day d iff 0 <= d - start(s) < keeps_days.
+    """Cook-session start days (0-indexed, sorted, deduped). A component
+    cooked in session s is edible on day d iff 0 <= d - start(s) < keeps_days.
 
     ``cook_days`` is REQUIRED settings data (M0.17) — validated at load;
-    there is no code default."""
-    return settings["cook_days"]
+    there is no code default. Canonicalized here exactly like shop_days_for
+    (Settings.from_raw already canonicalizes on load): session_plan's
+    "earliest session wins" (PRD §8.2) must mean earliest DAY — the YAML
+    list order of cook_days can never change attribution."""
+    return sorted(set(settings["cook_days"]))
 
 
 def shop_days_for(settings):
@@ -206,7 +209,13 @@ def purchase(comps, ing, chosen, batches=None, pantry=None):
     optional) has its stock grams deducted from ingredient need BEFORE
     rounding to packs, floored at zero. A missing or empty pantry is a
     no-op — results are identical to no pantry at all. Cooked leftovers are
-    NOT consumed here (planning integration is M1+)."""
+    NOT consumed here (planning integration is M1+).
+
+    DEFERRED (M1, PRD Appendix B errata): the stock 'acquired' date is
+    validated but not consumed — PRD §8.1's age rule (acquired age reduces
+    the effective raw keeps_days) is not implemented in M0, so deducted
+    stock is treated as fresh at the nearest prior shop day by
+    raw_freshness. See TASKS.md M1.8."""
     batches = batches or {i: 1 for i in chosen}
     need = {}
     for i in chosen:
@@ -264,6 +273,11 @@ def menu_cost(comps, ing, chosen, batches=None, people=None, settings=None,
 
 
 def budget_ceiling(settings, people):
+    """Weekly grocery ceiling from the budget doc, or None for no ceiling.
+
+    'by_consumption' deliberately has NO ceiling (like 'off'): it is the
+    attribution-only mode — whatever the shop costs splits by consumption
+    share, which ``attribute`` computes and render applies for every mode."""
     b = settings["budget"] or {"mode": "off"}
     if b.get("mode") == "shared":
         return b.get("total")

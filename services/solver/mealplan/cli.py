@@ -29,11 +29,15 @@ from .units import MACROS, fmt_miss, kcal_of
 #  report
 # --------------------------------------------------------------------------- #
 def render(comps, ing, people, settings, menu, weeks, demand, docmsg, menuinfo,
-           sp, pantry=None):
+           sp, pantry=None, diag=None):
     """``sp`` is the canonical session plan (costing.session_plan, M0.4/P10):
     the ONE source for the cook plan, minutes, purchasing, and cost below.
     ``pantry`` (M0.12, optional): stock is deducted from the shopping list —
-    and therefore the cost — before pack rounding, inside purchase()."""
+    and therefore the cost — before pack rounding, inside purchase().
+    ``diag`` (P8, optional): build_week's diagnostics dict. When present,
+    every day the relaxation ladder loosened the variety caps for is flagged
+    inline and summarized up top — no silent caps, drops, or relaxations."""
+    relax = (diag or {}).get("relax_tiers", {})
     L = ["# Week plan\n", docmsg, "\n## Menu\n"]
     for i in menu:
         c = comps[i]
@@ -47,6 +51,19 @@ def render(comps, ing, people, settings, menu, weeks, demand, docmsg, menuinfo,
     L.append(f"\nHands-on total: **{sp['minutes']} min** "
              f"(budget {settings['active_min_budget']}), "
              f"{menuinfo['cuisines']} cuisines.\n")
+
+    # P8: no silent relaxations — if any day's plate only exists because the
+    # variety caps were loosened, the plan says so up front.
+    relaxed_days = sorted((pn, d, t)
+                          for pn, tiers in relax.items()
+                          for d, t in enumerate(tiers) if t)
+    if relaxed_days:
+        L.append("> **Variety caps relaxed** (P8: solver relaxations are "
+                 "never silent): "
+                 + "; ".join(f"{pn} day {d + 1} (tier {t})"
+                             for pn, d, t in relaxed_days)
+                 + ". Tier 1 allows +1 repeat day/batch per component, "
+                   "tier 2 removes the day cap and allows +2 batches.\n")
 
     # cook plan — straight from the canonical session plan (M0.4). Each
     # session lists what IT cooks; purchasing and cost below consume the
@@ -109,8 +126,12 @@ def render(comps, ing, people, settings, menu, weeks, demand, docmsg, menuinfo,
                 continue
             tot = {m: sum(g * comps[c]["per100"][m] / 100 for c, g in pl.items())
                    for m in MACROS}
+            tiers = relax.get(pname) or []
+            tier = tiers[d - 1] if d - 1 < len(tiers) else None
             L.append(f"**Day {d}** — {kcal_of(tot):.0f} kcal, "
-                     f"{tot['protein']:.0f}p / {tot['fat']:.0f}f / {tot['carb']:.0f}c")
+                     f"{tot['protein']:.0f}p / {tot['fat']:.0f}f / {tot['carb']:.0f}c"
+                     + (f" — *variety caps relaxed (tier {tier})*"
+                        if tier else ""))
             for c, g in sorted(pl.items(), key=lambda x: -x[1]):
                 u = comps[c].get("unit_g")
                 extra = f"  ({g//u} × {comps[c]['name'].lower()})" if u else ""
@@ -316,14 +337,15 @@ def _run(a, timer):
               f"cuisines {menuinfo['cuisines']}")
         return
 
+    diag = {}      # P8: relaxation-ladder tiers surface in the rendered plan
     with timer.span("build_week"):
         weeks, demand = build_week(comps, people, settings, menu, seed=a.seed,
-                                   ing=ing)
+                                   ing=ing, diag=diag)
     with timer.span("session_plan"):
         sp = session_plan(comps, ing, settings, weeks)
     with timer.span("render"):
         out = render(comps, ing, people, settings, menu, weeks, demand, docmsg,
-                     menuinfo, sp, pantry=pantry)
+                     menuinfo, sp, pantry=pantry, diag=diag)
 
     if a.cmd == "shop":
         print(out.split("## Shopping list")[1])

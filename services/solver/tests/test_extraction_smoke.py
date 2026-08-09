@@ -28,10 +28,25 @@ def lib():
 
 @pytest.fixture(scope="module")
 def proto_plan():
-    """The v1 prototype, imported as a module (sys.path trick — tests only)."""
+    """The v1 prototype, imported as a module (tests only).
+
+    Retirement-safe: when the frozen prototype directory is gone, the parity
+    test SKIPS instead of blocking `mealplan/` deletion — the parity it
+    proves was recorded at extraction time and the derived values are pinned
+    by the determinism golden from then on. The sys.path entry is removed
+    immediately after import (and the module dropped from sys.modules at
+    teardown) so the prototype's top-level modules (plan.py, serve.py) can
+    never shadow later imports for the rest of the pytest session."""
+    if not (PROTOTYPE_DIR / "plan.py").exists():
+        pytest.skip("v1 prototype (mealplan/plan.py) retired — extraction "
+                    "parity was proven before retirement")
     sys.path.insert(0, str(PROTOTYPE_DIR))
-    import plan
-    return plan
+    try:
+        import plan
+    finally:
+        sys.path.remove(str(PROTOTYPE_DIR))
+    yield plan
+    sys.modules.pop("plan", None)
 
 
 def test_examples_corpus_loads(lib):

@@ -481,3 +481,32 @@ Load-bearing dispositions:
 | Cooked `keeps_days` beyond USDA guidance baked into architecture | §8.1: guidance-following defaults; household overrides are data and labeled, not hidden |
 | Two identical PRD copies drifting | Single `PRD.md`; v1 preserved once as `PRD-v1-household.md` |
 | Paywalled-source recipes in the corpus *(v1 OQ-4 / I9 risk, not a scrutiny finding)* | §6 quarantine; OQ-C1 |
+
+## Appendix B — Errata & explicit deferrals (M0 Phase 5 review, 2026-08-09)
+
+Recorded during the M0 gate's adversarial review so spec and code stop quietly
+disagreeing. Each item is a decision, not an omission.
+
+1. **§5.2 cost statement corrected.** §5.2 says "the v1 solver reports cost
+   but does not optimize on it." As built, menu *selection* is deliberately
+   cost-aware: `score_menu` penalizes budget-ceiling overage
+   (`budget_overage_per_dollar`) and mildly prefers cheaper menus
+   (`cost_per_dollar`) — both named provisional weights in
+   `engine.SCORE_WEIGHTS`. The `frontier` budget-sweep command also survived
+   extraction and is retained as a dev tool (it runs synchronously; the §8.4
+   interruptible-background posture applies when it reaches a service
+   surface). What §5.2 defers is budget *optimization as a product feature*
+   (budget↔outcome sweeps in the product loop), unchanged.
+2. **Per-person `serve_g` scaling (Appendix A) deferred to M1.** The
+   confirmed v1 defect "serve_g shared across divergent eaters → §8.1
+   per-person scaling (provisional)" is NOT implemented in M0: `plate()`
+   still applies one shared serve band per component to every eater. Deferred
+   to M1 (TASKS M1.7) where the real-week gate can measure it against real
+   targets (OQ-D1) — a shared band across a 1.65× kcal spread survives until
+   then by this decision.
+3. **Pantry `acquired`-age rule deferred to M1.** §8.1's "age reduces
+   effective raw keeps_days" is validated (ISO date required) but consumed
+   nowhere: `purchase()` deducts stock grams only, and `raw_freshness`
+   treats deducted stock as bought fresh at the nearest prior shop day.
+   Deferred to M1 (TASKS M1.8) together with the already-documented pantry
+   `cooked` planning integration.

@@ -1,7 +1,9 @@
 """M0.14 — CI-assertable LP-solve budgets (PRD §8.5, measure-then-promise).
 
-Solve COUNTS are deterministic — same inputs + seed produce the same CBC
-invocations on every machine — so CI asserts them. Wall-clock timings are
+Solve COUNTS are deterministic for a given CBC build — same inputs + seed
+produce the same invocations on the pinned reference environment, where CI
+asserts them exactly; other platforms assert tolerance bands (PRD §9 golden
+policy — a foreign CBC may legally search differently). Wall-clock timings are
 recorded-only in services/solver/BASELINES.md (``make baseline``) and are
 NEVER asserted here: v1's single-shot wall-clock CI guards flaked by
 construction, and PRD §8.5 bans the pattern.
@@ -15,6 +17,8 @@ exact counts is a behavior change to review, never to absorb silently.
 from pathlib import Path
 
 from mealplan import costing, engine, io_yaml
+
+import refenv
 
 # One frozen parameter set, shared with the determinism golden — a drift
 # between the two files cannot happen because both import it from here.
@@ -36,17 +40,21 @@ GOLDEN_SOLO_COUNTS = {
 
 # Examples (founder corpus) `week`-command pipeline (doctor + choose_menu at
 # the CLI default n=12 + build_week + session_plan), total solve count.
-# Budget = recorded count + ~20% headroom: the corpus is hand-edited data and
-# small drifts are expected; order-of-magnitude jumps are not.
+# Budget = recorded count x2: the corpus is LIVE hand-edited data (M1's gate
+# will edit it), so this guard is deliberately order-of-magnitude — it
+# catches solve-count EXPLOSIONS, and must not break on routine corpus edits
+# (PRD §9: the founder household is not a test fixture).
 EXAMPLES_RECORDED_TOTAL = 698
-EXAMPLES_BUDGET = int(EXAMPLES_RECORDED_TOTAL * 1.2)      # 837
+EXAMPLES_BUDGET = EXAMPLES_RECORDED_TOTAL * 2
 
 
 def test_golden_solo_pipeline_solve_counts_exact():
     """CATCHES: any change in how much LP work the frozen golden pipeline
     does — an accidental extra verify pass, a doubled re-solve, a silently
     skipped stage. The counts are exact per stage because the pipeline is
-    deterministic end to end."""
+    deterministic end to end ON the pinned reference environment; elsewhere
+    a different CBC build may legally take a different search path, so the
+    assert relaxes to a tolerance band (PRD §9 golden policy)."""
     engine.reset_solve_counts()
     ing, comps, people, settings = io_yaml.load(FIXTURES / "solo_lifter")
     menu, info, feasible, broke = engine.choose_menu(
@@ -55,10 +63,20 @@ def test_golden_solo_pipeline_solve_counts_exact():
                                       seed=GOLDEN_SEED, ing=ing)
     costing.session_plan(comps, ing, settings, weeks)
     got = engine.solve_counts()
-    assert got == GOLDEN_SOLO_COUNTS, (
-        f"solve counts drifted from the recorded baseline: {got} != "
-        f"{GOLDEN_SOLO_COUNTS} — if the change is intended, re-record via "
-        "`make baseline` in a reviewed commit (services/solver/BASELINES.md)")
+    if refenv.is_reference_env():
+        assert got == GOLDEN_SOLO_COUNTS, (
+            f"solve counts drifted from the recorded baseline: {got} != "
+            f"{GOLDEN_SOLO_COUNTS} — if the change is intended, re-record via "
+            "`make baseline` in a reviewed commit (services/solver/"
+            "BASELINES.md)")
+    else:
+        # off-reference: same stages, totals within a 2x band (explosions
+        # still fail; a foreign CBC's different search path does not)
+        assert set(got) == set(GOLDEN_SOLO_COUNTS), (got, refenv.REFERENCE)
+        ref_total = sum(GOLDEN_SOLO_COUNTS.values())
+        assert 0 < sum(got.values()) <= 2 * ref_total, (
+            f"off-reference solve total {sum(got.values())} outside the "
+            f"2x band around recorded {ref_total}")
 
 
 def test_examples_week_pipeline_within_solve_budget():
