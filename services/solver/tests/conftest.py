@@ -22,6 +22,7 @@ SLOW_MODULES = {
     "test_sessions_freshness",  # session_plan scenarios solve weeks
     "test_score_scale",         # frontier points run choose_menu
     "test_plate_bounds_replate",  # 20-seed property over plate solves
+    "test_contracts_roundtrip",  # full pipeline + doctor vs pydantic mirrors
 }
 
 
