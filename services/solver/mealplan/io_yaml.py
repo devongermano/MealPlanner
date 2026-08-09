@@ -1,0 +1,358 @@
+"""io_yaml.py — library load/save with schema validation and atomic writes.
+
+M0.2: the ONE sanctioned behavior addition of the extraction. Rules:
+
+- Validation reports ALL problems in one structured error — never
+  first-error-wins.
+- Loads validate before the engine sees anything.
+- Saves validate first, write to a temp file in the target directory, then
+  atomically rename over the destination. An invalid save is refused entirely
+  and leaves the original file untouched.
+- Every document carries ``schema_version`` (currently only version 1 is
+  known).
+"""
+
+from __future__ import annotations
+
+import os
+import tempfile
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Optional
+
+import yaml
+
+from .model import (Budget, Component, Ingredient, Person, Settings,
+                    derive_component)
+
+SCHEMA_VERSION = 1
+KNOWN_SCHEMA_VERSIONS = (1,)
+
+ROLES = ("main", "starch", "veg", "accent", "drink")
+
+INGREDIENT_REQUIRED = ("kcal", "p", "f", "c", "perishable", "pack_g",
+                       "keeps_days", "cost")
+COMPONENT_REQUIRED = ("id", "name", "cuisine", "role", "yield_g", "serve_g",
+                      "keeps_days", "active_min", "ingredients")
+PERSON_REQUIRED = ("targets", "tolerance")
+
+
+# --------------------------------------------------------------------------- #
+#  structured all-errors reporting
+# --------------------------------------------------------------------------- #
+@dataclass(frozen=True)
+class ValidationIssue:
+    """One problem, precisely located."""
+
+    code: str        # machine-readable: unknown_ingredient, nonpositive_grams, …
+    where: str       # e.g. "components.yaml: component 'picadillo', ingredient 'tofu'"
+    message: str     # human-readable
+    severity: str = "error"   # "error" blocks the load/save; "warning" is reported only
+
+    def __str__(self):
+        return f"[{self.severity}:{self.code}] {self.where}: {self.message}"
+
+
+class ValidationError(Exception):
+    """Carries EVERY issue found, not just the first."""
+
+    def __init__(self, issues: list[ValidationIssue]):
+        self.issues = list(issues)
+        self.errors = [i for i in self.issues if i.severity == "error"]
+        self.warnings = [i for i in self.issues if i.severity == "warning"]
+        super().__init__(
+            f"{len(self.errors)} validation error(s):\n"
+            + "\n".join(f"  - {i}" for i in self.issues))
+
+    def codes(self) -> set[str]:
+        return {i.code for i in self.issues}
+
+
+def _split(issues: list[ValidationIssue]):
+    errors = [i for i in issues if i.severity == "error"]
+    warnings = [i for i in issues if i.severity == "warning"]
+    return errors, warnings
+
+
+def _report_warnings(warnings: list[ValidationIssue]) -> None:
+    import sys
+    for w in warnings:
+        print(str(w), file=sys.stderr)
+
+
+# --------------------------------------------------------------------------- #
+#  per-document validators — each returns a list of issues, never raises early
+# --------------------------------------------------------------------------- #
+def _check_schema_version(doc: Any, fname: str) -> list[ValidationIssue]:
+    out = []
+    if not isinstance(doc, dict):
+        return [ValidationIssue("bad_document", fname,
+                                "document is not a mapping")]
+    if "schema_version" not in doc:
+        out.append(ValidationIssue(
+            "missing_field", f"{fname}: schema_version",
+            "document must declare a schema_version"))
+    elif doc["schema_version"] not in KNOWN_SCHEMA_VERSIONS:
+        out.append(ValidationIssue(
+            "unknown_schema_version", f"{fname}: schema_version",
+            f"unknown schema_version {doc['schema_version']!r}; "
+            f"known: {list(KNOWN_SCHEMA_VERSIONS)}"))
+    return out
+
+
+def validate_ingredients_doc(doc: Any, fname: str = "ingredients.yaml"
+                             ) -> list[ValidationIssue]:
+    issues = _check_schema_version(doc, fname)
+    if not isinstance(doc, dict):
+        return issues
+    ing = doc.get("ingredients")
+    if not isinstance(ing, dict):
+        issues.append(ValidationIssue(
+            "missing_field", f"{fname}: ingredients",
+            "top-level 'ingredients' mapping is required"))
+        return issues
+    for iid, d in ing.items():
+        where = f"{fname}: ingredient '{iid}'"
+        if not isinstance(d, dict):
+            issues.append(ValidationIssue("bad_document", where,
+                                          "entry is not a mapping"))
+            continue
+        for f_ in INGREDIENT_REQUIRED:
+            if f_ not in d:
+                issues.append(ValidationIssue(
+                    "missing_field", f"{where}, field '{f_}'",
+                    f"required field '{f_}' is missing"))
+        pg = d.get("pack_g")
+        if isinstance(pg, (int, float)) and pg <= 0:
+            issues.append(ValidationIssue(
+                "nonpositive_grams", f"{where}, field 'pack_g'",
+                f"pack_g must be > 0 (got {pg})"))
+    return issues
+
+
+def validate_components_doc(doc: Any, known_ingredients: Optional[set] = None,
+                            fname: str = "components.yaml"
+                            ) -> list[ValidationIssue]:
+    issues = _check_schema_version(doc, fname)
+    if not isinstance(doc, dict):
+        return issues
+    comps = doc.get("components")
+    if not isinstance(comps, list):
+        issues.append(ValidationIssue(
+            "missing_field", f"{fname}: components",
+            "top-level 'components' list is required"))
+        return issues
+    for idx, c in enumerate(comps):
+        if not isinstance(c, dict):
+            issues.append(ValidationIssue(
+                "bad_document", f"{fname}: components[{idx}]",
+                "entry is not a mapping"))
+            continue
+        cid = c.get("id", f"components[{idx}]")
+        where = f"{fname}: component '{cid}'"
+        for f_ in COMPONENT_REQUIRED:
+            if f_ not in c:
+                issues.append(ValidationIssue(
+                    "missing_field", f"{where}, field '{f_}'",
+                    f"required field '{f_}' is missing"))
+        role = c.get("role")
+        if role is not None and role not in ROLES:
+            issues.append(ValidationIssue(
+                "bad_enum", f"{where}, field 'role'",
+                f"role must be one of {'|'.join(ROLES)} (got {role!r})"))
+        # tags are DERIVED from ingredients — declaring them by hand is forbidden
+        if "tags" in c:
+            issues.append(ValidationIssue(
+                "forbidden_field", f"{where}, field 'tags'",
+                "tags are derived from ingredient tags and must never be "
+                "declared on a component"))
+        yg = c.get("yield_g")
+        if isinstance(yg, (int, float)) and yg <= 0:
+            issues.append(ValidationIssue(
+                "nonpositive_grams", f"{where}, field 'yield_g'",
+                f"yield_g must be > 0 (got {yg})"))
+        sg = c.get("serve_g")
+        if sg is not None:
+            if not isinstance(sg, dict) or "min" not in sg or "max" not in sg:
+                issues.append(ValidationIssue(
+                    "missing_field", f"{where}, field 'serve_g'",
+                    "serve_g must be a mapping with 'min' and 'max'"))
+            else:
+                lo, hi = sg.get("min"), sg.get("max")
+                if (isinstance(lo, (int, float)) and isinstance(hi, (int, float))
+                        and lo > hi):
+                    issues.append(ValidationIssue(
+                        "serve_bounds_inverted", f"{where}, field 'serve_g'",
+                        f"serve_g min ({lo}) exceeds max ({hi})"))
+                ug = c.get("unit_g")
+                if (isinstance(ug, (int, float)) and not isinstance(ug, bool)
+                        and ug > 0):
+                    mis = [k for k in ("min", "max")
+                           if isinstance(sg.get(k), (int, float))
+                           and sg[k] % ug != 0]
+                    if mis:
+                        issues.append(ValidationIssue(
+                            "serve_bounds_not_unit_aligned",
+                            f"{where}, field 'serve_g'",
+                            f"serve_g {'/'.join(mis)} not a multiple of "
+                            f"unit_g={ug} (becomes an error at M0.8)",
+                            severity="warning"))
+        ings = c.get("ingredients")
+        if isinstance(ings, dict):
+            for iname, grams in ings.items():
+                iwhere = f"{where}, ingredient '{iname}'"
+                if known_ingredients is not None and iname not in known_ingredients:
+                    issues.append(ValidationIssue(
+                        "unknown_ingredient", iwhere,
+                        f"component '{cid}' references unknown ingredient "
+                        f"'{iname}'"))
+                if not isinstance(grams, (int, float)) or isinstance(grams, bool):
+                    issues.append(ValidationIssue(
+                        "bad_grams", iwhere,
+                        f"grams must be a number (got {grams!r})"))
+                elif grams <= 0:
+                    issues.append(ValidationIssue(
+                        "nonpositive_grams", iwhere,
+                        f"grams must be > 0 (got {grams})"))
+        elif ings is not None:
+            issues.append(ValidationIssue(
+                "bad_document", f"{where}, field 'ingredients'",
+                "ingredients must be a mapping of ingredient -> grams"))
+    return issues
+
+
+def validate_people_doc(doc: Any, fname: str = "people.yaml"
+                        ) -> list[ValidationIssue]:
+    issues = _check_schema_version(doc, fname)
+    if not isinstance(doc, dict):
+        return issues
+    people = doc.get("people")
+    if not isinstance(people, dict):
+        issues.append(ValidationIssue(
+            "missing_field", f"{fname}: people",
+            "top-level 'people' mapping is required"))
+    else:
+        for pname, p in people.items():
+            where = f"{fname}: person '{pname}'"
+            if not isinstance(p, dict):
+                issues.append(ValidationIssue("bad_document", where,
+                                              "entry is not a mapping"))
+                continue
+            for f_ in PERSON_REQUIRED:
+                if f_ not in p:
+                    issues.append(ValidationIssue(
+                        "missing_field", f"{where}, field '{f_}'",
+                        f"required field '{f_}' is missing"))
+            tgt = p.get("targets")
+            if isinstance(tgt, dict):
+                for mac in ("protein", "fat", "carb"):
+                    if mac not in tgt:
+                        issues.append(ValidationIssue(
+                            "missing_field", f"{where}, targets.{mac}",
+                            f"daily target for '{mac}' is missing"))
+    if not isinstance(doc.get("settings"), dict):
+        issues.append(ValidationIssue(
+            "missing_field", f"{fname}: settings",
+            "top-level 'settings' mapping is required"))
+    return issues
+
+
+VALIDATORS = {
+    "ingredients": lambda doc, **kw: validate_ingredients_doc(doc, **kw),
+    "components": lambda doc, **kw: validate_components_doc(doc, **kw),
+    "people": lambda doc, **kw: validate_people_doc(doc, **kw),
+}
+
+
+# --------------------------------------------------------------------------- #
+#  load
+# --------------------------------------------------------------------------- #
+def load(library: str | os.PathLike):
+    """Load a library directory (ingredients.yaml, components.yaml,
+    people.yaml), validating everything first and reporting every problem in
+    one ValidationError. Returns ``(ing, comps, people, settings)`` shaped
+    exactly like the prototype's ``plan.load()``.
+    """
+    lib = Path(library)
+    docs, issues = {}, []
+    for fname in ("ingredients.yaml", "components.yaml", "people.yaml"):
+        path = lib / fname
+        if not path.exists():
+            issues.append(ValidationIssue(
+                "missing_file", str(path), "library file not found"))
+            docs[fname] = None
+            continue
+        try:
+            docs[fname] = yaml.safe_load(path.read_text())
+        except yaml.YAMLError as e:
+            issues.append(ValidationIssue(
+                "bad_yaml", str(path), f"YAML parse error: {e}"))
+            docs[fname] = None
+    if any(d is None for d in docs.values()):
+        raise ValidationError(issues)
+
+    ing_doc = docs["ingredients.yaml"]
+    comp_doc = docs["components.yaml"]
+    ppl_doc = docs["people.yaml"]
+
+    issues += validate_ingredients_doc(ing_doc)
+    known = set((ing_doc.get("ingredients") or {})
+                if isinstance(ing_doc, dict) else ())
+    issues += validate_components_doc(comp_doc, known_ingredients=known)
+    issues += validate_people_doc(ppl_doc)
+    errors, warnings = _split(issues)
+    if errors:
+        raise ValidationError(issues)
+    _report_warnings(warnings)
+
+    ing = {iid: Ingredient.from_raw(iid, d)
+           for iid, d in ing_doc["ingredients"].items()}
+    comps = {}
+    for c in comp_doc["components"]:
+        comps[c["id"]] = derive_component(c, ing)
+    people = {pn: Person.from_raw(pn, d)
+              for pn, d in ppl_doc["people"].items()}
+    # prototype behavior: budget rides along inside settings
+    settings = Settings.from_raw(ppl_doc["settings"],
+                                 ppl_doc.get("budget", {"mode": "off"}))
+    return ing, comps, people, settings
+
+
+# --------------------------------------------------------------------------- #
+#  atomic validated save
+# --------------------------------------------------------------------------- #
+def save(path: str | os.PathLike, doc: dict, kind: str,
+         known_ingredients: Optional[set] = None) -> None:
+    """Validate ``doc`` as a ``kind`` document ('ingredients' | 'components' |
+    'people') and atomically write it to ``path``.
+
+    Refuses invalid documents entirely: validate → write temp file in the same
+    directory → atomic rename. A failed validation never touches the existing
+    file.
+    """
+    if kind not in VALIDATORS:
+        raise ValueError(f"unknown document kind {kind!r}; "
+                         f"expected one of {sorted(VALIDATORS)}")
+    path = Path(path)
+    kwargs = {"fname": path.name}
+    if kind == "components":
+        kwargs["known_ingredients"] = known_ingredients
+    issues = VALIDATORS[kind](doc, **kwargs)
+    errors, warnings = _split(issues)
+    if errors:
+        raise ValidationError(issues)
+    _report_warnings(warnings)
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.",
+                               suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w") as fh:
+            yaml.safe_dump(doc, fh, sort_keys=False)
+        os.replace(tmp, path)     # atomic on POSIX
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise

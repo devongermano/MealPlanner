@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mealplan"
+version = "0.1.0"
+description = "Constraint-based batch-cooking planner engine (M0 extraction of the v1 prototype)"
+requires-python = ">=3.10"
+dependencies = [
+    "PuLP==3.3.2",
+    "PyYAML==6.0.3",
+]
+
+[project.optional-dependencies]
+dev = ["pytest==9.1.1"]
+
+[project.scripts]
+mealplan = "mealplan.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["mealplan*"]
+
+[tool.pytest.ini_options]
+# PuLP 3.3.2 emits ~15k DeprecationWarnings (LpVariable ctor / PULP_CBC_CMD, removed
+# in PuLP 4.0). Pinned solver version is deliberate; revisit at a PuLP-4 migration.
+filterwarnings = ["ignore::DeprecationWarning:pulp"]

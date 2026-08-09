@@ -17,8 +17,8 @@ green; same inputs + seed ⇒ byte-identical plan on the reference environment; 
 config; one canonical computation per quantity; measured perf baselines recorded.
 
 ### Scaffold
-- [ ] M0.1 Monorepo skeleton per `ARCHITECTURE.md` (`services/solver/` is home); `pyproject.toml` with pinned deps (pyyaml, pulp, pytest); `make test`; package layout `mealplan/{model,engine,costing,io,units}.py` extracted from `plan.py`; adapters import core only
-- [ ] M0.2 Schema validation on load and before every write: structured all-errors reporting, atomic writes, `schema_version` on all documents (PRD §8.1)
+- [x] M0.1 Monorepo skeleton per `ARCHITECTURE.md` (`services/solver/` is home); `pyproject.toml` with pinned deps (pyyaml, pulp, pytest); `make test`; package layout `mealplan/{model,engine,costing,io_yaml,units,cli}.py` extracted from `plan.py` (io_yaml not io — avoids shadowing stdlib); adapters import core only. *Verified: behavior preserved gram-for-gram vs prototype; 18 tests green.*
+- [x] M0.2 Schema validation on load and before every write: structured all-errors reporting, atomic writes, `schema_version` on all documents (PRD §8.1). *Unit-alignment is a warning until M0.8 (examples `mango_jalapeno_wings` max 500 vs unit 45 — fix bound to 495 in M0.8).*
 
 ### Confirmed defect fixes (each lands with its regression test)
 - [ ] M0.3 Determinism: kill `hash(pname)` day-seed (`plan.py:537`); every random draw from an explicit seed; no wall clock
