@@ -41,8 +41,9 @@ config; one canonical computation per quantity; measured perf baselines recorded
 
 ## M1 — Headless demo loop *(next — awaiting go)*
 
-Gate: §3 demo from a fresh config file with format docs at hand; founder household
-runs a real week on it (needs OQ-D1: real targets).
+Gate: §3 demo from a fresh config file with format docs at hand; a real week cooked
+and eaten from M1 output. Targets are arbitrary by design (owner, 2026-08-09:
+"arbitrary goals for arbitrary people" — OQ-D1 dissolved; examples/ is demo data).
 
 - [ ] M1.0 Sweep the Phase 5 deferred minors (`services/solver/PHASE5_FIXNOTES.md`, "Deferred minors" section)
 - [ ] M1.1 The three deliverables as human-readable artifacts: shopping list, per-session cook plan with scaled recipes, per-day per-person eat sheets

@@ -433,7 +433,7 @@ external households at M4. Solver-side validation alone is no longer called vali
 | OQ-M1 | Competitive scan to verify the wedge claim (§1) | Marketing copy only |
 | OQ-P1 | Notification channel for the veto window (push / email / SMS) | M2 detail |
 | OQ-T1 | ~~Service hosting & stack~~ **Resolved 2026-08-09** → `ARCHITECTURE.md` | — |
-| OQ-D1 | Founder-household real targets (still placeholders in the dev corpus) | M1's real-week gate |
+| OQ-D1 | ~~Founder-household real targets~~ **Dissolved 2026-08-09** — owner: targets are arbitrary by design ("arbitrary goals for arbitrary people"); `examples/` is demo data, not ground truth | — |
 
 ### 12.2 Implementer proposals awaiting ratification
 
