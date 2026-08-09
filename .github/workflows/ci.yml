@@ -1,0 +1,40 @@
+name: CI
+
+# Two tiers (mirrors the Makefile):
+#   PRs      -> fast tier (~30s local): everything except LP/subprocess-heavy
+#   main     -> full suite (parallel)
+# Golden byte-compares and exact solve-count assertions are gated to the
+# pinned reference environment (tests/refenv.py) and self-skip here; the
+# all-platform property tests carry the guarantees on CI.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  fast:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+          cache: pip
+      - run: python -m pip install -e "services/solver[dev]"
+      - run: python -m pytest services/solver/tests -q -n auto -m "not slow"
+
+  full:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+          cache: pip
+      - run: python -m pip install -e "services/solver[dev]"
+      - run: python -m pytest services/solver/tests -q -n auto
