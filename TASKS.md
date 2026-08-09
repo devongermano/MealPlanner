@@ -10,7 +10,7 @@ green, not before.
 
 ---
 
-## M0 — Engine correctness *(current)*
+## M0 — Engine correctness *(✅ complete 2026-08-09 — commits ce8f3f8→bc9b306; gate evidence in bc9b306's message + PHASE5_FIXNOTES.md)*
 
 Extract the engine from the prototype and make it tell the truth. Gate: full suite
 green; same inputs + seed ⇒ byte-identical plan on the reference environment; no dead
@@ -39,7 +39,7 @@ config; one canonical computation per quantity; measured perf baselines recorded
 - [x] M0.16 Capability test suite (PRD §9 names): composite-dish fat-forcing; binding-macro id; shelf-life valley → explained hole; variety caps don't starve late days; unit snapping in bounds; excluded tags never served; determinism golden (pinned reference env)
 - [x] M0.17 Dev-corpus cleanup: fix tolerance advice in `people.yaml:4-5` + `SKILL.md:106` (structural fix first, tolerance last — PRD §8.3); remove `[0,3]` code-default for `cook_days` (config-required); unify `n` defaults; move founder library to `examples/`; delete dead code (`assign_week`, unused imports)
 
-## M1 — Headless demo loop
+## M1 — Headless demo loop *(next — awaiting go)*
 
 Gate: §3 demo from a fresh config file with format docs at hand; founder household
 runs a real week on it (needs OQ-D1: real targets).
