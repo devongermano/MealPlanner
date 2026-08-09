@@ -25,7 +25,7 @@ from pathlib import Path
 
 import pytest
 
-from mealplan import costing, engine, io_yaml
+from mealplan import costing, engine, io_yaml, model
 from mealplan.costing import purchase, session_plan
 from mealplan.io_yaml import ValidationError, validate_ingredients_doc, validate_people_doc
 
@@ -54,8 +54,13 @@ def _ing(perishable=True, keeps=5, freezable=False, pack_g=500, cost=5.0):
     return d
 
 
+# Full validated-settings shape (M0.17): the engine reads settings by plain
+# indexing — hand-built dicts must carry every field the model layer would
+# have defaulted.
 SETTINGS = dict(days=7, active_min_budget=180, batch_time_factor=0.5,
-                max_days_same_component=4, cook_days=[0, 4], shop_days=[0])
+                max_days_same_component=4, cook_days=[0, 4], shop_days=[0],
+                min_lean_anchors=2, max_batches_per_component=3,
+                use_freezer=True, budget={"mode": "off"})
 
 
 # --------------------------------------------------------------------------- #
@@ -157,7 +162,9 @@ def test_purchase_covers_summed_session_batches():
 # --------------------------------------------------------------------------- #
 FRESH_SETTINGS = dict(days=7, active_min_budget=180, batch_time_factor=0.5,
                       max_days_same_component=4, cook_days=[0, 4],
-                      shop_days=[0])
+                      shop_days=[0], min_lean_anchors=2,
+                      max_batches_per_component=3, use_freezer=True,
+                      budget={"mode": "off"})
 
 
 def _fresh_lib(freezable):
@@ -286,27 +293,36 @@ def _ppl_doc(settings):
 
 def test_shop_days_empty_list_is_error():
     issues = validate_people_doc(_ppl_doc(
-        {"days": 7, "active_min_budget": 180, "shop_days": []}))
+        {"days": 7, "active_min_budget": 180, "cook_days": [0],
+         "shop_days": []}))
     assert any(i.code == "bad_shop_days" and i.severity == "error"
                for i in issues)
 
 
 def test_shop_days_out_of_week_is_error():
     issues = validate_people_doc(_ppl_doc(
-        {"days": 7, "active_min_budget": 180, "shop_days": [0, 9]}))
+        {"days": 7, "active_min_budget": 180, "cook_days": [0],
+         "shop_days": [0, 9]}))
     assert any(i.code == "shop_day_out_of_range" and i.severity == "error"
                for i in issues)
 
 
 def test_shop_days_valid_and_absent_are_fine():
-    for st in ({"days": 7, "active_min_budget": 180, "shop_days": [0, 4]},
-               {"days": 7, "active_min_budget": 180}):
+    for st in ({"days": 7, "active_min_budget": 180, "cook_days": [0],
+                "shop_days": [0, 4]},
+               {"days": 7, "active_min_budget": 180, "cook_days": [0]}):
         issues = validate_people_doc(_ppl_doc(st))
         assert not [i for i in issues if i.severity == "error"], st
 
 
 def test_shop_days_default_is_day_zero_sorted():
-    assert costing.shop_days_for({"days": 7}) == [0]
+    # M0.17: the [0] default lives in the MODEL layer (Settings.from_raw),
+    # not as an inline fallback in costing — shop_days_for reads validated
+    # settings and only canonicalizes (sorted, deduped).
+    st = model.Settings.from_raw({"days": 7, "cook_days": [0]},
+                                 {"mode": "off"})
+    assert st["shop_days"] == [0]
+    assert costing.shop_days_for(st) == [0]
     assert costing.shop_days_for({"days": 7, "shop_days": [4, 0]}) == [0, 4]
 
 

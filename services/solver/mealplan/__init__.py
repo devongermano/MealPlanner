@@ -19,6 +19,8 @@ Modules:
     costing  purchasing, cook minutes, batch estimation, cost attribution
     units    human pack sizes, miss formatting, kcal
     cli      argparse front end (console script: mealplan)
+    instrument  wall-clock stage timing OUTSIDE the engine (M0.14, §8.5);
+             the deterministic solve counters live in engine.SOLVE_COUNTS
 """
 
 __version__ = "0.1.0"

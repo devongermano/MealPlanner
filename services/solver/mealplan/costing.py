@@ -19,7 +19,7 @@ menu-search score only; every real surface consumes session_plan.
 
 import math
 
-from .units import KCAL, MACROS, kcal_of
+from .units import kcal_of
 
 
 # --------------------------------------------------------------------------- #
@@ -27,14 +27,17 @@ from .units import KCAL, MACROS, kcal_of
 # --------------------------------------------------------------------------- #
 def sessions_for(settings):
     """Cook-session start days (0-indexed). A component cooked in session s
-    is edible on day d iff 0 <= d - start(s) < keeps_days."""
-    return settings.get("cook_days", [0, 3])
+    is edible on day d iff 0 <= d - start(s) < keeps_days.
+
+    ``cook_days`` is REQUIRED settings data (M0.17) — validated at load;
+    there is no code default."""
+    return settings["cook_days"]
 
 
 def shop_days_for(settings):
     """Shopping-trip days (0-indexed, sorted, deduped). Default: one trip on
     day 0."""
-    return sorted(set(settings.get("shop_days") or [0]))
+    return sorted(set(settings["shop_days"]))
 
 
 def nearest_prior_shop_day(day, settings):
@@ -79,7 +82,7 @@ def freezer_bridges(comp, settings):
     into the freezer on cook day and later days serve it
     "from freezer — thaw ahead". With use_freezer false (or freezes
     false/absent) the strict shelf-life rule applies unchanged."""
-    return bool(comp.get("freezes")) and bool(settings.get("use_freezer", True))
+    return bool(comp.get("freezes")) and bool(settings["use_freezer"])
 
 
 def cookable_sessions(comp, settings, ing=None):
@@ -146,7 +149,7 @@ def session_plan(comps, ing, settings, weeks):
             unattributed.append(dict(component=cid, day=d, grams=g))
         else:
             sess_demand[k_fit][cid] = sess_demand[k_fit].get(cid, 0) + g
-    f = settings.get("batch_time_factor", 0.45)
+    f = settings["batch_time_factor"]
     sessions, total_batches = [], {}
     for k, start in enumerate(ss):
         batches = {cid: math.ceil(g / comps[cid]["yield_g"] - 1e-9)
@@ -233,7 +236,7 @@ def cook_minutes(comps, settings, batches):
     """Hands-on time for a whole week. Counting each recipe once is wrong — you
     cook most of them 2-5 times. Each extra batch costs batch_time_factor of the
     first (setup amortizes; a bigger braise is nearly free, meatballs are not)."""
-    f = settings.get("batch_time_factor", 0.45)
+    f = settings["batch_time_factor"]
     return round(sum(comps[i]["active_min"] * (1 + f * (b - 1))
                      for i, b in batches.items() if b > 0))
 
@@ -243,7 +246,7 @@ def estimate_batches(comps, people, settings, chosen):
     vs. what one batch of the whole menu delivers. Crude, but cheap and monotone —
     good enough to make a budget ceiling bind during the search. The real batch
     counts come out of build_week."""
-    days = settings.get("days", 7)
+    days = settings["days"]
     need = sum(kcal_of(p["targets"]) for p in people.values()) * days
     per_set = sum(comps[i]["yield_g"] * comps[i]["per100"]["kcal"] / 100 for i in chosen)
     if per_set <= 0:
@@ -261,7 +264,7 @@ def menu_cost(comps, ing, chosen, batches=None, people=None, settings=None,
 
 
 def budget_ceiling(settings, people):
-    b = settings.get("budget") or {"mode": "off"}
+    b = settings["budget"] or {"mode": "off"}
     if b.get("mode") == "shared":
         return b.get("total")
     if b.get("mode") == "per_person":

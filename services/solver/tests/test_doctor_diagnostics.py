@@ -46,8 +46,13 @@ def _person(targets, tol=0.05):
     return dict(targets=targets, tolerance=tol, exclude=[], dislikes=[])
 
 
+# Full validated-settings shape (M0.17): the engine reads settings by plain
+# indexing — hand-built dicts must carry every field the model layer would
+# have defaulted.
 SET = dict(days=7, active_min_budget=600, batch_time_factor=0.5,
-           max_days_same_component=7, cook_days=[0, 4], shop_days=[0])
+           max_days_same_component=7, cook_days=[0, 4], shop_days=[0],
+           min_lean_anchors=2, max_batches_per_component=3, use_freezer=True,
+           budget={"mode": "off"})
 
 
 # --------------------------------------------------------------------------- #

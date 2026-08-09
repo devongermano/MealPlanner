@@ -3,7 +3,7 @@ parse_budget/main, behavior-preserving.
 
 Commands:
     mealplan doctor                  what the library can and cannot hit, and why
-    mealplan menu [--n 10]           choose this week's components
+    mealplan menu [--n 12]           choose this week's components
     mealplan week  [--menu a,b,c]    full 7-day plan + cook list
     mealplan shop  [--menu a,b,c]    shopping list, purchase units, waste
     mealplan all                     everything, written to plan.md
@@ -17,11 +17,11 @@ import argparse
 import sys
 from pathlib import Path
 
-from . import io_yaml
+from . import instrument, io_yaml
 from .costing import (attribute, budget_ceiling, menu_cost, purchase,
                       session_plan)
 from .engine import (available_on, build_week, choose_menu, from_freezer,
-                     plate, score_menu)
+                     reset_solve_counts, score_menu, solve_counts)
 from .units import MACROS, fmt_miss, kcal_of
 
 
@@ -124,7 +124,7 @@ def render(comps, ing, people, settings, menu, weeks, demand, docmsg, menuinfo,
                        pantry=pantry)
     shares, eaten = attribute(comps, ing, weeks, bought)
     cap = budget_ceiling(settings, people)
-    b = settings.get("budget") or {}
+    b = settings["budget"] or {}
     L.append("\n## Cost\n")
     L.append(f"- groceries: **${bought:,.2f}**"
              + (f" against a ${cap:,.0f} ceiling — "
@@ -212,7 +212,9 @@ def main(argv=None):
     ap.add_argument("--pantry", default=None, metavar="PATH",
                     help="optional pantry.yaml; on-hand stock is deducted from "
                          "the shopping list before pack rounding (M0.12)")
-    ap.add_argument("--n", type=int, default=10)
+    ap.add_argument("--n", type=int, default=12,
+                    help="menu size: how many components choose_menu selects "
+                         "(default: %(default)s)")
     ap.add_argument("--menu", default=None)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--out", default="plan.md")
@@ -222,11 +224,28 @@ def main(argv=None):
     ap.add_argument("--exclude", default="", help="components to keep off the menu")
     ap.add_argument("--force", default="", help="components that must be on the menu")
     ap.add_argument("--range", default="400:700:50", help="frontier sweep lo:hi:step")
+    ap.add_argument("--stats", action="store_true",
+                    help="after the command, print LP-solve counts by stage "
+                         "and wall-clock stage timings to stderr (M0.14)")
     a = ap.parse_args(argv)
 
+    # M0.14: counts are deterministic engine bookkeeping; timing wraps the
+    # engine calls from OUT HERE (instrument.py) and never feeds them.
+    reset_solve_counts()
+    timer = instrument.StageTimer()
+    try:
+        _run(a, timer)
+    finally:
+        if a.stats:
+            print(instrument.format_stats(solve_counts(), timer.spans),
+                  file=sys.stderr)
+
+
+def _run(a, timer):
     lib = Path(a.library) if a.library else Path.cwd() / "examples"
     try:
-        ing, comps, people, settings = io_yaml.load(lib)
+        with timer.span("load"):
+            ing, comps, people, settings = io_yaml.load(lib)
     except io_yaml.ValidationError as e:
         sys.exit(str(e))
     pantry = None
@@ -254,11 +273,13 @@ def main(argv=None):
         sys.exit(f"unknown components in --force: {', '.join(unknown_forced)}")
     if a.cmd == "frontier":
         lo, hi, st = (int(x) for x in a.range.split(":"))
-        frontier(comps, ing, people, settings, lo, hi, st, a.n, seed=a.seed,
-                 must=force)
+        with timer.span("frontier"):
+            frontier(comps, ing, people, settings, lo, hi, st, a.n,
+                     seed=a.seed, must=force)
         return
     from .engine import doctor as _doctor
-    docmsg, _ = _doctor(comps, people, settings, ing=ing)
+    with timer.span("doctor"):
+        docmsg, _ = _doctor(comps, people, settings, ing=ing)
 
     if a.cmd == "doctor":
         print(docmsg)
@@ -271,15 +292,21 @@ def main(argv=None):
             sys.exit(f"unknown components: {unknown}")
         _, menuinfo = score_menu(comps, ing, menu, settings)
     else:
-        menu, menuinfo, feas, broke = choose_menu(comps, ing, people, settings,
-                                                  n=a.n, seed=a.seed,
-                                                  must=force)
+        with timer.span("choose_menu"):
+            menu, menuinfo, feas, broke = choose_menu(comps, ing, people,
+                                                      settings, n=a.n,
+                                                      seed=a.seed, must=force)
         if not feas:
             print("!! best menu found is not feasible for everyone:", file=sys.stderr)
             for who, miss in broke.items():
                 print(f"   {who}: {fmt_miss(miss)}", file=sys.stderr)
-            print("   -> loosen tolerance in people.yaml, raise --n, or add a "
-                  "component that fixes the gap. run `mealplan doctor`.\n", file=sys.stderr)
+            # PRD §8.3 playbook: cheapest STRUCTURAL fix first; loosening
+            # tolerance is the explicit last resort.
+            print("   -> add a component that fixes the gap (run `mealplan "
+                  "doctor` — it names the class), raise --n, or move a cook "
+                  "day. loosening tolerance in people.yaml is the LAST "
+                  "resort: it redefines success instead of fixing the "
+                  "plan.\n", file=sys.stderr)
 
     if a.cmd == "menu":
         for i in menu:
@@ -289,11 +316,14 @@ def main(argv=None):
               f"cuisines {menuinfo['cuisines']}")
         return
 
-    weeks, demand = build_week(comps, people, settings, menu, seed=a.seed,
-                               ing=ing)
-    sp = session_plan(comps, ing, settings, weeks)
-    out = render(comps, ing, people, settings, menu, weeks, demand, docmsg,
-                 menuinfo, sp, pantry=pantry)
+    with timer.span("build_week"):
+        weeks, demand = build_week(comps, people, settings, menu, seed=a.seed,
+                                   ing=ing)
+    with timer.span("session_plan"):
+        sp = session_plan(comps, ing, settings, weeks)
+    with timer.span("render"):
+        out = render(comps, ing, people, settings, menu, weeks, demand, docmsg,
+                     menuinfo, sp, pantry=pantry)
 
     if a.cmd == "shop":
         print(out.split("## Shopping list")[1])

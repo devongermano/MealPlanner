@@ -119,10 +119,13 @@ def _lean_lib():
 
 def _score_with(min_lean):
     comps, ing, people = _lean_lib()
-    settings = dict(days=7, active_min_budget=600, batch_time_factor=0.5,
-                    max_days_same_component=4, cook_days=[0, 3], shop_days=[0])
+    st = dict(days=7, active_min_budget=600, batch_time_factor=0.5,
+              max_days_same_component=4, cook_days=[0, 3], shop_days=[0])
     if min_lean is not None:
-        settings["min_lean_anchors"] = min_lean
+        st["min_lean_anchors"] = min_lean
+    # M0.17: defaults live in the model layer — the engine reads validated
+    # settings by plain indexing, so hand-built dicts go through from_raw.
+    settings = model.Settings.from_raw(st, {"mode": "off"})
     s, _ = engine.score_menu(comps, ing, list(comps), settings, people)
     return s
 
@@ -137,7 +140,10 @@ def test_min_lean_anchors_setting_changes_menu_score():
 
 def test_min_lean_anchors_default_is_two():
     """Absent setting behaves exactly like the effective prototype behavior:
-    the hardcoded >= 2."""
+    the hardcoded >= 2. Since M0.17 the default is applied by the MODEL
+    layer (model.SETTINGS_DEFAULTS via Settings.from_raw), not inline in
+    the engine."""
+    assert model.SETTINGS_DEFAULTS["min_lean_anchors"] == 2
     assert _score_with(None) == _score_with(2)
 
 
@@ -148,7 +154,7 @@ def _ppl_doc(person_extra=None, settings_extra=None):
     p = {"targets": {"protein": 100, "fat": 60, "carb": 200},
          "tolerance": 0.05}
     p.update(person_extra or {})
-    st = {"days": 7, "active_min_budget": 180}
+    st = {"days": 7, "active_min_budget": 180, "cook_days": [0]}
     st.update(settings_extra or {})
     return {"schema_version": 1, "people": {"p1": p}, "settings": st}
 
@@ -211,9 +217,14 @@ def test_examples_corpus_carries_no_removed_fields():
 # --------------------------------------------------------------------------- #
 #  freezes — LIVE: freezer-bridging availability (PRD §8.1/§8.2)
 # --------------------------------------------------------------------------- #
+# Full validated-settings shape (M0.17): the engine reads settings by plain
+# indexing — hand-built dicts must carry every field the model layer would
+# have defaulted.
 VALLEY_SETTINGS = dict(days=7, active_min_budget=180, batch_time_factor=0.5,
                        max_days_same_component=4, cook_days=[0, 3],
-                       shop_days=[0])
+                       shop_days=[0], min_lean_anchors=2,
+                       max_batches_per_component=3, use_freezer=True,
+                       budget={"mode": "off"})
 
 
 def _valley_lib(freezes):

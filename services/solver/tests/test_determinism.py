@@ -75,12 +75,22 @@ def test_no_hash_or_wall_clock_in_package():
     engine package. Since M0.12 the datetime MODULE is allowed — pantry
     validation parses stored ISO dates, which is deterministic — but every
     wall-clock entry point (now/today/utcnow, the time module) stays
-    banned."""
+    banned.
+
+    M0.14 allowlist: instrument.py, and ONLY instrument.py, may import time —
+    it collects wall-clock stage timings by wrapping engine calls from the
+    OUTSIDE (CLI --stats, make baseline) and never feeds a measurement back
+    into any engine input, seed, or branch. The deterministic half of the
+    instrumentation (LP solve counts) lives in engine.py and stays under
+    this scan."""
+    allowlisted = {"instrument.py"}
     banned = re.compile(
         r"(?<!\w)hash\(|import\s+time|from\s+time\s"
         r"|\.now\(|\.today\(|\.utcnow\(|fromtimestamp\(")
     hits = []
     for py in sorted(PACKAGE.glob("*.py")):
+        if py.name in allowlisted:
+            continue
         for n, line in enumerate(py.read_text().splitlines(), 1):
             if banned.search(line.split("#")[0]):
                 hits.append(f"{py.name}:{n}: {line.strip()}")

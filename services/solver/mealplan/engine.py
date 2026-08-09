@@ -29,8 +29,8 @@ per-day seeds from its seed parameter and the sorted index of the person
 name. No wall clock anywhere in the package.
 """
 
-import math
 import random
+from contextlib import contextmanager
 
 import pulp
 
@@ -38,6 +38,42 @@ from .costing import (budget_ceiling, cook_minutes, cookable_sessions,
                       estimate_batches, freezer_bridges, menu_cost, purchase,
                       raw_freshness, sessions_for, shop_days_for)
 from .units import MACROS, fmt_miss, kcal_of
+
+
+# --------------------------------------------------------------------------- #
+#  M0.14 solve-count instrumentation (PRD §8.5)
+# --------------------------------------------------------------------------- #
+# Deterministic bookkeeping ONLY: every CBC invocation increments a counter
+# tagged with the innermost active stage. The counters never feed a solver
+# input, never branch engine behavior, and read no wall clock — timing lives
+# OUTSIDE the engine, in instrument.py (allowlisted by the determinism scan).
+
+SOLVE_COUNTS = {}          # stage -> CBC invocations since the last reset
+_STAGE_STACK = []          # innermost active stage tag; empty -> "plate"
+
+
+@contextmanager
+def solve_stage(name):
+    """Tag every LP solve inside the block with ``name`` (innermost wins)."""
+    _STAGE_STACK.append(name)
+    try:
+        yield
+    finally:
+        _STAGE_STACK.pop()
+
+
+def _count_solve():
+    stage = _STAGE_STACK[-1] if _STAGE_STACK else "plate"
+    SOLVE_COUNTS[stage] = SOLVE_COUNTS.get(stage, 0) + 1
+
+
+def reset_solve_counts():
+    SOLVE_COUNTS.clear()
+
+
+def solve_counts():
+    """Snapshot: {stage: CBC invocations} since the last reset."""
+    return dict(SOLVE_COUNTS)
 
 
 def eligible(comp, person):
@@ -167,6 +203,7 @@ def plate(person, comps, ids, weights=None, tol=None, locked=None,
                              "unit grid)")))
             seed_fixed[k] = adj
     m, g, slack = build(seed_fixed)
+    _count_solve()
     if m.solve(pulp.PULP_CBC_CMD(msg=0)) != 1:
         return PlateResult(False, {},
                            {mac: person["targets"][mac] for mac in MACROS},
@@ -187,6 +224,7 @@ def plate(person, comps, ids, weights=None, tol=None, locked=None,
             fixed[i] = snapped
     if fixed:
         m, g, slack = build(fixed)
+        _count_solve()
         if m.solve(pulp.PULP_CBC_CMD(msg=0)) != 1:
             return PlateResult(False, {},
                                {mac: person["targets"][mac] for mac in MACROS},
@@ -224,14 +262,15 @@ def binding_macro(person, comps, ids=None, steps=10):
     """
     ids = list(comps) if ids is None else ids
     tol0 = person["tolerance"]
-    for k in range(steps + 1):
-        t = tol0 * (steps - k) / steps
-        ok, _, miss = plate(person, comps, ids, tol=t)
-        if not ok and miss:
-            mac = max(miss, key=lambda m: abs(miss[m]))
-            return dict(macro=mac, signed_miss_g=miss[mac],
-                        direction="over" if miss[mac] > 0 else "short",
-                        at_tolerance=round(t, 4), misses=dict(miss))
+    with solve_stage("doctor-binding"):
+        for k in range(steps + 1):
+            t = tol0 * (steps - k) / steps
+            ok, _, miss = plate(person, comps, ids, tol=t)
+            if not ok and miss:
+                mac = max(miss, key=lambda m: abs(miss[m]))
+                return dict(macro=mac, signed_miss_g=miss[mac],
+                            direction="over" if miss[mac] > 0 else "short",
+                            at_tolerance=round(t, 4), misses=dict(miss))
     return None
 
 
@@ -254,7 +293,8 @@ def volume_floor(person, comps, ids=None, lo=500, hi=8000, res=25):
     def solve(cap):
         p2 = {k: v for k, v in person.items()}
         p2["max_daily_mass_g"] = cap
-        return plate(p2, comps, ids)
+        with solve_stage("doctor-volume"):
+            return plate(p2, comps, ids)
 
     lo0, hi0 = lo, hi
     if not solve(hi)[0]:
@@ -291,7 +331,7 @@ def lean_coverage(comps, settings, ing=None, ids=None):
     availability: the hole in the middle of the week the prototype's
     boolean expression never actually checked for."""
     ids = list(comps) if ids is None else ids
-    days = settings.get("days", 7)
+    days = settings["days"]
     leans = [i for i in ids if comps[i].get("anchor") == "lean"]
     per_day = {d: [i for i in leans
                    if available_on(comps[i], d, settings, ing)]
@@ -308,7 +348,7 @@ def carb_headroom(person, comps, settings, ids=None, ing=None):
     Returns ``dict(target_g, per_day, worst_day, worst_headroom_g, ok)`` —
     ok iff even the worst day's headroom clears the target."""
     ids = list(comps) if ids is None else ids
-    days = settings.get("days", 7)
+    days = settings["days"]
     elig = [i for i in ids if eligible(comps[i], person)]
     tgt = person["targets"]["carb"]
     per_day = []
@@ -366,7 +406,8 @@ def doctor(comps, people, settings, ing=None):
     lines.append("## Feasibility\n")
     data["feasibility"] = {}
     for pname, p in people.items():
-        ok, pl, miss = plate(p, comps, ids)
+        with solve_stage("doctor-feasibility"):
+            ok, pl, miss = plate(p, comps, ids)
         elig = [i for i in ids if eligible(comps[i], p)]
         blocked = [i for i in ids if not eligible(comps[i], p)]
         entry = dict(ok=bool(ok), miss=dict(miss), eligible=len(elig),
@@ -385,7 +426,9 @@ def doctor(comps, people, settings, ing=None):
             lines.append(f"- **INFEASIBLE** — misses "
                          + fmt_miss(miss))
             for t2 in (0.08, 0.10, 0.15):
-                if plate(p, comps, ids, tol=t2)[0]:
+                with solve_stage("doctor-feasibility"):
+                    cleared = plate(p, comps, ids, tol=t2)[0]
+                if cleared:
                     lines.append(f"  - would clear at ±{t2:.0%} tolerance")
                     entry["clears_at_tolerance"] = t2
                     break
@@ -451,12 +494,13 @@ def doctor(comps, people, settings, ing=None):
                              for i in leanness[:5]) + " …")
     for pname, p in people.items():
         broke = None
-        for k in range(1, len(leanness)):
-            trimmed = [i for i in comps if i not in leanness[:k]]
-            ok, _, miss = plate(p, comps, trimmed)
-            if not ok:
-                broke = (k, miss)
-                break
+        with solve_stage("doctor-ablation"):
+            for k in range(1, len(leanness)):
+                trimmed = [i for i in comps if i not in leanness[:k]]
+                ok, _, miss = plate(p, comps, trimmed)
+                if not ok:
+                    broke = (k, miss)
+                    break
         if broke:
             k, miss = broke
             data["structural"]["ablation"][pname] = dict(
@@ -554,7 +598,7 @@ def score_menu(comps, ing, chosen, settings, people=None):
     # Per-person structural proxies. These are what actually predict LP feasibility,
     # and they cost nothing to evaluate.
     if people:
-        days_n = settings.get("days", 7)
+        days_n = settings["days"]
         # per-day availability is menu-wide and person-independent (cook_days
         # + keeps_days + freezer bridging + raw freshness) — compute it once
         avail = {i: [available_on(comps[i], d, settings, ing)
@@ -596,7 +640,7 @@ def score_menu(comps, ing, chosen, settings, people=None):
             # M0.5: the floor is settings.min_lean_anchors (default 2 — the
             # effective prototype behavior; its yaml said 1 but the code
             # hardcoded 2, and matching behavior wins).
-            pen += 0 if len(lean) >= settings.get("min_lean_anchors", 2) \
+            pen += 0 if len(lean) >= settings["min_lean_anchors"] \
                 else 15000
             # REAL stagger check (M0.11): the prototype's boolean expression
             # here (plan.py:397-398 — len(set-of-bools), a no-op) is replaced
@@ -649,18 +693,19 @@ def choose_menu(comps, ing, people, settings, n=10, seed=0, iters=4000,
 
     # ---- phase 2: verify best-first ------------------------------------------
     first_fail = None
-    for keys, _score in ranked:
-        sel = sorted(keys)
-        broke = {}
-        for pname, p in people.items():
-            ok, _, miss = plate(p, comps, sel)
-            if not ok:
-                broke[pname] = miss
-        if not broke:
-            _, info = sc(sel)
-            return sel, info, True, {}
-        if first_fail is None:
-            first_fail = (sel, broke)
+    with solve_stage("menu-verify"):
+        for keys, _score in ranked:
+            sel = sorted(keys)
+            broke = {}
+            for pname, p in people.items():
+                ok, _, miss = plate(p, comps, sel)
+                if not ok:
+                    broke[pname] = miss
+            if not broke:
+                _, info = sc(sel)
+                return sel, info, True, {}
+            if first_fail is None:
+                first_fail = (sel, broke)
 
     sel, broke = first_fail
     _, info = sc(sel)
@@ -752,29 +797,10 @@ def replate(person, comps, menu, day, settings, locked=None, weights=None,
                 code="locked_unavailable", component=k, day=day, pinned_g=v,
                 message=(f"lock of {v}g on '{k}' dropped: component is not "
                          f"available on day {day}")))
-    res = plate(person, comps, avail, weights=weights, tol=tol, locked=kept,
-                allow_out_of_bounds=allow_out_of_bounds)
+    with solve_stage("replate"):
+        res = plate(person, comps, avail, weights=weights, tol=tol,
+                    locked=kept, allow_out_of_bounds=allow_out_of_bounds)
     return PlateResult(res[0], res[1], res[2], warnings + res.warnings)
-
-
-def assign_week(plates, days, maxsame):
-    if not plates:
-        return []
-    chosen, used = [], {}
-    for _ in range(days):
-        best, bestsc = None, None
-        for p in plates:
-            if any(used.get(c, 0) + 1 > maxsame for c in p):
-                continue
-            sc = sum(used.get(c, 0) ** 2 for c in p)
-            if bestsc is None or sc < bestsc:
-                bestsc, best = sc, p
-        if best is None:
-            best = min(plates, key=lambda p: sum(used.get(c, 0) ** 2 for c in p))
-        chosen.append(best)
-        for c in best:
-            used[c] = used.get(c, 0) + 1
-    return chosen
 
 
 def build_week(comps, people, settings, menu, seed=0, ing=None, diag=None):
@@ -798,7 +824,7 @@ def build_week(comps, people, settings, menu, seed=0, ing=None, diag=None):
     explained hole). Lets tests and doctors observe WHETHER the caps had to
     be relaxed, which the served week alone cannot show."""
     days = settings["days"]
-    cap_batches = settings.get("max_batches_per_component", 3)
+    cap_batches = settings["max_batches_per_component"]
     porder = {pn: k for k, pn in enumerate(sorted(people))}
     weeks, demand = {}, {}
     for pname, p in people.items():

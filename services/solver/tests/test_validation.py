@@ -154,6 +154,47 @@ def test_people_doc_validated_too():
 
 
 # --------------------------------------------------------------------------- #
+#  cook_days is REQUIRED (M0.17) — the silent [0, 3] code fallback is gone
+# --------------------------------------------------------------------------- #
+def ppl_doc_with_settings(st):
+    return {"schema_version": 1,
+            "people": {"p1": {"targets": {"protein": 150, "fat": 80,
+                                          "carb": 300},
+                              "tolerance": 0.05}},
+            "settings": st}
+
+
+def test_cook_days_absent_is_error_naming_the_field():
+    errs = errors_of(validate_people_doc(ppl_doc_with_settings(
+        {"days": 7, "active_min_budget": 180,
+         "max_days_same_component": 4})))
+    hits = [e for e in errs
+            if e.code == "missing_field" and "cook_days" in e.where]
+    assert hits, errs
+    assert "cook_days" in hits[0].message
+    assert "no default" in hits[0].message
+
+
+@pytest.mark.parametrize("bad", [[], "0,4", 3, [0, "four"], [True]])
+def test_cook_days_bad_shape_is_error(bad):
+    errs = errors_of(validate_people_doc(ppl_doc_with_settings(
+        {"days": 7, "active_min_budget": 180, "cook_days": bad})))
+    assert any(e.code == "bad_cook_days" for e in errs), (bad, errs)
+
+
+def test_cook_days_out_of_week_is_error():
+    errs = errors_of(validate_people_doc(ppl_doc_with_settings(
+        {"days": 7, "active_min_budget": 180, "cook_days": [0, 7]})))
+    assert any(e.code == "cook_day_out_of_range" for e in errs)
+
+
+def test_cook_days_valid_is_fine():
+    errs = errors_of(validate_people_doc(ppl_doc_with_settings(
+        {"days": 7, "active_min_budget": 180, "cook_days": [0, 4]})))
+    assert not errs
+
+
+# --------------------------------------------------------------------------- #
 #  atomic writes
 # --------------------------------------------------------------------------- #
 def test_invalid_save_leaves_no_file(tmp_path):

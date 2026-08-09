@@ -178,7 +178,7 @@ def test_replate_excludes_expired_component(lib):
     beyond both (5-0=5, 5-3=2 — both >= keeps_days): a day-5 replate must not
     serve it, even though the v1 prototype's replate would have."""
     _, comps, people, _ = lib
-    settings = {"cook_days": [0, 3], "days": 7}
+    settings = {"cook_days": [0, 3], "days": 7, "use_freezer": True}
     assert comps["guacamole"]["keeps_days"] == 2
     assert not available_on(comps["guacamole"], 5, settings)
     p = people["devon"]
@@ -195,7 +195,7 @@ def test_replate_excludes_expired_component(lib):
 
 def test_replate_locked_unavailable_warns_and_drops(lib):
     _, comps, people, _ = lib
-    settings = {"cook_days": [0, 3], "days": 7}
+    settings = {"cook_days": [0, 3], "days": 7, "use_freezer": True}
     p = people["devon"]
     menu = list(comps)
     res = engine.replate(p, comps, menu, day=5, settings=settings,

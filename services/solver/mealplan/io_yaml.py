@@ -23,8 +23,7 @@ from typing import Any, Optional
 
 import yaml
 
-from .model import (Budget, Component, Ingredient, Pantry, Person, Settings,
-                    derive_component)
+from .model import (Ingredient, Pantry, Person, Settings, derive_component)
 
 SCHEMA_VERSION = 1
 KNOWN_SCHEMA_VERSIONS = (1,)
@@ -311,6 +310,32 @@ def validate_people_doc(doc: Any, fname: str = "people.yaml"
             "missing_field", f"{fname}: settings",
             "top-level 'settings' mapping is required"))
     else:
+        # M0.17: cook_days is REQUIRED — sessions are data, and the
+        # prototype's silent [0, 3] code fallback is gone.
+        cd = st.get("cook_days")
+        cwhere = f"{fname}: settings, field 'cook_days'"
+        if cd is None:
+            issues.append(ValidationIssue(
+                "missing_field", cwhere,
+                "required field 'cook_days' is missing — list the 0-indexed "
+                "cook-session start days (e.g. [0, 4]); there is no default"))
+        elif (not isinstance(cd, list) or not cd
+              or not all(isinstance(x, int) and not isinstance(x, bool)
+                         for x in cd)):
+            issues.append(ValidationIssue(
+                "bad_cook_days", cwhere,
+                "cook_days must be a non-empty list of 0-indexed day "
+                f"indices (got {cd!r})"))
+        else:
+            days = st.get("days")
+            hi = days if isinstance(days, int) else None
+            bad = [x for x in cd
+                   if x < 0 or (hi is not None and x >= hi)]
+            if bad:
+                issues.append(ValidationIssue(
+                    "cook_day_out_of_range", cwhere,
+                    f"cook day(s) {bad} outside the plan week "
+                    f"[0, {hi if hi is not None else '?'})"))
         # M0.6: shopping trips are data. shop_days (optional, default [0]):
         # at least one day index, every one inside the plan week.
         sd = st.get("shop_days")

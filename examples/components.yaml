@@ -12,7 +12,7 @@ schema_version: 1
 # FIELDS
 #   role:     main | starch | accent | veg
 #   anchor:   lean            -> flags a low-fat protein. The library needs >=1 per week
-#                               or the leaner eater becomes infeasible. See doctor.py.
+#                               or the leaner eater becomes infeasible. See `mealplan doctor`.
 #   yield_g:  finished cooked weight of ONE batch of this recipe
 #   serve_g:  palatability bounds. The solver will happily prescribe 750g of tortilla
 #             if you let it. These stop that.
@@ -471,7 +471,7 @@ components:
   cuisine: mexican
   role: main
   anchor: lean
-  # Added because `plan.py doctor` found the day-before-cook-day hole: the short-keeping
+  # Added because `mealplan doctor` found the day-before-cook-day hole: the short-keeping
   # lean protein expires and there is no way to reach protein without overshooting fat.
   # This one keeps 5 days and freezes, so it spans the gap.
   source: house

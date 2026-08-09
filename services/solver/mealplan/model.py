@@ -9,11 +9,17 @@ Two jobs:
    The math is copied verbatim from plan.py's load().
 
 Behavior preservation: the v1 engine code indexes everything dict-style
-(``comps[i]["per100"]``, ``settings.get("cook_days", [0, 3])``, …). Each
-dataclass therefore keeps the raw mapping it was built from and exposes
-dict-style access that delegates to it, so the extracted engine code reads —
-and behaves — identically to the prototype, including which keys are absent
-(``.get`` defaults fire exactly when the YAML omitted the key, as before).
+(``comps[i]["per100"]``, ``settings["cook_days"]``, …). Each dataclass
+therefore keeps the raw mapping it was built from and exposes dict-style
+access that delegates to it, so the extracted engine code reads — and
+behaves — identically to the prototype.
+
+Settings defaults (M0.17): schema defaults live HERE, in the model layer
+(``SETTINGS_DEFAULTS``, applied once in ``Settings.from_raw``) — the engine
+and costing read validated settings by plain indexing and carry no inline
+``.get(..., default)`` fallbacks. ``cook_days`` has NO default: it is
+required (validated in io_yaml) — the prototype's silent ``[0, 3]`` code
+fallback is gone.
 """
 
 from dataclasses import dataclass, field
@@ -197,6 +203,30 @@ class Pantry(_RawView):
         return out
 
 
+# The ONE place schema defaults are declared (M0.17). Field-by-field:
+#   days                       7      plan length
+#   batch_time_factor          0.45   marginal-batch time share (provisional, P9)
+#   min_lean_anchors           2      M0.5: effective prototype behavior kept
+#   shop_days                  [0]    M0.6: one shopping trip, day 0
+#   max_batches_per_component  3      variety/volume guard
+#   use_freezer                True   M0.5: freezer bridging on by default
+# No default — REQUIRED:
+#   cook_days                  validated required (io_yaml, M0.17): the
+#                              prototype's silent [0, 3] fallback is gone
+#   active_min_budget          engine indexes it; every corpus declares it
+#   max_days_same_component    engine indexes it; every corpus declares it
+#   budget                     defaulted to {"mode": "off"} at load
+#                              (io_yaml.load), not here
+SETTINGS_DEFAULTS = {
+    "days": 7,
+    "batch_time_factor": 0.45,
+    "min_lean_anchors": 2,
+    "shop_days": [0],
+    "max_batches_per_component": 3,
+    "use_freezer": True,
+}
+
+
 @dataclass
 class Settings(_RawView):
     days: Optional[int] = None
@@ -204,7 +234,7 @@ class Settings(_RawView):
     batch_time_factor: Optional[float] = None
     max_days_same_component: Optional[int] = None
     min_lean_anchors: Optional[int] = None
-    cook_days: Optional[list] = None
+    cook_days: Optional[list] = None      # REQUIRED — no default (M0.17)
     shop_days: Optional[list] = None      # M0.6: shopping trips are data
     max_batches_per_component: Optional[int] = None
     use_freezer: Optional[bool] = None    # M0.5: freezer bridging, default true
@@ -215,17 +245,20 @@ class Settings(_RawView):
     def from_raw(cls, d: dict, budget: Any) -> "Settings":
         raw = dict(d)
         raw["budget"] = budget
-        if d.get("shop_days"):
-            # canonical form everywhere downstream: sorted, deduped
-            raw["shop_days"] = sorted(set(d["shop_days"]))
-        return cls(days=d.get("days"), active_min_budget=d.get("active_min_budget"),
-                   batch_time_factor=d.get("batch_time_factor"),
-                   max_days_same_component=d.get("max_days_same_component"),
-                   min_lean_anchors=d.get("min_lean_anchors"),
-                   cook_days=d.get("cook_days"),
-                   shop_days=raw.get("shop_days"),
-                   max_batches_per_component=d.get("max_batches_per_component"),
-                   use_freezer=d.get("use_freezer"),
+        for k, v in SETTINGS_DEFAULTS.items():
+            if raw.get(k) is None:
+                raw[k] = list(v) if isinstance(v, list) else v
+        # canonical form everywhere downstream: sorted, deduped
+        raw["shop_days"] = sorted(set(raw["shop_days"]))
+        return cls(days=raw["days"],
+                   active_min_budget=raw.get("active_min_budget"),
+                   batch_time_factor=raw["batch_time_factor"],
+                   max_days_same_component=raw.get("max_days_same_component"),
+                   min_lean_anchors=raw["min_lean_anchors"],
+                   cook_days=raw.get("cook_days"),
+                   shop_days=raw["shop_days"],
+                   max_batches_per_component=raw["max_batches_per_component"],
+                   use_freezer=raw["use_freezer"],
                    budget=budget, raw=raw)
 
 

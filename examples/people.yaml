@@ -3,9 +3,14 @@ schema_version: 1
 # targets are DAILY grams. kcal is derived, never entered (it would just drift).
 #
 # tolerance: fraction each macro may miss by. 0.05 = +/-5%.
-#   Loosen this first when the solver says infeasible. It is the cheapest knob.
+#   When the solver says infeasible, fix the STRUCTURE first (PRD §8.3):
+#   add the missing class of recipe, move a cook day, raise a serve bound
+#   someone would actually eat — `mealplan doctor` names the gap and its
+#   direction. Loosening tolerance is the explicit LAST resort: it redefines
+#   success instead of fixing the plan.
 # exclude: allergen/intolerance tags. A component carrying any of these tags
-#   is hard-zeroed for that person. Tags come from library/ingredients.yaml.
+#   is hard-zeroed for that person. Tags come from ingredients.yaml (component
+#   tags are the union of their ingredients' tags — never declared by hand).
 # active_min_budget: total hands-on cooking minutes available per week.
 #   Unattended oven/braise time does NOT count against this.
 
@@ -40,10 +45,14 @@ settings:
   # middle estimate — raise it if cook day keeps running long.
   batch_time_factor: 0.45
   max_days_same_component: 4    # variety guard: nothing more than 4 of 7 days
-  min_lean_anchors: 2           # see doctor. this is not a preference, it is structural.
+  min_lean_anchors: 2           # ENFORCED minimum of lean-anchor mains the menu search
+                                # requires per person. `mealplan doctor`'s ablation
+                                # DERIVES the number this library+household actually
+                                # needs — set this to at least what it reports.
                                 # (M0.5: the yaml used to say 1 but the prototype code
                                 # hardcoded 2 — 2 IS the effective behavior, kept.)
-  cook_days: [0, 4]             # you cook on day 1 and day 5 (0-indexed). shelf life
+  cook_days: [0, 4]             # REQUIRED (no default): cook sessions are data.
+                                # you cook on day 1 and day 5 (0-indexed). shelf life
                                 # is measured from the nearest prior cook day.
                                 # [0,3] (Sun/Wed) leaves day 7 with no lean protein if
                                 # your lean anchor only keeps 3 days. [0,4] (Sun/Thu) fixes it.
@@ -57,9 +66,9 @@ settings:
 # ---------------------------------------------------------------------------
 # BUDGET POLICY. Nothing here is hardcoded into the solver — change it and re-run,
 # or override per-run from the CLI:
-#     plan.py all --budget 550
-#     plan.py all --budget devon=320,jimbo=240
-#     plan.py frontier                 <- sweeps it and shows what each level buys
+#     mealplan all --budget 550
+#     mealplan all --budget devon=320,jimbo=240
+#     mealplan frontier                <- sweeps it and shows what each level buys
 #
 # mode:
 #   shared          one household pot. `total` is the ceiling. Simplest.
