@@ -14,6 +14,7 @@ M0.2: the ONE sanctioned behavior addition of the extraction. Rules:
 
 from __future__ import annotations
 
+import datetime
 import os
 import tempfile
 from dataclasses import dataclass
@@ -22,7 +23,7 @@ from typing import Any, Optional
 
 import yaml
 
-from .model import (Budget, Component, Ingredient, Person, Settings,
+from .model import (Budget, Component, Ingredient, Pantry, Person, Settings,
                     derive_component)
 
 SCHEMA_VERSION = 1
@@ -30,7 +31,7 @@ KNOWN_SCHEMA_VERSIONS = (1,)
 
 ROLES = ("main", "starch", "veg", "accent", "drink")
 
-INGREDIENT_REQUIRED = ("kcal", "p", "f", "c", "perishable", "pack_g",
+INGREDIENT_REQUIRED = ("p", "f", "c", "perishable", "pack_g",
                        "keeps_days", "cost")
 COMPONENT_REQUIRED = ("id", "name", "cuisine", "role", "yield_g", "serve_g",
                       "keeps_days", "active_min", "ingredients")
@@ -122,6 +123,32 @@ def validate_ingredients_doc(doc: Any, fname: str = "ingredients.yaml"
                 issues.append(ValidationIssue(
                     "missing_field", f"{where}, field '{f_}'",
                     f"required field '{f_}' is missing"))
+        # kcal is never stored (M0.9) — it derives from macros, always
+        if "kcal" in d:
+            issues.append(ValidationIssue(
+                "forbidden_field", f"{where}, field 'kcal'",
+                "ingredient kcal is not stored; kcal derives from macros "
+                "(Atwater 4/9/4)"))
+        # all-zero macros are a data-entry smell unless flagged intentional
+        macros = [d.get(k) for k in ("p", "f", "c")]
+        if (all(isinstance(v, (int, float)) and not isinstance(v, bool)
+                for v in macros)
+                and not any(macros) and not d.get("negligible")):
+            issues.append(ValidationIssue(
+                "all_zero_macros", where,
+                "all macros are zero; set 'negligible: true' if intentional, "
+                "otherwise fill in real values", severity="warning"))
+        ef = d.get("edible_fraction")
+        if ef is not None and (not isinstance(ef, (int, float))
+                               or isinstance(ef, bool) or not 0 < ef <= 1):
+            issues.append(ValidationIssue(
+                "bad_edible_fraction", f"{where}, field 'edible_fraction'",
+                f"edible_fraction must be a number in (0, 1] (got {ef!r})"))
+        fz = d.get("freezable")
+        if fz is not None and not isinstance(fz, bool):
+            issues.append(ValidationIssue(
+                "bad_freezable", f"{where}, field 'freezable'",
+                f"freezable must be a boolean (got {fz!r})"))
         pg = d.get("pack_g")
         if isinstance(pg, (int, float)) and pg <= 0:
             issues.append(ValidationIssue(
@@ -160,6 +187,17 @@ def validate_components_doc(doc: Any, known_ingredients: Optional[set] = None,
             issues.append(ValidationIssue(
                 "bad_enum", f"{where}, field 'role'",
                 f"role must be one of {'|'.join(ROLES)} (got {role!r})"))
+        # batch_g was removed from the schema in M0.5 — nothing ever read it
+        if "batch_g" in c:
+            issues.append(ValidationIssue(
+                "removed_field", f"{where}, field 'batch_g'",
+                "'batch_g' was removed in schema v1; no engine consumed "
+                "them — delete the field"))
+        fz = c.get("freezes")
+        if fz is not None and not isinstance(fz, bool):
+            issues.append(ValidationIssue(
+                "bad_freezes", f"{where}, field 'freezes'",
+                f"freezes must be a boolean (got {fz!r})"))
         # tags are DERIVED from ingredients — declaring them by hand is forbidden
         if "tags" in c:
             issues.append(ValidationIssue(
@@ -191,12 +229,14 @@ def validate_components_doc(doc: Any, known_ingredients: Optional[set] = None,
                            if isinstance(sg.get(k), (int, float))
                            and sg[k] % ug != 0]
                     if mis:
+                        # ERROR since M0.8: the plate LP's snap-and-clamp can
+                        # only guarantee unit multiples if the bounds
+                        # themselves sit on the unit grid.
                         issues.append(ValidationIssue(
                             "serve_bounds_not_unit_aligned",
                             f"{where}, field 'serve_g'",
-                            f"serve_g {'/'.join(mis)} not a multiple of "
-                            f"unit_g={ug} (becomes an error at M0.8)",
-                            severity="warning"))
+                            f"serve_g {'/'.join(mis)} must be a multiple of "
+                            f"unit_g={ug}"))
         ings = c.get("ingredients")
         if isinstance(ings, dict):
             for iname, grams in ings.items():
@@ -250,10 +290,142 @@ def validate_people_doc(doc: Any, fname: str = "people.yaml"
                         issues.append(ValidationIssue(
                             "missing_field", f"{where}, targets.{mac}",
                             f"daily target for '{mac}' is missing"))
-    if not isinstance(doc.get("settings"), dict):
+            # meals_per_day is RESERVED (model.RESERVED_FIELDS): validated
+            # here, ignored by the M0 engine by design (M1 eat sheets).
+            mpd = p.get("meals_per_day")
+            if mpd is not None and (not isinstance(mpd, int)
+                                    or isinstance(mpd, bool) or mpd < 1):
+                issues.append(ValidationIssue(
+                    "bad_meals_per_day", f"{where}, field 'meals_per_day'",
+                    f"meals_per_day must be an integer >= 1 (got {mpd!r})"))
+            # removed in M0.5 — nothing ever read them
+            for f_ in ("min_components_per_day", "max_components_per_day"):
+                if f_ in p:
+                    issues.append(ValidationIssue(
+                        "removed_field", f"{where}, field '{f_}'",
+                        f"'{f_}' was removed in schema v1; no engine "
+                        "consumed them — delete the field"))
+    st = doc.get("settings")
+    if not isinstance(st, dict):
         issues.append(ValidationIssue(
             "missing_field", f"{fname}: settings",
             "top-level 'settings' mapping is required"))
+    else:
+        # M0.6: shopping trips are data. shop_days (optional, default [0]):
+        # at least one day index, every one inside the plan week.
+        sd = st.get("shop_days")
+        if sd is not None:
+            where = f"{fname}: settings, field 'shop_days'"
+            if (not isinstance(sd, list) or not sd
+                    or not all(isinstance(x, int) and not isinstance(x, bool)
+                               for x in sd)):
+                issues.append(ValidationIssue(
+                    "bad_shop_days", where,
+                    "shop_days must be a non-empty list of 0-indexed day "
+                    f"indices (got {sd!r})"))
+            else:
+                days = st.get("days")
+                hi = days if isinstance(days, int) else None
+                bad = [x for x in sd
+                       if x < 0 or (hi is not None and x >= hi)]
+                if bad:
+                    issues.append(ValidationIssue(
+                        "shop_day_out_of_range", where,
+                        f"shop day(s) {bad} outside the plan week "
+                        f"[0, {hi if hi is not None else '?'})"))
+        # M0.5: freezer-bridging availability toggle (default true)
+        uf = st.get("use_freezer")
+        if uf is not None and not isinstance(uf, bool):
+            issues.append(ValidationIssue(
+                "bad_use_freezer", f"{fname}: settings, field 'use_freezer'",
+                f"use_freezer must be a boolean (got {uf!r})"))
+    return issues
+
+
+# --------------------------------------------------------------------------- #
+#  pantry (M0.12, PRD §8.1) — schema + empty-state semantics
+# --------------------------------------------------------------------------- #
+PANTRY_STOCK_REQUIRED = ("ingredient", "grams", "acquired")
+PANTRY_COOKED_REQUIRED = ("component", "grams", "cooked")
+
+
+def _check_date(value: Any) -> bool:
+    """Is ``value`` a parseable ISO date? yaml.safe_load already turns bare
+    ISO dates into datetime.date; strings must be ISO-parseable."""
+    if isinstance(value, datetime.datetime):
+        return True
+    if isinstance(value, datetime.date):
+        return True
+    if isinstance(value, str):
+        try:
+            datetime.date.fromisoformat(value)
+            return True
+        except ValueError:
+            return False
+    return False
+
+
+def validate_pantry_doc(doc: Any, known_ingredients: Optional[set] = None,
+                        known_components: Optional[set] = None,
+                        fname: str = "pantry.yaml") -> list[ValidationIssue]:
+    """All-errors validation of a pantry document.
+
+    Schema: {schema_version: 1, stock: [{ingredient, grams, acquired}],
+    cooked: [{component, grams, cooked}]}. Both lists are optional — an
+    empty pantry is a valid state (PRD §8.1). Every entry needs a known
+    reference, grams > 0, and a parseable ISO date.
+    """
+    issues = _check_schema_version(doc, fname)
+    if not isinstance(doc, dict):
+        return issues
+    for key, required, ref_field, known, unknown_code in (
+            ("stock", PANTRY_STOCK_REQUIRED, "ingredient",
+             known_ingredients, "unknown_ingredient"),
+            ("cooked", PANTRY_COOKED_REQUIRED, "component",
+             known_components, "unknown_component")):
+        rows = doc.get(key)
+        if rows is None:
+            continue                       # absent list == empty pantry
+        if not isinstance(rows, list):
+            issues.append(ValidationIssue(
+                "bad_document", f"{fname}: {key}",
+                f"'{key}' must be a list of entries (got {type(rows).__name__})"))
+            continue
+        date_field = required[2]
+        for idx, r in enumerate(rows):
+            where = f"{fname}: {key}[{idx}]"
+            if not isinstance(r, dict):
+                issues.append(ValidationIssue("bad_document", where,
+                                              "entry is not a mapping"))
+                continue
+            ref = r.get(ref_field)
+            if isinstance(ref, str):
+                where = f"{fname}: {key}[{idx}] ('{ref}')"
+            for f_ in required:
+                if f_ not in r:
+                    issues.append(ValidationIssue(
+                        "missing_field", f"{where}, field '{f_}'",
+                        f"required field '{f_}' is missing"))
+            if (isinstance(ref, str) and known is not None
+                    and ref not in known):
+                issues.append(ValidationIssue(
+                    unknown_code, f"{where}, field '{ref_field}'",
+                    f"{key} entry references unknown {ref_field} '{ref}'"))
+            g = r.get("grams")
+            if g is not None:
+                if not isinstance(g, (int, float)) or isinstance(g, bool):
+                    issues.append(ValidationIssue(
+                        "bad_grams", f"{where}, field 'grams'",
+                        f"grams must be a number (got {g!r})"))
+                elif g <= 0:
+                    issues.append(ValidationIssue(
+                        "nonpositive_grams", f"{where}, field 'grams'",
+                        f"grams must be > 0 (got {g})"))
+            dv = r.get(date_field)
+            if dv is not None and not _check_date(dv):
+                issues.append(ValidationIssue(
+                    "bad_date", f"{where}, field '{date_field}'",
+                    f"'{date_field}' must be an ISO date (got {dv!r})"))
     return issues
 
 
@@ -261,6 +433,7 @@ VALIDATORS = {
     "ingredients": lambda doc, **kw: validate_ingredients_doc(doc, **kw),
     "components": lambda doc, **kw: validate_components_doc(doc, **kw),
     "people": lambda doc, **kw: validate_people_doc(doc, **kw),
+    "pantry": lambda doc, **kw: validate_pantry_doc(doc, **kw),
 }
 
 
@@ -316,6 +489,35 @@ def load(library: str | os.PathLike):
     settings = Settings.from_raw(ppl_doc["settings"],
                                  ppl_doc.get("budget", {"mode": "off"}))
     return ing, comps, people, settings
+
+
+def load_pantry(path: str | os.PathLike,
+                known_ingredients: Optional[set] = None,
+                known_components: Optional[set] = None) -> Pantry:
+    """Load and validate an OPTIONAL pantry.yaml (M0.12, PRD §8.1).
+
+    The pantry is optional at the call site — callers with no pantry simply
+    never call this (purchase(pantry=None) is the no-op empty state). A path
+    that IS given must exist and validate; every problem is reported in one
+    ValidationError.
+    """
+    path = Path(path)
+    if not path.exists():
+        raise ValidationError([ValidationIssue(
+            "missing_file", str(path), "pantry file not found")])
+    try:
+        doc = yaml.safe_load(path.read_text())
+    except yaml.YAMLError as e:
+        raise ValidationError([ValidationIssue(
+            "bad_yaml", str(path), f"YAML parse error: {e}")])
+    issues = validate_pantry_doc(doc, known_ingredients=known_ingredients,
+                                 known_components=known_components,
+                                 fname=path.name)
+    errors, warnings = _split(issues)
+    if errors:
+        raise ValidationError(issues)
+    _report_warnings(warnings)
+    return Pantry.from_raw(doc)
 
 
 # --------------------------------------------------------------------------- #

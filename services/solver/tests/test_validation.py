@@ -16,10 +16,10 @@ from mealplan.io_yaml import (ValidationError, save, validate_components_doc,
 ING_DOC = {
     "schema_version": 1,
     "ingredients": {
-        "chicken": {"kcal": 120, "p": 22.5, "f": 2.6, "c": 0.0,
+        "chicken": {"p": 22.5, "f": 2.6, "c": 0.0,
                     "perishable": True, "pack_g": 907, "keeps_days": 3,
                     "tags": [], "cost": 9.0},
-        "rice": {"kcal": 365, "p": 7.1, "f": 0.7, "c": 80.0,
+        "rice": {"p": 7.1, "f": 0.7, "c": 80.0,
                  "perishable": False, "pack_g": 907, "keeps_days": 999,
                  "tags": [], "cost": 3.5},
     },
@@ -128,14 +128,13 @@ def test_rejects_serve_min_over_max():
     assert any(e.code == "serve_bounds_inverted" for e in errs)
 
 
-def test_unit_misalignment_is_warning_not_error():
+def test_unit_misalignment_is_error():
+    # promoted from warning to error at M0.8: the LP's snap-and-clamp can only
+    # guarantee unit multiples when the bounds sit on the unit grid
     doc = comp_doc(comp("u", unit_g=45, serve_g={"min": 90, "max": 500}))
-    issues = validate_components_doc(doc, known_ingredients=KNOWN)
-    assert not errors_of(issues)
-    warns = warnings_of(issues)
-    assert len(warns) == 1
-    assert warns[0].code == "serve_bounds_not_unit_aligned"
-    # ...and an aligned one produces no warning
+    errs = errors_of(validate_components_doc(doc, known_ingredients=KNOWN))
+    assert any(e.code == "serve_bounds_not_unit_aligned" for e in errs)
+    # ...and an aligned one produces no issue at all
     ok = comp_doc(comp("u2", unit_g=45, serve_g={"min": 90, "max": 450}))
     assert not validate_components_doc(ok, known_ingredients=KNOWN)
 

@@ -48,24 +48,34 @@ def test_examples_corpus_loads(lib):
 def test_derived_per100_matches_prototype(lib, proto_plan):
     """Derived macros for cilantro_lime_rice and birria_chuck must match the
     prototype's derivation to 3 decimals (expected values COMPUTED by running
-    the prototype's own load())."""
+    the prototype's own load()).
+
+    kcal is deliberately excluded from prototype parity: M0.9 made kcal
+    Atwater-only (4/9/4 from the derived macros) while the prototype summed
+    label kcal — that two-accounting defect is the thing M0.9 removed. kcal is
+    instead asserted to be exactly Atwater over the same per100 row."""
     _, comps, _, _ = lib
     _, pcomps, _, _ = proto_plan.load()
     for cid in ("cilantro_lime_rice", "turkey_meatballs", "birria_chuck"):
-        for mac, expected in pcomps[cid]["per100"].items():
+        for mac in ("protein", "fat", "carb"):
             got = comps[cid]["per100"][mac]
-            assert got == pytest.approx(expected, abs=1e-3), (cid, mac)
+            assert got == pytest.approx(pcomps[cid]["per100"][mac],
+                                        abs=1e-3), (cid, mac)
+        pc = comps[cid]["per100"]
+        assert pc["kcal"] == pytest.approx(
+            4 * pc["protein"] + 9 * pc["fat"] + 4 * pc["carb"], abs=1e-3), cid
         assert comps[cid]["tags"] == pcomps[cid]["tags"], cid
 
 
 def test_doctor_produces_report(lib):
     ing, comps, people, settings = lib
-    docmsg, lines = engine.doctor(comps, people, settings)
+    docmsg, data = engine.doctor(comps, people, settings)
     assert "## Feasibility" in docmsg
     assert "## Structural check" in docmsg
     for pname in people:
         assert pname in docmsg
-    assert isinstance(lines, list) and lines
+    # M0.11: the second return value is the structured mirror of the report
+    assert isinstance(data, dict) and data
 
 
 def test_plate_feasible_for_each_person(lib):

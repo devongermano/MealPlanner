@@ -21,17 +21,17 @@ config; one canonical computation per quantity; measured perf baselines recorded
 - [x] M0.2 Schema validation on load and before every write: structured all-errors reporting, atomic writes, `schema_version` on all documents (PRD §8.1). *Unit-alignment is a warning until M0.8 (examples `mango_jalapeno_wings` max 500 vs unit 45 — fix bound to 495 in M0.8).*
 
 ### Confirmed defect fixes (each lands with its regression test)
-- [ ] M0.3 Determinism: kill `hash(pname)` day-seed (`plan.py:537`); every random draw from an explicit seed; no wall clock
-- [ ] M0.4 Canonical batching: one session-attribution function (earliest session still within shelf life — PRD §8.2) feeding cook plan, minutes, purchasing, cost; deletes the `plan.py:577` vs `serve.py:101` fork
-- [ ] M0.5 Dead config, wire or delete: `--force` (parsed, unused — `plan.py:715`), `min_lean_anchors` (yaml says 1, code hardcodes 2 — `plan.py:396`), `meals_per_day` (→ presentation-level meal structure or drop), `min/max_components_per_day`, `batch_g`, `freezes` (→ live availability extension per PRD §8.1)
-- [ ] M0.6 Raw-freshness constraint: shopping trips as data; ingredient cookable in session *s* only within raw `keeps_days` of its trip, else frozen-with-thaw-note (PRD §8.2); enforced in menu search + diagnostics
-- [ ] M0.7 `edible_fraction` on ingredients; portion math weighs gross, macros apply to edible share (bone-in wings defect)
-- [ ] M0.8 Discrete snapping clamped into serve bounds; validation that `serve_g` min/max are `unit_g`-aligned; pinned portions clamped by default, warned when deliberately out of bounds (PRD §8.3)
-- [ ] M0.9 kcal: Atwater-only everywhere; drop ingredient-level label kcal (two-accounting defect); `spices`-style zero-kcal entries get honest values or an explicit `negligible` flag
-- [ ] M0.10 Menu-score scale consistency: waste, cost, and time all at estimated-batch scale (`plan.py:341` computed waste at 1 batch while cost used estimates)
-- [ ] M0.11 Diagnostics upgrades: binding-macro identification per person; volume-floor search (generic form of the reproduced 4.7 lb/day finding); real shelf-life-stagger check (replaces the boolean no-op at `plan.py:397-398`); starch/carb headroom derived from availability math, any residual heuristic labeled `provisional`
-- [ ] M0.12 Pantry: schema + empty-state semantics; purchasing deducts before pack rounding (PRD §8.1)
-- [ ] M0.13 Availability/replate day-correctness: day-constrained rebalance (v1 replate ignored `available_on`)
+- [x] M0.3 Determinism: kill `hash(pname)` day-seed (`plan.py:537`); every random draw from an explicit seed; no wall clock
+- [x] M0.4 Canonical batching: one session-attribution function (earliest session still within shelf life — PRD §8.2) feeding cook plan, minutes, purchasing, cost; deletes the `plan.py:577` vs `serve.py:101` fork
+- [x] M0.5 Dead config, wire or delete: `--force` (parsed, unused — `plan.py:715`), `min_lean_anchors` (yaml says 1, code hardcodes 2 — `plan.py:396`), `meals_per_day` (→ presentation-level meal structure or drop), `min/max_components_per_day`, `batch_g`, `freezes` (→ live availability extension per PRD §8.1)
+- [x] M0.6 Raw-freshness constraint: shopping trips as data; ingredient cookable in session *s* only within raw `keeps_days` of its trip, else frozen-with-thaw-note (PRD §8.2); enforced in menu search + diagnostics
+- [x] M0.7 `edible_fraction` on ingredients; portion math weighs gross, macros apply to edible share (bone-in wings defect)
+- [x] M0.8 Discrete snapping clamped into serve bounds; validation that `serve_g` min/max are `unit_g`-aligned; pinned portions clamped by default, warned when deliberately out of bounds (PRD §8.3)
+- [x] M0.9 kcal: Atwater-only everywhere; drop ingredient-level label kcal (two-accounting defect); `spices`-style zero-kcal entries get honest values or an explicit `negligible` flag
+- [x] M0.10 Menu-score scale consistency: waste, cost, and time all at estimated-batch scale (`plan.py:341` computed waste at 1 batch while cost used estimates)
+- [x] M0.11 Diagnostics upgrades: binding-macro identification per person; volume-floor search (generic form of the reproduced 4.7 lb/day finding); real shelf-life-stagger check (replaces the boolean no-op at `plan.py:397-398`); starch/carb headroom derived from availability math, any residual heuristic labeled `provisional`
+- [x] M0.12 Pantry: schema + empty-state semantics; purchasing deducts before pack rounding (PRD §8.1)
+- [x] M0.13 Availability/replate day-correctness: day-constrained rebalance (v1 replate ignored `available_on`)
 
 ### Measurement & fixtures
 - [ ] M0.14 Instrumentation: LP-solve counts and stage timings; record baselines on reference machine (PRD §8.5)

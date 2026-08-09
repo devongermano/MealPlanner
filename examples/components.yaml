@@ -18,7 +18,6 @@ schema_version: 1
 #             if you let it. These stop that.
 #   unit_g:   set for DISCRETE things (tortillas, meatballs, wings). Grams snap to
 #             multiples of this. Omit for continuous things (rice, braise, sauce).
-#   batch_g:  granularity you can realistically cook/portion in.
 #   source:   where the recipe came from. barefoodtim = Tim Laielli's substack.
 
 components:
@@ -32,7 +31,6 @@ components:
   source: "barefoodtim - gorditas de picadillo (Vitamina T)"
   yield_g: 1000
   serve_g: {min: 80, max: 450}
-  batch_g: 100
   keeps_days: 5
   freezes: true
   active_min: 40
@@ -55,7 +53,6 @@ components:
   yield_g: 425
   unit_g: 85
   serve_g: {min: 85, max: 340}
-  batch_g: 85
   keeps_days: 3
   freezes: true
   active_min: 25
@@ -70,7 +67,6 @@ components:
   source: house
   yield_g: 1500
   serve_g: {min: 80, max: 400}
-  batch_g: 100
   keeps_days: 5
   freezes: true
   active_min: 30      # + 4h unattended in the oven
@@ -91,7 +87,6 @@ components:
   source: house
   yield_g: 1300
   serve_g: {min: 80, max: 400}
-  batch_g: 100
   keeps_days: 5
   freezes: true
   active_min: 25      # + 3h unattended
@@ -112,7 +107,6 @@ components:
   source: house
   yield_g: 900
   serve_g: {min: 80, max: 450}
-  batch_g: 100
   keeps_days: 3
   freezes: false
   active_min: 20
@@ -132,7 +126,6 @@ components:
   source: house
   yield_g: 1250
   serve_g: {min: 100, max: 600}
-  batch_g: 100
   keeps_days: 5
   freezes: true
   active_min: 10
@@ -150,7 +143,6 @@ components:
   source: house
   yield_g: 800
   serve_g: {min: 80, max: 400}
-  batch_g: 100
   keeps_days: 5
   freezes: true
   active_min: 20
@@ -169,7 +161,6 @@ components:
   yield_g: 568
   unit_g: 71
   serve_g: {min: 71, max: 284}     # max 4 tortillas/day. the solver WILL try for 11.
-  batch_g: 71
   keeps_days: 14
   freezes: true
   active_min: 0
@@ -183,7 +174,6 @@ components:
   source: house
   yield_g: 600
   serve_g: {min: 20, max: 150}
-  batch_g: 50
   keeps_days: 7
   freezes: false
   active_min: 15
@@ -203,7 +193,6 @@ components:
   source: house
   yield_g: 700
   serve_g: {min: 20, max: 150}
-  batch_g: 50
   keeps_days: 2
   freezes: false
   active_min: 10
@@ -222,7 +211,6 @@ components:
   source: store
   yield_g: 340
   serve_g: {min: 15, max: 120}
-  batch_g: 30
   keeps_days: 14
   freezes: false
   active_min: 0
@@ -236,7 +224,6 @@ components:
   source: store
   yield_g: 425
   serve_g: {min: 15, max: 100}
-  batch_g: 25
   keeps_days: 14
   freezes: false
   active_min: 0
@@ -254,7 +241,6 @@ components:
   source: "barefoodtim (orange chicken) - soy swapped"
   yield_g: 1100
   serve_g: {min: 80, max: 450}
-  batch_g: 100
   keeps_days: 4
   freezes: true
   active_min: 35
@@ -276,7 +262,6 @@ components:
   source: house
   yield_g: 600
   serve_g: {min: 60, max: 350}
-  batch_g: 50
   keeps_days: 4
   freezes: true
   active_min: 25
@@ -297,7 +282,6 @@ components:
   source: house
   yield_g: 1500
   serve_g: {min: 100, max: 600}
-  batch_g: 100
   keeps_days: 5
   freezes: true
   active_min: 5
@@ -312,7 +296,6 @@ components:
   source: house
   yield_g: 620
   serve_g: {min: 50, max: 300}
-  batch_g: 50
   keeps_days: 3
   freezes: false
   active_min: 10
@@ -331,7 +314,6 @@ components:
   source: house
   yield_g: 280
   serve_g: {min: 10, max: 60}      # dense fat lever, mostly for the 4700 side
-  batch_g: 20
   keeps_days: 14
   freezes: false
   active_min: 10
@@ -350,7 +332,6 @@ components:
   source: "barefoodtim 010 - spicy sausage fusilli al forno (sauce base)"
   yield_g: 1500
   serve_g: {min: 80, max: 400}
-  batch_g: 100
   keeps_days: 5
   freezes: true
   active_min: 35
@@ -370,7 +351,6 @@ components:
   source: house
   yield_g: 1000
   serve_g: {min: 100, max: 500}
-  batch_g: 100
   keeps_days: 4
   freezes: false
   active_min: 12
@@ -387,7 +367,6 @@ components:
   yield_g: 1000
   unit_g: 40
   serve_g: {min: 80, max: 400}
-  batch_g: 40
   keeps_days: 4
   freezes: true
   active_min: 35
@@ -407,7 +386,6 @@ components:
   source: store
   yield_g: 227
   serve_g: {min: 15, max: 120}
-  batch_g: 25
   keeps_days: 14
   freezes: true
   active_min: 0
@@ -421,7 +399,6 @@ components:
   source: "barefoodtim 008 - crispy rosemary potatoes"
   yield_g: 1100
   serve_g: {min: 100, max: 500}
-  batch_g: 100
   keeps_days: 4
   freezes: false
   active_min: 15
@@ -441,8 +418,7 @@ components:
   source: "barefoodtim 013 - soy sauce -> coconut aminos, butter -> neutral oil"
   yield_g: 1600
   unit_g: 45
-  serve_g: {min: 90, max: 500}
-  batch_g: 45
+  serve_g: {min: 90, max: 495}   # 2..11 wings; bounds must sit on the 45g unit grid (M0.8)
   keeps_days: 4
   freezes: true
   active_min: 20
@@ -467,7 +443,6 @@ components:
   source: "barefoodtim - breakfast burritos"
   yield_g: 950
   serve_g: {min: 80, max: 450}
-  batch_g: 100
   keeps_days: 3
   freezes: true
   active_min: 25
@@ -485,7 +460,6 @@ components:
   source: store
   yield_g: 227
   serve_g: {min: 15, max: 120}
-  batch_g: 25
   keeps_days: 14
   freezes: true
   active_min: 0
@@ -503,7 +477,6 @@ components:
   source: house
   yield_g: 1200
   serve_g: {min: 80, max: 500}
-  batch_g: 100
   keeps_days: 5
   freezes: true
   active_min: 20

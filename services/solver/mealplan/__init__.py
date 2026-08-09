@@ -1,10 +1,16 @@
 """mealplan — constraint-based batch-cooking planner engine.
 
 M0 extraction of the v1 prototype (`mealplan/plan.py` at the repo root, commit
-4851dd1). Behavior-preserving, bug-for-bug: the prototype's known defects
-(hash(pname) day seeding, unused --force, global-ceil batching, 1-batch waste in
-the menu score, …) are deliberately kept — each is a Phase 2 task with its own
-regression test. The ONLY behavior added here is schema validation (M0.2).
+4851dd1). Extracted behavior-preserving, bug-for-bug; Phase 2 then fixes the
+prototype's known defects one by one, each with its own regression test.
+All eleven Phase 2 fixes (M0.3–M0.13) have landed with regression tests:
+explicit-seed determinism, canonical per-session batching (costing.session_plan
+is the one source for cook plan, minutes, purchasing, cost), dead config wired
+or deleted (--force works; freezes is live via use_freezer; min_lean_anchors
+is a setting; meals_per_day reserved for M1 presentation), raw freshness
+(shop_days + freezable with thaw notes), edible_fraction, snap/pin clamping,
+Atwater-only kcal, pantry deduction, estimated-batch score scale, and the
+doctor diagnostics (binding macro, volume floor, lean coverage, carb headroom).
 
 Modules:
     model    typed dataclasses + macro/tag derivation (per100, tag union)

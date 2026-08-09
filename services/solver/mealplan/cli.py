@@ -14,20 +14,26 @@ relative to the current directory — the package hardcodes NO repo paths, PRD P
 """
 
 import argparse
-import math
 import sys
 from pathlib import Path
 
 from . import io_yaml
-from .costing import attribute, budget_ceiling, menu_cost, purchase
-from .engine import available_on, build_week, choose_menu, plate, score_menu
+from .costing import (attribute, budget_ceiling, menu_cost, purchase,
+                      session_plan)
+from .engine import (available_on, build_week, choose_menu, from_freezer,
+                     plate, score_menu)
 from .units import MACROS, fmt_miss, kcal_of
 
 
 # --------------------------------------------------------------------------- #
 #  report
 # --------------------------------------------------------------------------- #
-def render(comps, ing, people, settings, menu, weeks, demand, docmsg, menuinfo):
+def render(comps, ing, people, settings, menu, weeks, demand, docmsg, menuinfo,
+           sp, pantry=None):
+    """``sp`` is the canonical session plan (costing.session_plan, M0.4/P10):
+    the ONE source for the cook plan, minutes, purchasing, and cost below.
+    ``pantry`` (M0.12, optional): stock is deducted from the shopping list —
+    and therefore the cost — before pack rounding, inside purchase()."""
     L = ["# Week plan\n", docmsg, "\n## Menu\n"]
     for i in menu:
         c = comps[i]
@@ -38,22 +44,40 @@ def render(comps, ing, people, settings, menu, weeks, demand, docmsg, menuinfo):
                    f"/ {pc['carb']:.1f}c per 100g — {c['active_min']}min active, "
                    f"keeps {c['keeps_days']}d"
                  + (f" — source: {c['source']}" if c.get("source") else ""))
-    L.append(f"\nHands-on total: **{menuinfo['active_min']} min** "
+    L.append(f"\nHands-on total: **{sp['minutes']} min** "
              f"(budget {settings['active_min_budget']}), "
              f"{menuinfo['cuisines']} cuisines.\n")
 
-    # batches
-    L.append("## Cook list\n")
-    L.append("| component | need | batches | cook | leftover |")
-    L.append("|---|---|---|---|---|")
-    batches = {}
-    for i in menu:
-        need = demand.get(i, 0)
-        b = max(1, math.ceil(need / comps[i]["yield_g"] - 1e-9)) if need else 0
-        batches[i] = b
-        made = b * comps[i]["yield_g"]
-        if b:
-            L.append(f"| {comps[i]['name']} | {need}g | {b} | {made}g | {made-need}g |")
+    # cook plan — straight from the canonical session plan (M0.4). Each
+    # session lists what IT cooks; purchasing and cost below consume the
+    # summed per-session batches.
+    L.append("## Cook plan\n")
+    batches = sp["batches"]
+    for s in sp["sessions"]:
+        L.append(f"### Session {s['index']} — cook day {s['start']} — "
+                 f"{s['minutes']} min active\n")
+        if not s["batches"]:
+            L.append("_nothing to cook this session_\n")
+            continue
+        L.append("| component | need | batches | cook | leftover |")
+        L.append("|---|---|---|---|---|")
+        for i in menu:
+            b = s["batches"].get(i, 0)
+            if not b:
+                continue
+            need = s["demand_g"][i]
+            made = s["made_g"][i]
+            L.append(f"| {comps[i]['name']} | {need}g | {b} | {made}g "
+                     f"| {made-need}g |")
+        for n in s["thaw_notes"]:
+            L.append(f"- THAW: {n['note']}")
+        for n in s.get("freezer_notes", []):
+            L.append(f"- FREEZER: {n['note']}")
+        L.append("")
+    for u in sp["unattributed"]:
+        L.append(f"- WARNING: {u['grams']}g of `{u['component']}` demanded on "
+                 f"day {u['day']} but no cook session can feed that day — "
+                 "run `mealplan doctor`.")
 
     L.append("\n## Custom foods to create in your tracker\n")
     L.append("Create each of these once, per 100g. Then you only ever log a weight.\n")
@@ -75,7 +99,7 @@ def render(comps, ing, people, settings, menu, weeks, demand, docmsg, menuinfo):
         for d, pl in enumerate(wk, 1):
             if not pl:
                 gone = [comps[i]["name"] for i in menu
-                        if not available_on(comps[i], d - 1, settings)]
+                        if not available_on(comps[i], d - 1, settings, ing)]
                 L.append(f"**Day {d}** — NO FEASIBLE PLATE.")
                 L.append(f"  - past shelf life by day {d}: "
                          + (", ".join(gone) if gone else "nothing"))
@@ -90,11 +114,14 @@ def render(comps, ing, people, settings, menu, weeks, demand, docmsg, menuinfo):
             for c, g in sorted(pl.items(), key=lambda x: -x[1]):
                 u = comps[c].get("unit_g")
                 extra = f"  ({g//u} × {comps[c]['name'].lower()})" if u else ""
+                if from_freezer(comps[c], d - 1, settings, ing):
+                    extra += "  — from freezer — thaw ahead"
                 L.append(f"  - {comps[c]['name']}: **{g}g**{extra}")
             L.append("")
 
     # ---- cost + volume ----
-    bought = menu_cost(comps, ing, [i for i in menu if batches.get(i)], batches)
+    bought = menu_cost(comps, ing, [i for i in menu if batches.get(i)], batches,
+                       pantry=pantry)
     shares, eaten = attribute(comps, ing, weeks, bought)
     cap = budget_ceiling(settings, people)
     b = settings.get("budget") or {}
@@ -130,7 +157,8 @@ def render(comps, ing, people, settings, menu, weeks, demand, docmsg, menuinfo):
         L.append(f"| {pn} | {sum(ms)/len(ms):.0f}g ({sum(ms)/len(ms)/453.6:.1f} lb) "
                  f"| {min(ms)}-{max(ms)}g | {capm or 'none'} |")
 
-    rows, wp, wt = purchase(comps, ing, [i for i in menu if batches.get(i)], batches)
+    rows, wp, wt = purchase(comps, ing, [i for i in menu if batches.get(i)],
+                            batches, pantry=pantry)
     L.append("\n## Shopping list\n")
     L.append("| ingredient | need | buy | leftover | keeps |")
     L.append("|---|---|---|---|---|")
@@ -146,7 +174,7 @@ def render(comps, ing, people, settings, menu, weeks, demand, docmsg, menuinfo):
 
 
 # --------------------------------------------------------------------------- #
-def frontier(comps, ing, people, settings, lo, hi, step, n):
+def frontier(comps, ing, people, settings, lo, hi, step, n, seed=0, must=None):
     """What does each budget level actually buy? This is the answer to
     'how much variety can we afford' — a curve, not a number."""
     print(f"{'budget':>8} {'spend':>8} {'dishes':>7} {'cuisines':>9} "
@@ -156,7 +184,8 @@ def frontier(comps, ing, people, settings, lo, hi, step, n):
     for cap in range(lo, hi + 1, step):
         st = dict(settings)
         st["budget"] = {"mode": "shared", "total": cap}
-        menu, info, feas, broke = choose_menu(comps, ing, people, st, n=n)
+        menu, info, feas, broke = choose_menu(comps, ing, people, st, n=n,
+                                              seed=seed, must=must)
         spend = menu_cost(comps, ing, menu, people=people, settings=st)
         mains = len([i for i in menu if comps[i]["role"] in ("main", "starch")])
         print(f"{cap:>8} {spend:>8.0f} {mains:>7} {info['cuisines']:>9} "
@@ -180,6 +209,9 @@ def main(argv=None):
     ap.add_argument("--library", default=None, metavar="PATH",
                     help="library directory holding ingredients/components/people "
                          "yaml (default: ./examples)")
+    ap.add_argument("--pantry", default=None, metavar="PATH",
+                    help="optional pantry.yaml; on-hand stock is deducted from "
+                         "the shopping list before pack rounding (M0.12)")
     ap.add_argument("--n", type=int, default=10)
     ap.add_argument("--menu", default=None)
     ap.add_argument("--seed", type=int, default=0)
@@ -197,6 +229,14 @@ def main(argv=None):
         ing, comps, people, settings = io_yaml.load(lib)
     except io_yaml.ValidationError as e:
         sys.exit(str(e))
+    pantry = None
+    if a.pantry:
+        try:
+            pantry = io_yaml.load_pantry(a.pantry,
+                                         known_ingredients=set(ing),
+                                         known_components=set(comps))
+        except io_yaml.ValidationError as e:
+            sys.exit(str(e))
     if a.budget:
         settings["budget"] = parse_budget(a.budget)
     if a.mass:
@@ -205,12 +245,20 @@ def main(argv=None):
             people[k]["max_daily_mass_g"] = float(v)
     for cid in [x for x in a.exclude.split(",") if x]:
         comps.pop(cid, None)
+    # M0.5: --force is WIRED — forced components ride through choose_menu's
+    # ``must`` list; unknown ids (or ids just removed by --exclude) are a
+    # CLI error naming them.
+    force = [x.strip() for x in a.force.split(",") if x.strip()]
+    unknown_forced = [x for x in force if x not in comps]
+    if unknown_forced:
+        sys.exit(f"unknown components in --force: {', '.join(unknown_forced)}")
     if a.cmd == "frontier":
         lo, hi, st = (int(x) for x in a.range.split(":"))
-        frontier(comps, ing, people, settings, lo, hi, st, a.n)
+        frontier(comps, ing, people, settings, lo, hi, st, a.n, seed=a.seed,
+                 must=force)
         return
     from .engine import doctor as _doctor
-    docmsg, _ = _doctor(comps, people, settings)
+    docmsg, _ = _doctor(comps, people, settings, ing=ing)
 
     if a.cmd == "doctor":
         print(docmsg)
@@ -224,7 +272,8 @@ def main(argv=None):
         _, menuinfo = score_menu(comps, ing, menu, settings)
     else:
         menu, menuinfo, feas, broke = choose_menu(comps, ing, people, settings,
-                                                  n=a.n, seed=a.seed)
+                                                  n=a.n, seed=a.seed,
+                                                  must=force)
         if not feas:
             print("!! best menu found is not feasible for everyone:", file=sys.stderr)
             for who, miss in broke.items():
@@ -240,8 +289,11 @@ def main(argv=None):
               f"cuisines {menuinfo['cuisines']}")
         return
 
-    weeks, demand = build_week(comps, people, settings, menu)
-    out = render(comps, ing, people, settings, menu, weeks, demand, docmsg, menuinfo)
+    weeks, demand = build_week(comps, people, settings, menu, seed=a.seed,
+                               ing=ing)
+    sp = session_plan(comps, ing, settings, weeks)
+    out = render(comps, ing, people, settings, menu, weeks, demand, docmsg,
+                 menuinfo, sp, pantry=pantry)
 
     if a.cmd == "shop":
         print(out.split("## Shopping list")[1])
