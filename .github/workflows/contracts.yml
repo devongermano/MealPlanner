@@ -1,0 +1,42 @@
+name: Contracts
+
+# Drift gate for the generated cross-language contract (ARCHITECTURE.md "the
+# one non-negotiable wiring rule"): pydantic schemas -> solver-service
+# OpenAPI -> codegen'd TS in packages/contracts. Fails the PR when the
+# checked-in openapi.json / src/index.ts are stale against the schemas —
+# hand-mirrored or hand-edited types can never land.
+#
+# Deliberately a SEPARATE workflow from ci.yml (zero-conflict rule with the
+# in-flight M1 track). Static run commands only — no github event
+# interpolation in run: blocks.
+
+on:
+  pull_request:
+    paths:
+      - "services/solver/mealplan/schemas.py"
+      - "services/solver/mealplan/service.py"
+      - "packages/contracts/**"
+      - ".github/workflows/contracts.yml"
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+          cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: python -m pip install -e "services/solver[dev,service]"
+      - run: npm ci --no-audit --no-fund
+        working-directory: packages/contracts
+      - name: Regenerate and diff (fails on drift)
+        run: PYTHON=python npm run check
+        working-directory: packages/contracts
+      - name: Typecheck generated TS
+        run: npm run typecheck
+        working-directory: packages/contracts
