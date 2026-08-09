@@ -1,0 +1,8 @@
+.DS_Store
+.venv/
+__pycache__/
+*.pyc
+.remember/
+mealplan.zip
+.pytest_cache/
+plan.md

@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>mealplan</title>
+<style>
+:root{
+  color-scheme: dark;
+  --page:#0d0d0d; --surface:#1a1a19; --raised:#232321;
+  --ink:#ffffff; --ink2:#c3c2b7; --muted:#898781;
+  --grid:#2c2c2a; --base:#383835; --hair:rgba(255,255,255,.10);
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70;
+  --good:#0ca30c; --warn:#fab219; --crit:#d03b3b;
+  --accent:#eda100;
+}
+:root[data-theme="light"]{
+  color-scheme: light;
+  --page:#f9f9f7; --surface:#fcfcfb; --raised:#ffffff;
+  --ink:#0b0b0b; --ink2:#52514e; --muted:#898781;
+  --grid:#e1e0d9; --base:#c3c2b7; --hair:rgba(11,11,11,.10);
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:var(--page); color:var(--ink);
+  font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;
+  -webkit-font-smoothing:antialiased; padding-bottom:80px;
+}
+.wrap{max-width:1180px;margin:0 auto;padding:0 20px}
+header{
+  position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--page) 92%,transparent);
+  backdrop-filter:blur(12px);border-bottom:1px solid var(--hair);
+}
+.hrow{display:flex;align-items:center;gap:16px;padding:14px 0;flex-wrap:wrap}
+.logo{font-weight:650;letter-spacing:-.02em;font-size:17px}
+.logo span{color:var(--muted);font-weight:400}
+.spacer{flex:1}
+.tabs{display:flex;gap:2px;background:var(--surface);padding:3px;border-radius:11px;border:1px solid var(--hair)}
+.tab{padding:7px 15px;border-radius:8px;border:0;background:transparent;color:var(--ink2);
+  font:inherit;font-weight:520;cursor:pointer;transition:.15s}
+.tab[aria-selected="true"]{background:var(--raised);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.iconbtn{background:var(--surface);border:1px solid var(--hair);color:var(--ink2);
+  width:34px;height:34px;border-radius:9px;cursor:pointer;font-size:14px}
+.btn{background:var(--accent);color:#1a1a19;border:0;border-radius:9px;padding:9px 16px;
+  font:inherit;font-weight:620;cursor:pointer;transition:.15s}
+.btn:hover{filter:brightness(1.08)} .btn:disabled{opacity:.45;cursor:wait}
+.btn.ghost{background:var(--surface);color:var(--ink);border:1px solid var(--hair)}
+section{display:none;padding-top:26px} section.on{display:block}
+h2{font-size:13px;font-weight:620;letter-spacing:.07em;text-transform:uppercase;
+  color:var(--muted);margin:30px 0 12px}
+h2:first-child{margin-top:0}
+.card{background:var(--surface);border:1px solid var(--hair);border-radius:14px;padding:16px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:10px}
+.tile{background:var(--surface);border:1px solid var(--hair);border-radius:13px;padding:14px 15px}
+.tile .k{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.tile .v{font-size:26px;font-weight:640;letter-spacing:-.025em;margin-top:5px;line-height:1.1}
+.tile .sub{font-size:12px;color:var(--ink2);margin-top:3px}
+.tile.alert{border-color:color-mix(in srgb,var(--crit) 55%,var(--hair))}
+.tile.alert .v{color:var(--crit)}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{display:flex;align-items:center;gap:9px;background:var(--surface);border:1px solid var(--hair);
+  border-radius:11px;padding:9px 11px 9px 13px;font-size:13px;position:relative;overflow:hidden}
+.chip::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--dot,var(--muted))}
+.chip b{font-weight:580}
+.chip .meta{color:var(--muted);font-size:11.5px;font-variant-numeric:tabular-nums}
+.chip .x{border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:15px;
+  padding:0 2px;line-height:1;border-radius:5px}
+.chip .x:hover{color:var(--crit)}
+.chip .pin{border:0;background:transparent;cursor:pointer;font-size:12px;color:var(--muted);padding:0 2px}
+.chip.pinned{border-color:var(--accent)} .chip.pinned .pin{color:var(--accent)}
+.ctrl{display:grid;grid-template-columns:150px 1fr 92px;gap:14px;align-items:center;padding:9px 0}
+.ctrl + .ctrl{border-top:1px solid var(--hair)}
+.ctrl label{font-size:13px;color:var(--ink2);font-weight:520}
+.ctrl .val{text-align:right;font-variant-numeric:tabular-nums;font-weight:600;font-size:14px}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:4px;border-radius:2px;
+  background:var(--grid);outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:17px;height:17px;border-radius:50%;
+  background:var(--accent);cursor:pointer;border:3px solid var(--surface);box-shadow:0 0 0 1px var(--hair)}
+input[type=range]::-moz-range-thumb{width:17px;height:17px;border-radius:50%;background:var(--accent);
+  cursor:pointer;border:3px solid var(--surface)}
+.days{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:12px}
+.day{background:var(--surface);border:1px solid var(--hair);border-radius:14px;padding:15px}
+.day.bad{border-color:color-mix(in srgb,var(--crit) 50%,var(--hair))}
+.dhead{display:flex;align-items:baseline;gap:9px;margin-bottom:12px}
+.dhead .n{font-weight:640;font-size:15px}
+.dhead .kc{margin-left:auto;font-variant-numeric:tabular-nums;font-weight:640;font-size:15px}
+.dhead .kc small{color:var(--muted);font-weight:400;font-size:11px}
+.meters{display:grid;gap:7px;margin-bottom:13px}
+.meter{display:grid;grid-template-columns:20px 1fr 78px;gap:9px;align-items:center;font-size:11.5px}
+.meter .lab{color:var(--muted);font-weight:620;letter-spacing:.04em}
+.track{height:7px;border-radius:4px;background:var(--grid);position:relative;overflow:hidden}
+.fill{height:100%;border-radius:4px;transition:width .28s cubic-bezier(.4,0,.2,1)}
+.tick{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--ink);opacity:.55;border-radius:1px}
+.meter .num{text-align:right;font-variant-numeric:tabular-nums;color:var(--ink2)}
+.meter .num b{color:var(--ink);font-weight:620}
+.rows{display:grid;gap:2px}
+.prow{display:grid;grid-template-columns:1fr 62px;gap:10px;align-items:center;padding:6px 8px;
+  border-radius:8px;font-size:13px}
+.prow:hover{background:var(--raised)}
+.prow .nm{display:flex;align-items:center;gap:8px;min-width:0}
+.prow .nm i{width:7px;height:7px;border-radius:2px;background:var(--dot);flex:none}
+.prow .nm span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.prow input{width:100%;background:var(--raised);border:1px solid var(--hair);color:var(--ink);
+  border-radius:7px;padding:4px 6px;font:inherit;font-size:12.5px;text-align:right;
+  font-variant-numeric:tabular-nums}
+.prow input:focus{outline:none;border-color:var(--accent)}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{text-align:left;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);
+  font-weight:620;padding:0 10px 9px;border-bottom:1px solid var(--hair)}
+td{padding:9px 10px;border-bottom:1px solid var(--hair);font-variant-numeric:tabular-nums}
+td:first-child,th:first-child{padding-left:2px} tr:last-child td{border-bottom:0}
+tr.done td{opacity:.38;text-decoration:line-through}
+.num{text-align:right} .chk{width:28px} .chk input{width:16px;height:16px;accent-color:var(--accent);cursor:pointer}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--ink2);margin-bottom:12px}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+.charts{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
+.chart{background:var(--surface);border:1px solid var(--hair);border-radius:14px;padding:16px}
+.chart h3{font-size:13px;font-weight:600;margin-bottom:2px}
+.chart p{font-size:11.5px;color:var(--muted);margin-bottom:12px}
+svg{display:block;width:100%;overflow:visible}
+.tip{position:fixed;pointer-events:none;background:var(--raised);border:1px solid var(--hair);
+  border-radius:9px;padding:8px 11px;font-size:12px;box-shadow:0 8px 24px rgba(0,0,0,.4);
+  opacity:0;transition:opacity .1s;z-index:50;font-variant-numeric:tabular-nums}
+.banner{border-radius:12px;padding:13px 15px;font-size:13.5px;margin-bottom:16px;
+  border:1px solid color-mix(in srgb,var(--crit) 50%,var(--hair));
+  background:color-mix(in srgb,var(--crit) 11%,var(--surface))}
+.banner b{color:var(--crit)}
+.note{font-size:12.5px;color:var(--muted);margin-top:10px}
+.pill{display:inline-block;font-size:10.5px;font-weight:620;letter-spacing:.05em;text-transform:uppercase;
+  padding:2px 7px;border-radius:6px;background:var(--raised);color:var(--muted);border:1px solid var(--hair)}
+.pill.lean{color:var(--s3);border-color:color-mix(in srgb,var(--s3) 45%,var(--hair))}
+.split{display:grid;grid-template-columns:1fr 340px;gap:16px;align-items:start}
+@media(max-width:860px){.split{grid-template-columns:1fr}.ctrl{grid-template-columns:110px 1fr 72px}}
+.loading{opacity:.45;transition:opacity .2s}
+.who{display:flex;gap:2px;background:var(--surface);padding:3px;border-radius:10px;border:1px solid var(--hair)}
+.who button{border:0;background:transparent;color:var(--ink2);padding:6px 14px;border-radius:7px;
+  font:inherit;font-size:13px;font-weight:540;cursor:pointer}
+.who button[aria-pressed="true"]{background:var(--raised);color:var(--ink)}
+</style>
+</head>
+<body>
+<header><div class="wrap hrow">
+  <div class="logo">mealplan <span id="wk"></span></div>
+  <div class="spacer"></div>
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" aria-selected="true" data-t="plan">Plan</button>
+    <button class="tab" role="tab" aria-selected="false" data-t="eat">Eat</button>
+    <button class="tab" role="tab" aria-selected="false" data-t="shop">Shop &amp; Cook</button>
+  </div>
+  <button class="iconbtn" id="theme" title="Toggle theme">☀</button>
+  <button class="btn" id="solve">Re-solve</button>
+</div></header>
+
+<div class="wrap">
+  <div id="banner"></div>
+
+  <!-- ================= PLAN ================= -->
+  <section id="plan" class="on">
+    <div class="tiles" id="tiles"></div>
+
+    <div class="split" style="margin-top:22px">
+      <div>
+        <h2>This week's menu</h2>
+        <div class="chips" id="menu"></div>
+        <p class="note">📌 pins a dish so re-solving keeps it. ✕ drops it from the library for this solve.</p>
+
+        <h2>Dropped</h2>
+        <div class="chips" id="dropped"></div>
+      </div>
+
+      <div class="card">
+        <h2 style="margin-top:0">Dials</h2>
+        <div class="ctrl"><label>Budget ceiling</label>
+          <input type="range" id="budget" min="220" max="700" step="10"><div class="val" id="budgetV"></div></div>
+        <div class="ctrl"><label>Dishes on menu</label>
+          <input type="range" id="n" min="8" max="18" step="1"><div class="val" id="nV"></div></div>
+        <div class="ctrl"><label>Jimbo max/day</label>
+          <input type="range" id="mJ" min="1800" max="3400" step="50"><div class="val" id="mJV"></div></div>
+        <div class="ctrl"><label>Devon max/day</label>
+          <input type="range" id="mD" min="1000" max="2600" step="50"><div class="val" id="mDV"></div></div>
+        <div class="ctrl"><label>Shuffle</label>
+          <input type="range" id="seed" min="0" max="40" step="1"><div class="val" id="seedV"></div></div>
+        <p class="note">Every change re-runs the actual solver. Nothing here is precomputed.</p>
+      </div>
+    </div>
+
+    <h2>What each budget buys</h2>
+    <div class="charts" id="frontier">
+      <div class="chart"><h3>Actual spend</h3><p>Loading the sweep…</p></div>
+    </div>
+  </section>
+
+  <!-- ================= EAT ================= -->
+  <section id="eat">
+    <div class="hrow" style="padding:0 0 18px">
+      <div class="who" id="who"></div>
+      <div class="spacer"></div>
+      <button class="btn ghost" id="rebalance">Rebalance locked days</button>
+    </div>
+    <div class="legend">
+      <span><i style="background:var(--s1)"></i>Protein</span>
+      <span><i style="background:var(--s2)"></i>Fat</span>
+      <span><i style="background:var(--s3)"></i>Carb</span>
+      <span style="color:var(--muted)">│ marker = target</span>
+    </div>
+    <div class="days" id="days"></div>
+  </section>
+
+  <!-- ================= SHOP & COOK ================= -->
+  <section id="shop">
+    <div class="tiles" id="shoptiles"></div>
+    <div class="split" style="margin-top:22px">
+      <div>
+        <h2>Shopping list — perishable</h2>
+        <div class="card"><table id="shopP"></table></div>
+        <h2>Pantry &amp; shelf-stable</h2>
+        <div class="card"><table id="shopS"></table></div>
+      </div>
+      <div>
+        <h2>Cook days</h2>
+        <div id="cook"></div>
+      </div>
+    </div>
+  </section>
+</div>
+<div class="tip" id="tip"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const MAC = [['protein','P','--s1'],['fat','F','--s2'],['carb','C','--s3']];
+const CU = {mexican:'--s2', cn_am:'--s1', italian:'--s3', crossover:'--accent'};
+let D = null, dropped = [], pinned = [], who = null, edits = {}, checked = new Set();
+
+const state = () => ({
+  n: +$('#n').value, seed: +$('#seed').value, budget: +$('#budget').value,
+  exclude: dropped, force: pinned,
+  mass: {jimbo: +$('#mJ').value >= 3400 ? null : +$('#mJ').value,
+         devon: +$('#mD').value >= 2600 ? null : +$('#mD').value},
+});
+
+async function solve(){
+  const b = $('#solve'); b.disabled = true; b.textContent = 'Solving…';
+  document.body.classList.add('loading');
+  try{
+    const r = await fetch('/api/plan',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(state())});
+    D = await r.json();
+    if(D.error) throw new Error(D.error);
+    edits = {}; who = who || Object.keys(D.people)[0];
+    render();
+  }catch(e){
+    $('#banner').innerHTML = `<div class="banner"><b>Solver error.</b> ${String(e.message).slice(0,400)}</div>`;
+  }finally{
+    b.disabled=false; b.textContent='Re-solve'; document.body.classList.remove('loading');
+  }
+}
+
+/* ---------------- render ---------------- */
+function render(){
+  const c = D.cost, v = D.volume;
+  $('#wk').textContent = `· ${D.menu.length} dishes · $${c.bought.toFixed(0)}`;
+
+  $('#banner').innerHTML = D.feasible ? '' :
+    `<div class="banner"><b>Not feasible.</b> ` +
+    Object.entries(D.broke).map(([p,m]) => `${p}: ` +
+      Object.entries(m).map(([k,x]) => x>0 ? `${k} forced ${Math.abs(x)}g over`
+        : `${k} ${Math.abs(x)}g short`).join(', ')).join(' · ') +
+    ` — loosen a dial, or drop a dish that's crowding the menu.</div>`;
+
+  const over = c.ceiling && c.bought > c.ceiling;
+  $('#tiles').innerHTML = [
+    tile('Groceries', '$'+c.bought.toFixed(0),
+         c.ceiling ? (over ? `$${(c.bought-c.ceiling).toFixed(0)} over ceiling`
+                           : `$${(c.ceiling-c.bought).toFixed(0)} under $${c.ceiling}`) : '', over),
+    tile('Eaten', '$'+c.eaten.toFixed(0), `$${(c.bought-c.eaten).toFixed(0)} is leftover you paid for`),
+    ...Object.entries(c.shares).map(([p,s]) =>
+       tile(p+"'s share", '$'+s.toFixed(0),
+            `${(s/c.bought*100).toFixed(0)}% of cost · ${(D.people[p].kcal/
+              Object.values(D.people).reduce((a,x)=>a+x.kcal,0)*100).toFixed(0)}% of calories`)),
+    tile('Perishable waste', D.waste.perishable+'g'),
+    tile('Hands-on', fmtMin(D.cook_minutes),
+         D.active_budget && D.cook_minutes > D.active_budget
+           ? `budget was ${fmtMin(D.active_budget)} — this is ${(D.cook_minutes/D.active_budget).toFixed(1)}×`
+           : `${D.info.cuisines} cuisines`,
+         D.active_budget && D.cook_minutes > D.active_budget * 1.15),
+    ...Object.entries(v).map(([p,x]) =>
+       tile(p+' per day', (x.avg/453.6).toFixed(1)+' lb',
+            `${x.avg}g · cap ${x.cap ? x.cap+'g' : 'none'}`)),
+  ].join('');
+
+  $('#menu').innerHTML = D.menu.map(chipHTML).join('');
+  $('#dropped').innerHTML = dropped.length
+    ? dropped.map(id => `<div class="chip"><b>${id}</b>
+        <button class="x" data-undrop="${id}" title="put back">↩</button></div>`).join('')
+    : '<span class="note">Nothing dropped.</span>';
+
+  $('#who').innerHTML = Object.keys(D.people).map(p =>
+    `<button data-who="${p}" aria-pressed="${p===who}">${p}</button>`).join('');
+  renderDays();
+  renderShop();
+}
+const tile = (k,v,sub='',alert=false) =>
+  `<div class="tile${alert?' alert':''}"><div class="k">${k}</div><div class="v">${v}</div>` +
+  (sub?`<div class="sub">${sub}</div>`:'') + `</div>`;
+
+function chipHTML(id){
+  const c = D.components[id];
+  return `<div class="chip${pinned.includes(id)?' pinned':''}" style="--dot:var(${CU[c.cuisine]||'--muted'})">
+    <div><b>${c.name}</b>${c.anchor==='lean'?' <span class="pill lean">lean</span>':''}
+      <div class="meta">${c.per100.kcal.toFixed(0)} kcal · ${c.per100.protein.toFixed(0)}p
+        ${c.per100.fat.toFixed(0)}f ${c.per100.carb.toFixed(0)}c /100g · $${c.cost_per_100g.toFixed(2)}
+        · keeps ${c.keeps}d</div></div>
+    <button class="pin" data-pin="${id}" title="pin">📌</button>
+    <button class="x" data-drop="${id}" title="drop">✕</button></div>`;
+}
+
+/* ---------------- eat tab ---------------- */
+function dayItems(pi){
+  const base = D.weeks[who][pi].items;
+  return {...base, ...(edits[who]?.[pi] || {})};
+}
+function renderDays(){
+  const P = D.people[who];
+  $('#days').innerHTML = D.weeks[who].map((d,i) => {
+    const items = dayItems(i);
+    if(!Object.keys(items).length)
+      return `<div class="day bad"><div class="dhead"><span class="n">Day ${i+1}</span></div>
+        <p class="note">No feasible plate. Everything short-dated has expired by here —
+        move a cook day or add a longer-keeping component.</p></div>`;
+    const t = totals(items);
+    return `<div class="day"><div class="dhead"><span class="n">Day ${i+1}</span>
+        <span class="kc">${Math.round(t.kcal)} <small>kcal · ${(sumG(items)/453.6).toFixed(1)} lb</small></span></div>
+      <div class="meters">${MAC.map(([m,l,cv]) => meter(l,cv,t[m],P.targets[m],P.tolerance)).join('')}</div>
+      <div class="rows">${Object.entries(items).sort((a,b)=>b[1]-a[1]).map(([id,g]) =>
+        `<div class="prow" style="--dot:var(--base)">
+          <div class="nm"><i></i><span title="${D.components[id].name}">${D.components[id].name}</span></div>
+          <input type="number" step="5" min="0" value="${Math.round(g)}"
+            data-day="${i}" data-id="${id}"></div>`).join('')}</div></div>`;
+  }).join('');
+}
+function meter(lab,cv,val,tgt,tol){
+  const pct = Math.min(140, val/tgt*100), inBand = Math.abs(val-tgt)/tgt <= tol;
+  return `<div class="meter"><span class="lab">${lab}</span>
+    <div class="track"><div class="fill" style="width:${Math.min(100,pct)}%;
+      background:var(${cv});${pct>100?'opacity:.55':''}"></div>
+      <div class="tick" style="left:calc(100% - 1px)"></div></div>
+    <span class="num"><b style="${inBand?'':'color:var(--warn)'}">${Math.round(val)}</b>/${Math.round(tgt)}g</span></div>`;
+}
+const fmtMin = m => m>=90 ? `${Math.floor(m/60)}h ${String(m%60).padStart(2,'0')}m` : `${m} min`;
+const sumG = it => Object.values(it).reduce((a,b)=>a+b,0);
+function totals(items){
+  const t = {kcal:0,protein:0,fat:0,carb:0};
+  for(const [id,g] of Object.entries(items)){
+    const p = D.components[id].per100;
+    for(const k in t) t[k] += p[k]*g/100;
+  }
+  return t;
+}
+
+/* ---------------- shop & cook ---------------- */
+function renderShop(){
+  const per = D.shop.filter(s=>s.perishable), sh = D.shop.filter(s=>!s.perishable);
+  const total = D.shop.reduce((a,s)=>a+s.cost,0);
+  const left = D.shop.filter(s=>!checked.has(s.name)).reduce((a,s)=>a+s.cost,0);
+  $('#shoptiles').innerHTML = [
+    tile('Cart total', '$'+total.toFixed(2), `${D.shop.length} items`),
+    tile('Still to grab', '$'+left.toFixed(2), `${D.shop.length-checked.size} items left`),
+    tile('Cook time', fmtMin(D.cook_minutes),
+         (D.session_minutes||[]).map(fmtMin).join(' + '),
+         D.active_budget && D.cook_minutes > D.active_budget*1.15),
+    tile('Batches', D.cook.reduce((a,c)=>a+c.batches,0), `${D.cook.length} components`),
+  ].join('');
+  const tbl = rows => `<thead><tr><th class="chk"></th><th>Ingredient</th><th class="num">Buy</th>
+    <th class="num">Need</th><th class="num">$</th></tr></thead><tbody>` +
+    rows.map(s => `<tr class="${checked.has(s.name)?'done':''}">
+      <td class="chk"><input type="checkbox" data-chk="${s.name}" ${checked.has(s.name)?'checked':''}></td>
+      <td>${s.name.replace(/_/g,' ')}</td>
+      <td class="num">${s.units} × ${s.pack_h}</td>
+      <td class="num">${s.need}g</td><td class="num">$${s.cost.toFixed(2)}</td></tr>`).join('') + '</tbody>';
+  $('#shopP').innerHTML = tbl(per); $('#shopS').innerHTML = tbl(sh);
+
+  const cd = D.settings.cook_days || [0,3];
+  $('#cook').innerHTML = cd.map((start,si) => {
+    const list = D.cook.filter(c => (c.per_session||[])[si] > 0);
+    const mins = list.reduce((a,c)=>a + D.components[c.id].active * c.per_session[si], 0);
+    return `<div class="card" style="margin-bottom:12px">
+      <div class="dhead"><span class="n">Session ${si+1} — day ${start+1}</span>
+        <span class="kc">${fmtMin((D.session_minutes||[])[si]||mins)} <small>hands-on</small></span></div>
+      <div class="rows">${list.length ? list.map(c => `<div class="prow">
+        <div class="nm"><i style="--dot:var(--base)"></i><span>${c.name}</span></div>
+        <div style="text-align:right;font-variant-numeric:tabular-nums;font-size:12.5px;color:var(--ink2)">
+          ×${c.per_session[si]}</div></div>`).join('')
+        : '<p class="note">Nothing to cook this session.</p>'}</div>
+      ${list.length?`<p class="note">Scale each recipe by its batch count.
+        Shortest shelf life here: ${Math.min(...list.map(c=>c.keeps))}d.</p>`:''}</div>`;
+  }).join('');
+}
+
+/* ---------------- frontier chart ---------------- */
+async function loadFrontier(){
+  const r = await fetch('/api/frontier?lo=220&hi=620&step=25&n=12');
+  const {points} = await r.json();
+  $('#frontier').innerHTML =
+    line(points,'spend','Actual spend','What it really costs at each ceiling','$') +
+    line(points,'dishes','Distinct dishes','What that budget buys you in variety','') +
+    line(points,'waste','Perishable waste','Squeezing the budget makes you wastier, not thriftier','g');
+}
+function line(pts,key,title,sub,unit){
+  const W=380,H=150,PL=42,PR=12,PT=10,PB=26;
+  const xs=pts.map(p=>p.budget), ys=pts.map(p=>p[key]);
+  const x0=Math.min(...xs),x1=Math.max(...xs);
+  let y0=Math.min(...ys),y1=Math.max(...ys);
+  if(y1===y0){y1=y0+1}
+  const pad=(y1-y0)*.15; y0-=pad; y1+=pad;
+  const X=v=>PL+(v-x0)/(x1-x0)*(W-PL-PR), Y=v=>PT+(1-(v-y0)/(y1-y0))*(H-PT-PB);
+  const d=pts.map((p,i)=>(i?'L':'M')+X(p.budget).toFixed(1)+' '+Y(p[key]).toFixed(1)).join(' ');
+  const span=y1-y0, intish=ys.every(v=>Number.isInteger(v)) && span<8;
+  let ticks=intish
+    ? [...new Set([Math.ceil(y0),Math.round((y0+y1)/2),Math.floor(y1)])]
+    : [y0+span*.05,(y0+y1)/2,y1-span*.05];
+  ticks=[...new Set(ticks.map(t=>intish?Math.round(t):Math.round(t)))];
+  return `<div class="chart"><h3>${title}</h3><p>${sub}</p>
+   <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${title}">
+    ${ticks.map(t=>`<line x1="${PL}" x2="${W-PR}" y1="${Y(t).toFixed(1)}" y2="${Y(t).toFixed(1)}"
+       stroke="var(--grid)" stroke-width="1"/>
+      <text x="${PL-7}" y="${(Y(t)+3.5).toFixed(1)}" text-anchor="end" font-size="9.5"
+       fill="var(--muted)">${unit==='$'?'$':''}${Math.round(t)}${unit==='g'?'g':''}</text>`).join('')}
+    <line x1="${PL}" x2="${W-PR}" y1="${H-PB}" y2="${H-PB}" stroke="var(--base)" stroke-width="1"/>
+    <path d="${d}" fill="none" stroke="var(--s1)" stroke-width="2" stroke-linejoin="round"
+      stroke-linecap="round"/>
+    ${pts.map(p=>`<circle cx="${X(p.budget).toFixed(1)}" cy="${Y(p[key]).toFixed(1)}" r="4.5"
+      fill="var(--s1)" stroke="var(--surface)" stroke-width="2"
+      data-tip="$${p.budget} ceiling → ${unit==='$'?'$':''}${p[key]}${unit==='g'?'g':''}"/>`).join('')}
+    ${[x0,(x0+x1)/2,x1].map(v=>`<text x="${X(v).toFixed(1)}" y="${H-9}" text-anchor="middle"
+      font-size="9.5" fill="var(--muted)">$${Math.round(v)}</text>`).join('')}
+   </svg></div>`;
+}
+
+/* ---------------- events ---------------- */
+document.addEventListener('click', async e => {
+  const t = e.target;
+  if(t.dataset.t){ $$('.tab').forEach(b=>b.setAttribute('aria-selected', b===t));
+    $$('section').forEach(s=>s.classList.toggle('on', s.id===t.dataset.t)); }
+  if(t.dataset.who){ who = t.dataset.who;
+    $$('#who button').forEach(b=>b.setAttribute('aria-pressed', b===t)); renderDays(); }
+  if(t.dataset.drop){ dropped.push(t.dataset.drop); pinned = pinned.filter(p=>p!==t.dataset.drop); solve(); }
+  if(t.dataset.undrop){ dropped = dropped.filter(x=>x!==t.dataset.undrop); solve(); }
+  if(t.dataset.pin){ const id=t.dataset.pin;
+    pinned = pinned.includes(id) ? pinned.filter(x=>x!==id) : [...pinned,id];
+    $('#menu').innerHTML = D.menu.map(chipHTML).join(''); }
+  if(t.dataset.chk!==undefined && t.tagName==='INPUT'){
+    checked.has(t.dataset.chk) ? checked.delete(t.dataset.chk) : checked.add(t.dataset.chk);
+    renderShop(); }
+  if(t.id==='theme'){ const d=document.documentElement;
+    d.dataset.theme = d.dataset.theme==='dark'?'light':'dark';
+    t.textContent = d.dataset.theme==='dark'?'☀':'☾'; loadFrontier(); }
+  if(t.id==='solve') solve();
+  if(t.id==='rebalance') rebalance();
+});
+document.addEventListener('input', e => {
+  const t = e.target;
+  if(!t || !t.dataset) return;
+  if(t.type==='range'){
+    $('#budgetV').textContent = '$'+$('#budget').value;
+    $('#nV').textContent = $('#n').value;
+    $('#mJV').textContent = +$('#mJ').value>=3400 ? 'off' : $('#mJ').value+'g';
+    $('#mDV').textContent = +$('#mD').value>=2600 ? 'off' : $('#mD').value+'g';
+    $('#seedV').textContent = $('#seed').value;
+    clearTimeout(window._t); window._t = setTimeout(solve, 420);
+  }
+  if(t.dataset.day!==undefined && t.type==='number'){
+    const d=+t.dataset.day; edits[who] ||= {}; edits[who][d] ||= {};
+    edits[who][d][t.dataset.id] = Math.max(0,+t.value||0);
+    const items = dayItems(d), P = D.people[who], tt = totals(items);
+    const card = t.closest('.day');
+    card.querySelector('.meters').innerHTML =
+      MAC.map(([m,l,cv])=>meter(l,cv,tt[m],P.targets[m],P.tolerance)).join('');
+    card.querySelector('.kc').innerHTML =
+      `${Math.round(tt.kcal)} <small>kcal · ${(sumG(items)/453.6).toFixed(1)} lb</small>`;
+  }
+});
+async function rebalance(){
+  const b=$('#rebalance'); b.disabled=true; b.textContent='Solving…';
+  for(const dStr of Object.keys(edits[who]||{})){
+    const d=+dStr;
+    const r = await fetch('/api/replate',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({person:who, menu:D.menu, locked:edits[who][d], ...state()})});
+    const res = await r.json();
+    if(res.ok){ D.weeks[who][d].items = res.items; delete edits[who][d]; }
+  }
+  b.disabled=false; b.textContent='Rebalance locked days'; renderDays();
+}
+document.addEventListener('mouseover', e => {
+  const tp = e.target.dataset?.tip; if(!tp) return;
+  const t=$('#tip'); t.textContent=tp; t.style.opacity=1;
+  t.style.left=(e.clientX+14)+'px'; t.style.top=(e.clientY-10)+'px';
+});
+document.addEventListener('mouseout', e => { if(e.target.dataset?.tip) $('#tip').style.opacity=0; });
+
+/* ---------------- boot ---------------- */
+$('#budget').value=550; $('#n').value=12; $('#mJ').value=3400; $('#mD').value=2600; $('#seed').value=0;
+$('#budgetV').textContent='$550'; $('#nV').textContent='12';
+$('#mJV').textContent='off'; $('#mDV').textContent='off'; $('#seedV').textContent='0';
+solve(); loadFrontier();
+</script>
+</body>
+</html>
