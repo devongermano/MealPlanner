@@ -45,15 +45,15 @@ Gate: §3 demo from a fresh config file with format docs at hand; a real week co
 and eaten from M1 output. Targets are arbitrary by design (owner, 2026-08-09:
 "arbitrary goals for arbitrary people" — OQ-D1 dissolved; examples/ is demo data).
 
-- [ ] M1.0 Sweep the Phase 5 deferred minors (`services/solver/PHASE5_FIXNOTES.md`, "Deferred minors" section)
+- [x] M1.0 Sweep the Phase 5 deferred minors (`services/solver/PHASE5_FIXNOTES.md`, "Deferred minors" section)
 - [ ] M1.1 The three deliverables as human-readable artifacts: shopping list, per-session cook plan with scaled recipes, per-day per-person eat sheets
 - [ ] M1.2 Relaxed mode: household-unit rendering + widened tolerance profile with honest error bars
 - [ ] M1.3 Locked-plan artifacts: immutable, inputs-hash (incl. seed + pantry), keyed by primary-trip date; open-format export
 - [ ] M1.4 n=1..4 exercised via fixtures; CLI `--json` contract versioned
 - [ ] M1.5 Interactive-latency targets set from M0 baselines (provisional labels)
 - [ ] M1.6 🥘 **Real-week gate:** founder household cooks and eats one week from M1 output
-- [ ] M1.7 Per-person-scalable `serve_g` bounds (PRD §8.1, Appendix A confirmed defect "serve_g shared across divergent eaters"): **explicitly deferred from M0** in the Phase 5 review — `plate()` still applies one shared serve band per component to every eater (PRD Appendix B, item 2). Implement kcal-proportional scaling (provisional) or ratify dropping it, with the M1.6 real week as the measuring stick
-- [ ] M1.8 Pantry aging + cooked leftovers (PRD §8.1): consume stock `acquired` dates (age reduces effective raw `keeps_days` — validated but unconsumed in M0, PRD Appendix B item 3); integrate pantry `cooked` list into availability (documented M1+ since M0.12)
+- [x] M1.7 Per-person-scalable `serve_g` bounds (PRD §8.1, Appendix A confirmed defect "serve_g shared across divergent eaters"): **explicitly deferred from M0** in the Phase 5 review — `plate()` still applies one shared serve band per component to every eater (PRD Appendix B, item 2). Implement kcal-proportional scaling (provisional) or ratify dropping it, with the M1.6 real week as the measuring stick
+- [x] M1.8 Pantry aging + cooked leftovers (PRD §8.1): consume stock `acquired` dates (age reduces effective raw `keeps_days` — validated but unconsumed in M0, PRD Appendix B item 3); integrate pantry `cooked` list into availability (documented M1+ since M0.12)
 
 ## M2 — Collaborative web app *(service posture begins)*
 
