@@ -41,7 +41,8 @@ def lib():
 # --------------------------------------------------------------------------- #
 def test_portions_within_bounds_and_on_grid_property(lib):
     """>=20 seeds x random weights x random raw pins (often out of bounds /
-    off grid): every emitted portion must satisfy serve_g min/max and, for
+    off grid): every emitted portion must satisfy the person's EFFECTIVE
+    serve bounds (M1.7: the authored band scaled by their kcal) and, for
     discrete components, land on a whole-unit multiple."""
     _, comps, people, _ = lib
     ids = list(comps)
@@ -56,7 +57,7 @@ def test_portions_within_bounds_and_on_grid_property(lib):
         pins = {pin_id: rng.uniform(0, 700)}
         ok, pl, miss = engine.plate(p, comps, ids, weights=w, locked=pins)
         for cid, g in pl.items():
-            lo, hi = comps[cid]["serve_g"]["min"], comps[cid]["serve_g"]["max"]
+            lo, hi, _w = engine.effective_serve_bounds(comps[cid], p)
             assert lo <= g <= hi, (seed, cid, g, lo, hi)
             u = comps[cid].get("unit_g")
             if u:
@@ -158,7 +159,9 @@ def test_pin_below_min_clamps_up():
 def test_pin_above_max_clamps_down():
     comps, p = _pin_lib()
     ok, pl, miss = engine.plate(p, comps, list(comps), locked={"balls": 900})
-    assert pl.get("balls") == 400  # clamped down to serve_max
+    # clamped down to this PERSON's effective serve_max (M1.7): the 1,440
+    # kcal person's scale clamps at 0.6 -> 400g authored max becomes 240g
+    assert pl.get("balls") == 240
 
 
 def test_pin_off_grid_snaps_to_unit():

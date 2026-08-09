@@ -97,10 +97,12 @@ def test_volume_floor_runs_end_to_end_on_live_corpus():
 def test_volume_floor_watery_carbs_higher_than_dense():
     """Same carb target: a watery carb library (10 c/100g) needs far more
     daily mass than a dense one (70 c/100g)."""
+    # 1200-kcal person -> serve bounds scale by 0.6 (M1.7); the watery serve
+    # ceiling is sized so the scaled band still admits the carb target
     person = _person({"protein": 0, "fat": 0, "carb": 300})
     watery = {"wet": _comp("wet", {"kcal": 40.0, "protein": 0.0, "fat": 0.0,
                                    "carb": 10.0},
-                           role="starch", serve=(100, 4000))}
+                           role="starch", serve=(100, 5500))}
     dense = {"dry": _comp("dry", {"kcal": 280.0, "protein": 0.0, "fat": 0.0,
                                   "carb": 70.0},
                           role="starch", serve=(100, 1000))}
@@ -180,22 +182,25 @@ def _starch_lib(short_keeps):
 
 def test_carb_headroom_short_keeping_starch_flags_day_3():
     """cook_days [0,4]: a keeps-3 starch is gone on day 3, leaving only the
-    long keeper — 120g of carb headroom against a 150g target. The worst
-    day must be day 3 and flagged; an all-long-keeping library is clean."""
-    person = _person({"protein": 80, "fat": 30, "carb": 150})
+    long keeper. This person's kcal clamps the serve scale to 0.6 (M1.7),
+    so each starch offers 240g x 30c = 72g headroom: day 3 has 72g against
+    a 120g target and must be flagged; the all-long-keeping library gives
+    144g every day and is clean."""
+    person = _person({"protein": 80, "fat": 30, "carb": 120})
     ch = engine.carb_headroom(person, _starch_lib(3), SET)
     assert not ch["ok"]
     assert ch["worst_day"] == 3
-    assert ch["worst_headroom_g"] < 150
+    assert ch["worst_headroom_g"] < 120
     ch2 = engine.carb_headroom(person, _starch_lib(7), SET)
     assert ch2["ok"], ch2
 
 
 def test_score_menu_uses_worst_day_headroom_not_flat_145():
-    """Whole-library carb ceiling is 240g >= 150*1.45 in BOTH libraries, so
-    the old flat check scored them identically. Day-correct headroom sees
-    day 3 at 120g < 150g in the short library and penalizes exactly it."""
-    people = {"p1": _person({"protein": 80, "fat": 30, "carb": 150},
+    """The whole-library carb ceiling clears the target in BOTH libraries,
+    so the old flat multiplier check scored them identically. Day-correct
+    headroom (at this person's scaled serve max — M1.7) sees day 3 at
+    72g < 120g in the short library and penalizes exactly it."""
+    people = {"p1": _person({"protein": 80, "fat": 30, "carb": 120},
                             tol=0.2)}
     short = _starch_lib(3)
     ok = _starch_lib(7)

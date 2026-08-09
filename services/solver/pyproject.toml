@@ -13,7 +13,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest==9.1.1"]
+dev = ["pytest==9.1.1", "pytest-xdist==3.8.0"]
 
 [project.scripts]
 mealplan = "mealplan.cli:main"

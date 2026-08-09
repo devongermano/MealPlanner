@@ -29,6 +29,7 @@ per-day seeds from its seed parameter and the sorted index of the person
 name. No wall clock anywhere in the package.
 """
 
+import math
 import random
 from contextlib import contextmanager
 
@@ -111,6 +112,62 @@ SCORE_WEIGHTS = {
 }
 
 
+# --------------------------------------------------------------------------- #
+#  per-person serve_g scaling (M1.7, PRD §8.1) — PROVISIONAL, never hidden
+# --------------------------------------------------------------------------- #
+# EVERY value below is provisional (P9), exactly like SCORE_WEIGHTS: the
+# scaling curve is linear in the person's Atwater kcal against a named
+# reference, clamped to a band — chosen as the simplest labeled curve that
+# fixes the confirmed v1 defect (one shared serve band across divergent
+# eaters), to be measured against the M1.6 real week.
+SCALING = {
+    "reference_kcal": 2500,   # provisional (P9): serve_g bounds are authored
+                              # for a person at this Atwater kcal
+    "scale_min": 0.6,         # provisional (P9): clamp floor
+    "scale_max": 1.8,         # provisional (P9): clamp ceiling
+}
+
+
+def person_scale(person):
+    """This person's serve-bound scale: Atwater kcal of their daily targets
+    over SCALING['reference_kcal'], clamped to [scale_min, scale_max]."""
+    s = kcal_of(person["targets"]) / SCALING["reference_kcal"]
+    return min(SCALING["scale_max"], max(SCALING["scale_min"], s))
+
+
+def effective_serve_bounds(comp, person):
+    """The (min, max) serve band THIS person actually gets for ``comp``
+    (M1.7): the authored serve_g bounds times person_scale, re-aligned to
+    the grid portions are actually EMITTED on — the unit grid for discrete
+    (unit_g) components, the whole-gram grid otherwise (plate() rounds every
+    portion to int grams, so a fractional scaled bound would let a portion
+    solved AT the bound round outside it). Min ceils UP to the grid, max
+    floors DOWN, so every admissible emitted portion stays inside the scaled
+    band. Returns ``(lo, hi, warning)``.
+
+    If grid re-alignment would invert the band (max < min), scaling cannot
+    produce a usable band on the emission grid: fall back to the UNSCALED
+    bounds (which validation guarantees are unit-aligned) and attach a
+    structured ``serve_scale_unaligned`` warning instead of inventing a band.
+    """
+    lo, hi = comp["serve_g"]["min"], comp["serve_g"]["max"]
+    s = person_scale(person)
+    if s == 1.0:
+        return lo, hi, None
+    slo, shi = lo * s, hi * s
+    u = comp.get("unit_g") or 1        # emission grid: unit_g, else 1g (int)
+    slo = math.ceil(slo / u - 1e-9) * u
+    shi = math.floor(shi / u + 1e-9) * u
+    if shi < slo:
+        return lo, hi, dict(
+            code="serve_scale_unaligned", component=comp["id"],
+            scale=round(s, 4), bounds=[lo, hi], unit_g=comp.get("unit_g"),
+            message=(f"serve bounds [{lo}, {hi}]g of '{comp['id']}' "
+                     f"scaled by {s:.2f} leave no whole {u}g unit; "
+                     "falling back to the unscaled bounds"))
+    return slo, shi, None
+
+
 def eligible(comp, person):
     return not (set(comp["tags"]) & set(person.get("exclude", [])))
 
@@ -156,7 +213,16 @@ def plate(person, comps, ids, weights=None, tol=None, locked=None,
     and clamped into serve bounds by default. With
     ``allow_out_of_bounds=True`` the raw pin is honored as given and a
     structured ``pin_out_of_bounds`` warning is attached to the result;
-    such pins are excluded from the bounds guarantees.
+    such pins are excluded from the bounds guarantees. A pin on a component
+    the person cannot eat (or one not on the menu) is dropped with a
+    structured ``pin_ineligible`` / ``pin_unknown`` warning (M1.0),
+    consistent with replate's ``locked_unavailable``.
+
+    Serve bounds are PER PERSON since M1.7 (PRD §8.1): every bound below is
+    ``effective_serve_bounds(comp, person)`` — the authored band scaled by
+    the person's kcal (provisional curve, ``SCALING``) and re-aligned to the
+    unit grid. Structural-failure fallbacks report NEGATIVE (SHORT) misses:
+    a person served nothing is short of every target (M1.0).
     """
     tol = person["tolerance"] if tol is None else tol
     weights = dict(weights or {})
@@ -165,15 +231,24 @@ def plate(person, comps, ids, weights=None, tol=None, locked=None,
     usable = [i for i in ids if eligible(comps[i], person)]
     if not usable:
         return PlateResult(False, {},
-                           {m: person["targets"][m] for m in MACROS})
+                           {m: -person["targets"][m] for m in MACROS})
+
+    # M1.7: this person's effective serve band per component (+ structured
+    # warnings where discrete grid re-alignment had to fall back unscaled)
+    warnings = []
+    bounds = {}
+    for i in usable:
+        lo, hi, w = effective_serve_bounds(comps[i], person)
+        bounds[i] = (lo, hi)
+        if w is not None:
+            warnings.append(w)
 
     def build(fixed=None):
         fixed = fixed or {}
         m = pulp.LpProblem("plate", pulp.LpMinimize)
         g, slack = {}, {}
         for i in usable:
-            c = comps[i]
-            lo, hi = c["serve_g"]["min"], c["serve_g"]["max"]
+            lo, hi = bounds[i]
             if i in fixed:
                 g[i] = fixed[i]
                 continue
@@ -208,13 +283,24 @@ def plate(person, comps, ids, weights=None, tol=None, locked=None,
         return m, g, slack
 
     # ---- pinned portions (M0.8): snap to unit grid + clamp into bounds ------
-    warnings = []
     seed_fixed = {}
     for k, v in (locked or {}).items():
         if k not in usable:
+            # M1.0: never a bare continue — the dropped pin is reported,
+            # consistent with replate's locked_unavailable warning
+            if k in comps and not eligible(comps[k], person):
+                warnings.append(dict(
+                    code="pin_ineligible", component=k, pinned_g=float(v),
+                    message=(f"pin {v}g on '{k}' dropped: the component "
+                             "carries a tag this person excludes")))
+            else:
+                warnings.append(dict(
+                    code="pin_unknown", component=k, pinned_g=float(v),
+                    message=(f"pin {v}g on '{k}' dropped: component is not "
+                             "on this plate's menu")))
             continue
         c = comps[k]
-        lo, hi = c["serve_g"]["min"], c["serve_g"]["max"]
+        lo, hi = bounds[k]
         u = c.get("unit_g")
         adj = float(v)
         if u:
@@ -242,13 +328,14 @@ def plate(person, comps, ids, weights=None, tol=None, locked=None,
     m, g, slack = build(seed_fixed)
     _count_solve()
     if m.solve(pulp.PULP_CBC_CMD(msg=0)) != 1:
+        # solver failure: nothing served -> SHORT of every target (M1.0)
         return PlateResult(False, {},
-                           {mac: person["targets"][mac] for mac in MACROS},
+                           {mac: -person["targets"][mac] for mac in MACROS},
                            warnings)
 
     # snap discrete components to whole units — clamped into serve bounds
-    # (M0.8; bounds are unit-aligned, so the clamp stays on the grid) — then
-    # re-solve the continuous rest
+    # (M0.8; effective bounds are unit-aligned, so the clamp stays on the
+    # grid) — then re-solve the continuous rest
     fixed = dict(seed_fixed)
     for i in usable:
         u = comps[i].get("unit_g")
@@ -256,7 +343,7 @@ def plate(person, comps, ids, weights=None, tol=None, locked=None,
             val = g[i].value() or 0
             snapped = round(val / u) * u
             if snapped:      # 0 means the component is OFF — never force it on
-                lo, hi = comps[i]["serve_g"]["min"], comps[i]["serve_g"]["max"]
+                lo, hi = bounds[i]
                 snapped = min(hi, max(lo, snapped))
             fixed[i] = snapped
     if fixed:
@@ -264,7 +351,8 @@ def plate(person, comps, ids, weights=None, tol=None, locked=None,
         _count_solve()
         if m.solve(pulp.PULP_CBC_CMD(msg=0)) != 1:
             return PlateResult(False, {},
-                               {mac: person["targets"][mac] for mac in MACROS},
+                               {mac: -person["targets"][mac]
+                                for mac in MACROS},
                                warnings)
 
     miss = {}
@@ -287,8 +375,8 @@ def plate(person, comps, ids, weights=None, tol=None, locked=None,
 # --------------------------------------------------------------------------- #
 def binding_macro(person, comps, ids=None, steps=10):
     """WHICH macro binds for THIS person on this library (M0.11, PRD §8.3) —
-    the generic capability behind the prototype's "carbs bind at 4,700 kcal"
-    household fact.
+    the generic capability behind the prototype's household-specific
+    "which macro binds first" finding.
 
     Tighten the tolerance from the person's own setting toward zero on a
     linear grid; at the first tolerance where the plate LP misses, the
@@ -313,7 +401,7 @@ def binding_macro(person, comps, ids=None, steps=10):
 
 def volume_floor(person, comps, ids=None, lo=500, hi=8000, res=25):
     """Minimum daily food mass the person's targets require (M0.11, PRD §8.3)
-    — the generic form of the reproduced ~2,121 g/day (~4.7 lb) finding.
+    — the generic form of the prototype's reproduced volume-floor finding.
 
     Bisects ``max_daily_mass_g`` over [lo, hi] to ``res``-gram resolution at
     the person's own tolerance. Returns ``dict(floor_g, binding, searched,
@@ -390,7 +478,10 @@ def carb_headroom(person, comps, settings, ids=None, ing=None):
     tgt = person["targets"]["carb"]
     per_day = []
     for d in range(days):
-        h = sum(comps[i]["serve_g"]["max"] * comps[i]["per100"]["carb"] / 100
+        # M1.7: headroom is against the PERSON's effective serve max — the
+        # scaled band is what the plate LP will actually allow them
+        h = sum(effective_serve_bounds(comps[i], person)[1]
+                * comps[i]["per100"]["carb"] / 100
                 for i in elig if available_on(comps[i], d, settings, ing))
         per_day.append(dict(day=d, headroom_g=round(h, 1)))
     worst = min(per_day, key=lambda r: r["headroom_g"]) if per_day else None
@@ -653,20 +744,23 @@ def score_menu(comps, ing, chosen, settings, people=None, score_weights=None):
             starch = [i for i in elig if comps[i]["role"] == "starch"]
             acc = [i for i in elig if comps[i]["role"] in ("accent", "veg")]
             pen += 0 if len(mains) >= 3 else W["person_mains_floor"]
-            # >=3 starches, not 2. Discovered the hard way: on the day before a cook
-            # session some starches have expired, and a 588g/day carb target cannot be
-            # met from two starches at realistic serving sizes.
+            # >=3 starches, not 2. Discovered the hard way: on the day before
+            # a cook session some starches have expired, and a high daily
+            # carb target cannot be met from two starches at realistic
+            # serving sizes.
             pen += 0 if len(starch) >= 3 else W["person_starch_floor"]
-            # CARB HEADROOM, day-correct (M0.11). This is the constraint that
-            # actually binds for a 4700 kcal day, and it is not fat: you have
-            # to physically eat ~590g of carbs. For every day, the ceiling is
-            # what is actually AVAILABLE that day (serve_max x carb/100 over
-            # the day's eligible survivors) — the worst day must clear the
-            # target outright. Replaces the prototype's flat 1.45x
-            # whole-library fudge (plan.py:389), which ignored that the
-            # short-keeping starches are gone by mid-week.
+            # CARB HEADROOM, day-correct (M0.11). For high-kcal targets the
+            # binding constraint is usually carbs, not fat: the target has to
+            # be physically eatable. For every day, the ceiling is what is
+            # actually AVAILABLE that day (the person's effective serve max
+            # x carb/100 over the day's eligible survivors — scaled per
+            # person since M1.7) — the worst day must clear the target
+            # outright. Replaces the prototype's flat whole-library fudge
+            # multiplier, which ignored that the short-keeping starches are
+            # gone by mid-week.
             worst_carb = min(
-                sum(comps[i]["serve_g"]["max"] * comps[i]["per100"]["carb"] / 100
+                sum(effective_serve_bounds(comps[i], p)[1]
+                    * comps[i]["per100"]["carb"] / 100
                     for i in elig if avail[i][d])
                 for d in range(days_n))
             pen += 0 if worst_carb >= p["targets"]["carb"] \
@@ -848,7 +942,8 @@ def replate(person, comps, menu, day, settings, locked=None, weights=None,
     return PlateResult(res[0], res[1], res[2], warnings + res.warnings)
 
 
-def build_week(comps, people, settings, menu, seed=0, ing=None, diag=None):
+def build_week(comps, people, settings, menu, seed=0, ing=None, diag=None,
+               leftovers=None):
     """Day by day, because a component's eligibility depends on WHICH day it is.
     Guacamole keeps 2 days; it cannot be on the day-7 plate no matter how well
     the macros work out.
@@ -867,16 +962,26 @@ def build_week(comps, people, settings, menu, seed=0, ing=None, diag=None):
     relaxation-ladder tier that produced the day's plate (0 = strict caps,
     1/2 = progressively relaxed, None = no tier fed the day, i.e. an
     explained hole). Lets tests and doctors observe WHETHER the caps had to
-    be relaxed, which the served week alone cannot show."""
+    be relaxed, which the served week alone cannot show.
+
+    Cooked leftovers (M1.8, PRD §8.1): pass ``leftovers`` — the entries
+    ``costing.cooked_leftovers`` computes from the pantry's cooked list —
+    and each component is ALSO available on the plan days its leftover's
+    residual life covers; session_plan then consumes those grams before any
+    fresh batch (economy: leftovers are already paid for)."""
     days = settings["days"]
     cap_batches = settings["max_batches_per_component"]
     porder = {pn: k for k, pn in enumerate(sorted(people))}
+    leftover_days = {}
+    for e in (leftovers or []):
+        leftover_days.setdefault(e["component"], set()).update(e["days"])
     weeks, demand = {}, {}
     for pname, p in people.items():
         wk, used_days, used_g = [], {}, {}
         for d in range(days):
             fresh = [i for i in menu
-                     if available_on(comps[i], d, settings, ing)]
+                     if available_on(comps[i], d, settings, ing)
+                     or d in leftover_days.get(i, ())]
 
             def pool(cap_days, cap_b):
                 # The variety cap belongs on MAINS and sauces. Nobody gets bored of

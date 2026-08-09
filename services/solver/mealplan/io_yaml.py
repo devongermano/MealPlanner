@@ -329,6 +329,18 @@ def validate_people_doc(doc: Any, fname: str = "people.yaml"
                         issues.append(ValidationIssue(
                             "missing_field", f"{where}, targets.{mac}",
                             f"daily target for '{mac}' is missing"))
+            # M1.0: tolerance must be a number in (0, 0.5] — the elastic
+            # macro band is a fraction of the target; 0 or negative makes
+            # the LP band degenerate/inverted, and anything past 50% is a
+            # config error, not a plan (loosening tolerance is already the
+            # labeled last resort, PRD §8.3).
+            tv = p.get("tolerance")
+            if tv is not None and (not isinstance(tv, (int, float))
+                                   or isinstance(tv, bool)
+                                   or not 0 < tv <= 0.5):
+                issues.append(ValidationIssue(
+                    "bad_tolerance", f"{where}, field 'tolerance'",
+                    f"tolerance must be a number in (0, 0.5] (got {tv!r})"))
             # meals_per_day is RESERVED (model.RESERVED_FIELDS): validated
             # here, ignored by the M0 engine by design (M1 eat sheets).
             mpd = p.get("meals_per_day")
@@ -376,6 +388,27 @@ def validate_people_doc(doc: Any, fname: str = "people.yaml"
                     "cook_day_out_of_range", cwhere,
                     f"cook day(s) {bad} outside the plan week "
                     f"[0, {hi if hi is not None else '?'})"))
+        # M1.0 follow-up: the other two engine-indexed settings get the same
+        # required-validation posture as cook_days — a load-time structured
+        # error beats a KeyError mid-solve ("every corpus declares it" is a
+        # hope, not a guarantee).
+        for req, kind, msg in (
+            ("active_min_budget", (int, float),
+             "required field 'active_min_budget' is missing — total hands-on "
+             "cooking minutes available per week; there is no default"),
+            ("max_days_same_component", int,
+             "required field 'max_days_same_component' is missing — variety "
+             "cap for mains (days per week one main may appear); no default"),
+        ):
+            val = st.get(req)
+            rwhere = f"{fname}: settings, field '{req}'"
+            if val is None:
+                issues.append(ValidationIssue("missing_field", rwhere, msg))
+            elif (not isinstance(val, kind) or isinstance(val, bool)
+                  or val <= 0):
+                issues.append(ValidationIssue(
+                    f"bad_{req}", rwhere,
+                    f"{req} must be a positive number (got {val!r})"))
         # M0.6: shopping trips are data. shop_days (optional, default [0]):
         # at least one day index, every one inside the plan week.
         sd = st.get("shop_days")

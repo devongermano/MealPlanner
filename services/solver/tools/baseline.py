@@ -37,10 +37,10 @@ REPO = SOLVER.parents[1]
 EXAMPLES = REPO / "examples"
 SOLO = SOLVER / "tests" / "fixtures" / "solo_lifter"
 
-sys.path.insert(0, str(SOLVER / "tests"))    # for test_capabilities
+sys.path.insert(0, str(SOLVER / "tests"))    # for tests/_shared.py
 
 import pulp                                        # noqa: E402
-from test_capabilities import GOLDEN_MENU_KW, GOLDEN_SEED   # noqa: E402
+from _shared import GOLDEN_MENU_KW, GOLDEN_SEED    # noqa: E402
 
 from mealplan import costing, engine, io_yaml      # noqa: E402
 
@@ -70,7 +70,11 @@ def run_examples(timings):
     with span(timings, "session_plan"):
         sp = costing.session_plan(comps, ing, settings, weeks)
     with span(timings, "purchase"):
-        costing.purchase(comps, ing, menu, sp["batches"])
+        # same shape as the CLI week command (cli.py): a menu component the
+        # week never serves gets no batch and is not purchased
+        costing.purchase(comps, ing,
+                         [i for i in menu if sp["batches"].get(i)],
+                         sp["batches"])
     return engine.solve_counts()
 
 
@@ -88,7 +92,10 @@ def run_solo(timings):
     with span(timings, "session_plan"):
         sp = costing.session_plan(comps, ing, settings, weeks)
     with span(timings, "purchase"):
-        costing.purchase(comps, ing, menu, sp["batches"])
+        # same menu-filtered shape as the CLI week command (cli.py)
+        costing.purchase(comps, ing,
+                         [i for i in menu if sp["batches"].get(i)],
+                         sp["batches"])
     return engine.solve_counts()
 
 

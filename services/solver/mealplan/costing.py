@@ -17,9 +17,21 @@ OR is freezable (frozen on arrival -> thaw note in the cook plan).
 menu-search score only; every real surface consumes session_plan.
 """
 
+import datetime
 import math
 
 from .units import kcal_of
+
+
+def _as_date(v):
+    """Coerce a stored date (datetime.date from YAML, or ISO string) to a
+    datetime.date. Deterministic: parses stored values only — never reads a
+    clock."""
+    if isinstance(v, datetime.datetime):
+        return v.date()
+    if isinstance(v, datetime.date):
+        return v
+    return datetime.date.fromisoformat(v)
 
 
 # --------------------------------------------------------------------------- #
@@ -98,7 +110,98 @@ def cookable_sessions(comp, settings, ing=None):
             if raw_freshness(comp, start, settings, ing)[0]]
 
 
-def session_plan(comps, ing, settings, weeks):
+# --------------------------------------------------------------------------- #
+#  pantry aging + cooked leftovers (M1.8, PRD §8.1)
+# --------------------------------------------------------------------------- #
+def age_pantry(pantry, ing, settings, plan_date):
+    """Apply the stock 'acquired' age rule (PRD §8.1: age reduces effective
+    raw keeps_days) and return ``(effective_pantry, warnings)``.
+
+    For each stock entry: ``age_days = plan_date - acquired`` (a stock entry
+    acquired AFTER the plan start is a hard error) and its REMAINING raw
+    life is ``keeps_days - age_days``. A perishable, non-freezable entry
+    that cannot survive to ANY cook session (no session start s with
+    ``s < remaining``) is dropped from the effective pantry — its grams are
+    NOT deducted from purchasing — and reported in a structured
+    ``stock_expiring_unused`` warning. Non-perishable stock never ages out;
+    freezable stock past raw life is frozen on arrival (the raw-freshness
+    escape hatch) and stays deductible.
+
+    Purchased (store) grams keep the existing nearest-prior-trip freshness
+    rule (a deliberate, labeled simplification — per-trip shopping
+    assignment is future multi-trip UX). The cooked list rides through
+    untouched; its planning integration is ``cooked_leftovers``.
+    """
+    ss = sessions_for(settings)
+    kept, warnings = [], []
+    for r in (pantry.get("stock") or []):
+        acquired = _as_date(r["acquired"])
+        age = (plan_date - acquired).days
+        if age < 0:
+            raise ValueError(
+                f"pantry stock of '{r['ingredient']}' is acquired "
+                f"{acquired.isoformat()}, after the plan start date "
+                f"{plan_date.isoformat()} — acquired dates cannot be in "
+                "the future")
+        i = ing[r["ingredient"]]
+        if i.get("perishable") and not i.get("freezable"):
+            remaining = i["keeps_days"] - age
+            if not any(s < remaining for s in ss):
+                warnings.append(dict(
+                    code="stock_expiring_unused", ingredient=r["ingredient"],
+                    grams=r["grams"], acquired=acquired.isoformat(),
+                    age_days=age, keeps_days=i["keeps_days"],
+                    remaining_days=remaining,
+                    message=(f"{r['grams']}g of '{r['ingredient']}' stock "
+                             f"(acquired {acquired.isoformat()}, "
+                             f"{age} days old, keeps {i['keeps_days']}d raw) "
+                             "cannot survive to any cook session — not "
+                             "deducted from the shopping list; it will "
+                             "expire unused")))
+                continue
+        kept.append(dict(r))
+    return {"stock": kept, "cooked": list(pantry.get("cooked") or [])}, \
+        warnings
+
+
+def cooked_leftovers(pantry, comps, settings, plan_date):
+    """Join the pantry's cooked leftovers to plan-day availability (M1.8).
+
+    Each cooked entry becomes ``{component, grams, days, cooked}`` where
+    ``days`` are the plan days its residual life covers under the one strict
+    convention (PRD §8.1): available on day d iff
+    ``0 <= (plan_date + d) - cooked_date < keeps_days``. An entry whose
+    window is empty (already past its life at plan start) is dropped with a
+    structured ``leftover_expired`` warning. Entries are sorted (component,
+    cook date) so session_plan eats the OLDEST leftover first.
+
+    Consumers: engine.build_week (availability join) and session_plan
+    (grams consumed before fresh batches — leftovers are already paid for).
+    """
+    days = settings["days"]
+    entries, warnings = [], []
+    for r in (pantry.get("cooked") or []):
+        cid = r["component"]
+        keeps = comps[cid]["keeps_days"]
+        age0 = (plan_date - _as_date(r["cooked"])).days
+        window = [d for d in range(days) if 0 <= age0 + d < keeps]
+        if not window:
+            warnings.append(dict(
+                code="leftover_expired", component=cid, grams=r["grams"],
+                cooked=_as_date(r["cooked"]).isoformat(), age_days=age0,
+                keeps_days=keeps,
+                message=(f"cooked leftover of '{cid}' ({r['grams']}g, "
+                         f"cooked {_as_date(r['cooked']).isoformat()}, "
+                         f"keeps {keeps}d) is past its life at plan start "
+                         "— ignored")))
+            continue
+        entries.append(dict(component=cid, grams=r["grams"], days=window,
+                            cooked=_as_date(r["cooked"]).isoformat()))
+    entries.sort(key=lambda e: (e["component"], e["cooked"]))
+    return entries, warnings
+
+
+def session_plan(comps, ing, settings, weeks, leftovers=None):
     """THE canonical session attribution (PRD §8.2, P10).
 
     Each (component, day) gram demand from ``weeks`` ({person: [{cid: g}
@@ -115,9 +218,17 @@ def session_plan(comps, ing, settings, weeks):
                        "minutes", "thaw_notes"}...],
          "batches": {cid: summed batches},   # feeds purchase() / menu_cost()
          "minutes": total,                   # == sum of session minutes
-         "unattributed": [{component, day, grams}...]}  # demand no session
+         "unattributed": [{component, day, grams}...],  # demand no session
                                                         # can feed (reported,
                                                         # never invented)
+         "leftover": [{component, day, grams, note}...]}  # demand fed from
+                                                          # cooked leftovers
+
+    Cooked leftovers (M1.8): pass ``leftovers`` (costing.cooked_leftovers
+    entries) and each (component, day) demand is fed FIRST from any leftover
+    still within residual life on that day — the economy-over-freshness rule
+    extended: leftovers are already paid for, eat them before cooking a
+    fresh batch. Only the remainder is attributed to cook sessions.
     """
     ss = sessions_for(settings)
     day_demand = {}
@@ -129,7 +240,26 @@ def session_plan(comps, ing, settings, weeks):
                 for cid in {c for c, _ in day_demand}}
     sess_demand = [{} for _ in ss]
     unattributed, freezer_serves = [], []
+    remaining = [dict(e) for e in (leftovers or [])]   # never mutate inputs
+    leftover_served = []
     for (cid, d), g in sorted(day_demand.items()):
+        # M1.8: leftovers first (oldest first — cooked_leftovers sorts them)
+        for e in remaining:
+            if g <= 0:
+                break
+            if (e["component"] != cid or d not in e["days"]
+                    or e["grams"] <= 0):
+                continue
+            take = min(e["grams"], g)
+            e["grams"] -= take
+            g -= take
+            leftover_served.append(dict(
+                component=cid, day=d, grams=take,
+                note=(f"'{cid}' day {d}: {take}g from leftover "
+                      f"(cooked {e['cooked']}) — leftovers are already "
+                      "paid for, eat them first")))
+        if g <= 0:
+            continue
         k_fit = None
         for k, start in enumerate(ss):
             if (k in cookable[cid] and start <= d
@@ -181,7 +311,8 @@ def session_plan(comps, ing, settings, weeks):
             total_batches[cid] = total_batches.get(cid, 0) + b
     return dict(sessions=sessions, batches=total_batches,
                 minutes=sum(s["minutes"] for s in sessions),
-                unattributed=unattributed, freezer=freezer_serves)
+                unattributed=unattributed, freezer=freezer_serves,
+                leftover=leftover_served)
 
 
 def cost_per_g(comps, ing, cid):
@@ -209,13 +340,13 @@ def purchase(comps, ing, chosen, batches=None, pantry=None):
     optional) has its stock grams deducted from ingredient need BEFORE
     rounding to packs, floored at zero. A missing or empty pantry is a
     no-op — results are identical to no pantry at all. Cooked leftovers are
-    NOT consumed here (planning integration is M1+).
+    not consumed here — they feed session_plan via cooked_leftovers (M1.8).
 
-    DEFERRED (M1, PRD Appendix B errata): the stock 'acquired' date is
-    validated but not consumed — PRD §8.1's age rule (acquired age reduces
-    the effective raw keeps_days) is not implemented in M0, so deducted
-    stock is treated as fresh at the nearest prior shop day by
-    raw_freshness. See TASKS.md M1.8."""
+    Stock aging (M1.8, PRD §8.1): callers with a plan date apply
+    ``age_pantry`` FIRST and pass its effective pantry here — stock too old
+    to survive to any cook session is then never deducted (and is reported
+    as expiring unused). This function itself deducts exactly the stock it
+    is given."""
     batches = batches or {i: 1 for i in chosen}
     need = {}
     for i in chosen:

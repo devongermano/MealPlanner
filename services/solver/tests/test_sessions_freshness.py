@@ -309,8 +309,9 @@ def test_shop_days_out_of_week_is_error():
 
 def test_shop_days_valid_and_absent_are_fine():
     for st in ({"days": 7, "active_min_budget": 180, "cook_days": [0],
-                "shop_days": [0, 4]},
-               {"days": 7, "active_min_budget": 180, "cook_days": [0]}):
+                "max_days_same_component": 4, "shop_days": [0, 4]},
+               {"days": 7, "active_min_budget": 180, "cook_days": [0],
+                "max_days_same_component": 4}):
         issues = validate_people_doc(_ppl_doc(st))
         assert not [i for i in issues if i.severity == "error"], st
 

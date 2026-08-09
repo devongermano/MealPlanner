@@ -158,7 +158,8 @@ def _ppl_doc(person_extra=None, settings_extra=None):
     p = {"targets": {"protein": 100, "fat": 60, "carb": 200},
          "tolerance": 0.05}
     p.update(person_extra or {})
-    st = {"days": 7, "active_min_budget": 180, "cook_days": [0]}
+    st = {"days": 7, "active_min_budget": 180, "cook_days": [0],
+          "max_days_same_component": 4}
     st.update(settings_extra or {})
     return {"schema_version": 1, "people": {"p1": p}, "settings": st}
 
@@ -176,11 +177,12 @@ def test_meals_per_day_valid_and_absent_are_fine():
         assert not [i for i in issues if i.severity == "error"], extra
 
 
-def test_reserved_set_is_exactly_the_documented_three():
-    """meals_per_day (Person, M1 eat sheets), period (Budget, weekly-only in
-    M0/M1), cooked (Pantry, M1+ availability join) — each reserved WITH a
-    rationale in model.py. Growing this set is a deliberate act."""
-    assert model.RESERVED_FIELDS == {"meals_per_day", "period", "cooked"}
+def test_reserved_set_is_exactly_the_documented_two():
+    """meals_per_day (Person, M1 eat sheets) and period (Budget, weekly-only
+    in M0/M1) — each reserved WITH a rationale in model.py. cooked (Pantry)
+    left the set when M1.8 made it live. Growing this set is a deliberate
+    act."""
+    assert model.RESERVED_FIELDS == {"meals_per_day", "period"}
 
 
 # --------------------------------------------------------------------------- #
@@ -344,10 +346,16 @@ def test_use_freezer_must_be_bool():
 #  the M0 gate — no dead config, ever again
 # --------------------------------------------------------------------------- #
 # Consuming code: the engine-side modules plus the derivation (per100/tags/
-# edible-fraction consumption lives in model.derive_component).
+# edible-fraction consumption lives in model.derive_component). M1.0: the
+# source is stripped of comments and docstrings first — a field named only
+# in prose is documentation, not consumption.
+from _shared import strip_comments_and_docstrings
+
+
 def _engine_side_source():
-    return ("".join(inspect.getsource(m) for m in (engine, costing, cli))
-            + inspect.getsource(model.derive_component))
+    srcs = [inspect.getsource(m) for m in (engine, costing, cli)]
+    srcs.append(inspect.getsource(model.derive_component))
+    return "".join(strip_comments_and_docstrings(s) for s in srcs)
 
 
 # Fields whose consumption IS validation behavior (they change what io_yaml
@@ -368,10 +376,12 @@ def test_no_dead_config_gate():
     validation-consumed field, or sit in model.RESERVED_FIELDS. Future dead
     config fails here. (Budget and Pantry were originally outside this loop,
     which let Budget.period ride along dead — the exact hole the gate
-    exists to close.)"""
+    exists to close. Since M1.0 the reference check runs on comment- and
+    docstring-stripped source, so prose can never launder a dead field.)"""
     engine_src = _engine_side_source()
-    validation_src = inspect.getsource(io_yaml)
-    assert model.RESERVED_FIELDS == {"meals_per_day", "period", "cooked"}
+    validation_src = strip_comments_and_docstrings(
+        inspect.getsource(io_yaml))
+    assert model.RESERVED_FIELDS == {"meals_per_day", "period"}
 
     for cls in (model.Ingredient, model.Component, model.Person,
                 model.Settings, model.Budget, model.Pantry):

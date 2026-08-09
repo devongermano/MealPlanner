@@ -37,13 +37,12 @@ from mealplan import costing, engine, io_yaml
 
 import refenv
 
+# The frozen golden parameter set lives in tests/_shared.py (M1.0: test
+# modules never import each other — importlib-mode safe).
+from _shared import GOLDEN_MENU_KW, GOLDEN_SEED
+
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 GOLDEN = Path(__file__).resolve().parent / "golden"
-
-# One frozen parameter set for the golden pipeline — changing any of these is
-# a deliberate, reviewed golden regeneration (tests/golden/README.md).
-GOLDEN_SEED = 0
-GOLDEN_MENU_KW = dict(n=6, seed=GOLDEN_SEED, iters=600, shortlist=8)
 
 
 def load(name):
@@ -300,7 +299,9 @@ def test_unit_snapping_in_bounds_property_15_seeds():
             continue          # snapping may legitimately break a tight band
         feasible += 1
         for cid, g in res.items_g.items():
-            lo, hi = comps[cid]["serve_g"]["min"], comps[cid]["serve_g"]["max"]
+            # M1.7: bounds are the PERSON's effective (kcal-scaled) band
+            lo, hi, _w = engine.effective_serve_bounds(comps[cid],
+                                                       people["disco"])
             assert lo <= g <= hi, (seed, cid, g, lo, hi)
             u = comps[cid].get("unit_g")
             if u:

@@ -192,7 +192,7 @@ def _ppl_doc(budget=None):
                                          "carb": 200},
                              "tolerance": 0.05}},
            "settings": {"days": 7, "active_min_budget": 180,
-                        "cook_days": [0]}}
+                        "cook_days": [0], "max_days_same_component": 4}}
     if budget is not None:
         doc["budget"] = budget
     return doc

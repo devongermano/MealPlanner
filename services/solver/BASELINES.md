@@ -19,19 +19,19 @@ load -> choose_menu(n=6, seed=0, iters=600, shortlist=8) -> build_week -> sessio
 | stage | CBC invocations |
 |---|---|
 | menu-verify | 1 |
-| plate | 323 |
-| **total** | **324** |
+| plate | 304 |
+| **total** | **305** |
 
 ### Wall timings over 5 runs (recorded-only — never asserted in CI, PRD §8.5)
 
 | stage | median ms | min ms | max ms |
 |---|---|---|---|
-| load | 4.2 | 4.1 | 4.2 |
-| choose_menu | 49.3 | 47.5 | 51.2 |
-| build_week | 6,636.2 | 6,408.7 | 6,900.2 |
+| load | 4.2 | 4.1 | 4.9 |
+| choose_menu | 70.7 | 68.7 | 73.8 |
+| build_week | 5,898.2 | 5,597.2 | 6,253.7 |
 | session_plan | 0.1 | 0.1 | 0.1 |
 | purchase | 0.0 | 0.0 | 0.0 |
-| **pipeline total** | **6,689.9** | 6,460.4 | 6,954.0 |
+| **pipeline total** | **5,972.1** | 5,673.5 | 6,328.6 |
 
 ## Examples corpus — `mealplan week` pipeline
 
@@ -41,22 +41,22 @@ load -> doctor -> choose_menu(n=12, seed=0; CLI defaults) -> build_week -> sessi
 
 | stage | CBC invocations |
 |---|---|
-| doctor-ablation | 12 |
+| doctor-ablation | 18 |
 | doctor-binding | 44 |
 | doctor-feasibility | 4 |
-| doctor-volume | 46 |
+| doctor-volume | 44 |
 | menu-verify | 4 |
-| plate | 588 |
-| **total** | **698** |
+| plate | 1340 |
+| **total** | **1454** |
 
 ### Wall timings over 5 runs (recorded-only — never asserted in CI, PRD §8.5)
 
 | stage | median ms | min ms | max ms |
 |---|---|---|---|
-| load | 27.7 | 27.4 | 28.2 |
-| doctor | 2,666.8 | 2,529.1 | 2,940.8 |
-| choose_menu | 1,149.8 | 1,131.0 | 1,168.2 |
-| build_week | 12,498.4 | 11,964.8 | 12,607.2 |
-| session_plan | 0.2 | 0.2 | 0.2 |
+| load | 27.9 | 26.8 | 29.4 |
+| doctor | 2,598.0 | 2,352.3 | 2,786.6 |
+| choose_menu | 1,592.0 | 1,565.4 | 1,657.4 |
+| build_week | 25,994.7 | 24,439.1 | 27,620.7 |
+| session_plan | 0.2 | 0.1 | 0.2 |
 | purchase | 0.0 | 0.0 | 0.0 |
-| **pipeline total** | **16,288.4** | 15,686.6 | 16,632.1 |
+| **pipeline total** | **30,344.6** | 28,383.8 | 32,026.3 |

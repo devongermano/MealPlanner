@@ -5,7 +5,9 @@ components:
   cuisine: test
   role: starch
   yield_g: 1000
-  serve_g: {min: 100, max: 4000}
+  # max sized so the 1,200-kcal person's 0.6-scaled band (M1.7) still admits
+  # the ~2,850g of watery starch their carb target physically requires
+  serve_g: {min: 100, max: 5500}
   keeps_days: 7
   active_min: 15
   ingredients: {water_starch: 1000}

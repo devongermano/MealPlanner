@@ -21,8 +21,10 @@ from mealplan import costing, engine, io_yaml
 import refenv
 
 # One frozen parameter set, shared with the determinism golden — a drift
-# between the two files cannot happen because both import it from here.
-from test_capabilities import GOLDEN_MENU_KW, GOLDEN_SEED
+# between the two files cannot happen because both import it from
+# tests/_shared.py (M1.0: never from another test module — importlib-mode
+# safe).
+from _shared import GOLDEN_MENU_KW, GOLDEN_SEED
 
 REPO = Path(__file__).resolve().parents[3]
 EXAMPLES = REPO / "examples"
@@ -33,9 +35,14 @@ FIXTURES = Path(__file__).resolve().parent / "fixtures"
 #  (recorded 2026-08-09, macOS arm64 / Python 3.14.4 / PuLP 3.3.2 CBC)
 # --------------------------------------------------------------------------- #
 # Golden solo_lifter pipeline: EXACT per-stage counts (deterministic).
+# Re-recorded 2026-08-09 via `make baseline` for M1 Phase 1 (was plate:
+# 323): M1.7 per-person serve scaling — with effective bounds aligned to
+# the whole-gram emission grid — changes the plate LPs' feasible regions,
+# so build_week's re-plate ladder takes a different (deterministic) number
+# of solves — see services/solver/M1P1_NOTES.md.
 GOLDEN_SOLO_COUNTS = {
     "menu-verify": 1,
-    "plate": 323,
+    "plate": 304,
 }
 
 # Examples (founder corpus) `week`-command pipeline (doctor + choose_menu at
@@ -44,7 +51,10 @@ GOLDEN_SOLO_COUNTS = {
 # will edit it), so this guard is deliberately order-of-magnitude — it
 # catches solve-count EXPLOSIONS, and must not break on routine corpus edits
 # (PRD §9: the founder household is not a test fixture).
-EXAMPLES_RECORDED_TOTAL = 698
+# Re-recorded 2026-08-09 via `make baseline` for M1 Phase 1 (was 698):
+# M1.7 scaling roughly doubles the examples pipeline's plate-LP work (588
+# -> 1340 plate solves) — see services/solver/M1P1_NOTES.md.
+EXAMPLES_RECORDED_TOTAL = 1454
 EXAMPLES_BUDGET = EXAMPLES_RECORDED_TOTAL * 2
 
 

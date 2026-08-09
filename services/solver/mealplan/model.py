@@ -39,10 +39,9 @@ from .units import KCAL, MACROS
 # - period (Budget): budget period label, validated to the one known value
 #   ('week') — M0/M1 plans are weekly by construction, so nothing consumes
 #   it; reserved for a future non-weekly budget period.
-# - cooked (Pantry): cooked-component leftovers — validated in M0 (schema +
-#   references + dates); the planning integration (availability join) is
-#   M1+ (see Pantry docstring and TASKS.md).
-RESERVED_FIELDS = frozenset({"meals_per_day", "period", "cooked"})
+# (cooked (Pantry) was reserved in M0; it went LIVE in M1.8 —
+#  costing.cooked_leftovers joins it into availability and session_plan.)
+RESERVED_FIELDS = frozenset({"meals_per_day", "period"})
 
 
 class _RawView:
@@ -182,12 +181,15 @@ class Budget(_RawView):
 
 @dataclass
 class Pantry(_RawView):
-    """On-hand stock (M0.12, PRD §8.1).
+    """On-hand stock (M0.12/M1.8, PRD §8.1).
 
     - stock: raw ingredient grams on hand — deducted from purchase need
-      BEFORE pack rounding (costing.purchase).
-    - cooked: cooked-component leftovers — schema and validation only in M0;
-      planning integration (availability join) is M1+.
+      BEFORE pack rounding (costing.purchase), after the acquired-age rule
+      (costing.age_pantry, M1.8: stock too old to survive to any cook
+      session is not deducted and is reported as expiring unused).
+    - cooked: cooked-component leftovers — LIVE since M1.8:
+      costing.cooked_leftovers joins them into build_week availability with
+      residual life, and session_plan consumes them before fresh batches.
 
     An empty pantry (empty/absent lists) behaves identically to no pantry.
     """

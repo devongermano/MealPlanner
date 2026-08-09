@@ -6,7 +6,9 @@ components:
   role: main
   anchor: lean
   yield_g: 2000
-  serve_g: {min: 100, max: 600}
+  # max sized so alice/bob's 1,735-kcal 0.694-scaled bands (M1.7) still let
+  # the shared base reach their 110g protein targets
+  serve_g: {min: 100, max: 900}
   keeps_days: 7
   active_min: 30
   ingredients: {base_mix: 2000}
@@ -15,7 +17,9 @@ components:
   cuisine: test
   role: starch
   yield_g: 2000
-  serve_g: {min: 100, max: 700}
+  # max sized so the 0.694-scaled band (M1.7) still carries the 186g carb
+  # floor from rice alone (~620g at 30 c/100g)
+  serve_g: {min: 100, max: 1000}
   keeps_days: 7
   active_min: 15
   ingredients: {rice_mix: 2000}

@@ -6,7 +6,9 @@ components:
   role: main
   anchor: lean
   yield_g: 2000
-  serve_g: {min: 100, max: 650}
+  # max sized so val's 1,765-kcal 0.706-scaled band (M1.7) still admits the
+  # ~560g of stew their 120g protein target requires on days 0-5
+  serve_g: {min: 100, max: 900}
   keeps_days: 3
   freezes: false
   active_min: 30
@@ -16,7 +18,9 @@ components:
   cuisine: test
   role: starch
   yield_g: 2000
-  serve_g: {min: 100, max: 800}
+  # max sized so the 0.706-scaled band (M1.7) still carries the ~207g carb
+  # floor from rice alone (~690g at 30 c/100g)
+  serve_g: {min: 100, max: 1200}
   keeps_days: 7
   active_min: 15
   ingredients: {rice_mix: 2000}

@@ -87,6 +87,12 @@ input that was previously valid AND canonical:
 
 ## Deferred minors (recorded, not fixed — sweep at M1 start, TASKS M1.0)
 
+> **SWEPT 2026-08-09 (M1 Phase 1):** every item below except the two
+> explicitly M2-scoped ones (nearest-prior-trip per-trip assignment; price
+> provenance / plan-group schema fields) was fixed in TASKS M1.0 — see
+> `services/solver/M1P1_NOTES.md` for the disposition and the golden/baseline
+> deltas of the phase.
+
 - plate() structural-failure fallback reports misses as positive full targets
   (reads as "forced OVER" when the person is SHORT of everything) — sign
   semantics of the no-usable-components branch.

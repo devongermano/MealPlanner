@@ -175,6 +175,34 @@ def test_cook_days_absent_is_error_naming_the_field():
     assert "no default" in hits[0].message
 
 
+@pytest.mark.parametrize("field", ["active_min_budget",
+                                   "max_days_same_component"])
+def test_engine_indexed_settings_absent_is_error_not_keyerror(field):
+    # M1.0 follow-up: same required posture as cook_days — a missing
+    # engine-indexed setting must be a structured load error, never a
+    # KeyError mid-solve.
+    st = {"days": 7, "cook_days": [0, 4], "active_min_budget": 180,
+          "max_days_same_component": 4}
+    del st[field]
+    errs = errors_of(validate_people_doc(ppl_doc_with_settings(st)))
+    hits = [e for e in errs
+            if e.code == "missing_field" and field in e.where]
+    assert hits, errs
+    assert "no default" in hits[0].message
+
+
+@pytest.mark.parametrize("field,bad", [("active_min_budget", -5),
+                                        ("max_days_same_component", 0),
+                                        ("active_min_budget", "lots"),
+                                        ("max_days_same_component", True)])
+def test_engine_indexed_settings_bad_value_is_error(field, bad):
+    st = {"days": 7, "cook_days": [0, 4], "active_min_budget": 180,
+          "max_days_same_component": 4}
+    st[field] = bad
+    errs = errors_of(validate_people_doc(ppl_doc_with_settings(st)))
+    assert any(e.code == f"bad_{field}" for e in errs), errs
+
+
 @pytest.mark.parametrize("bad", [[], "0,4", 3, [0, "four"], [True]])
 def test_cook_days_bad_shape_is_error(bad):
     errs = errors_of(validate_people_doc(ppl_doc_with_settings(
@@ -190,7 +218,8 @@ def test_cook_days_out_of_week_is_error():
 
 def test_cook_days_valid_is_fine():
     errs = errors_of(validate_people_doc(ppl_doc_with_settings(
-        {"days": 7, "active_min_budget": 180, "cook_days": [0, 4]})))
+        {"days": 7, "active_min_budget": 180, "cook_days": [0, 4],
+         "max_days_same_component": 4})))
     assert not errs
 
 

@@ -14,12 +14,13 @@ relative to the current directory — the package hardcodes NO repo paths, PRD P
 """
 
 import argparse
+import datetime
 import sys
 from pathlib import Path
 
 from . import instrument, io_yaml
-from .costing import (attribute, budget_ceiling, menu_cost, purchase,
-                      session_plan)
+from .costing import (age_pantry, attribute, budget_ceiling, cooked_leftovers,
+                      menu_cost, purchase, session_plan)
 from .engine import (available_on, build_week, choose_menu, from_freezer,
                      reset_solve_counts, score_menu, solve_counts)
 from .units import MACROS, fmt_miss, kcal_of
@@ -91,6 +92,10 @@ def render(comps, ing, people, settings, menu, weeks, demand, docmsg, menuinfo,
         for n in s.get("freezer_notes", []):
             L.append(f"- FREEZER: {n['note']}")
         L.append("")
+    # M1.8: demand fed from cooked pantry leftovers (already paid for —
+    # consumed before any fresh batch)
+    for n in sp.get("leftover", []):
+        L.append(f"- LEFTOVER: {n['note']}")
     for u in sp["unattributed"]:
         L.append(f"- WARNING: {u['grams']}g of `{u['component']}` demanded on "
                  f"day {u['day']} but no cook session can feed that day — "
@@ -232,7 +237,19 @@ def main(argv=None):
                          "yaml (default: ./examples)")
     ap.add_argument("--pantry", default=None, metavar="PATH",
                     help="optional pantry.yaml; on-hand stock is deducted from "
-                         "the shopping list before pack rounding (M0.12)")
+                         "the shopping list before pack rounding (M0.12), "
+                         "aged by --date (M1.8); cooked leftovers join "
+                         "availability and are eaten before fresh batches")
+    ap.add_argument("--date", default=None, metavar="YYYY-MM-DD",
+                    help="plan start date (ISO). REQUIRED when the pantry "
+                         "has stock or cooked leftovers — aging and residual "
+                         "life are computed relative to it; the engine reads "
+                         "no wall clock (M1.8)")
+    ap.add_argument("--diagnose", action="store_true",
+                    help="also run the full doctor diagnostics before "
+                         "week/menu/shop/all and include the report (§8.3: "
+                         "diagnostics are on demand, no longer implicit in "
+                         "every command)")
     ap.add_argument("--n", type=int, default=12,
                     help="menu size: how many components choose_menu selects "
                          "(default: %(default)s)")
@@ -240,8 +257,8 @@ def main(argv=None):
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--out", default="plan.md")
     ap.add_argument("--budget", default=None,
-                    help="override: '550' for a shared pot, or 'devon=320,jimbo=240'")
-    ap.add_argument("--mass", default=None, help="override: 'jimbo=2200'")
+                    help="override: '550' for a shared pot, or 'alice=320,bob=240'")
+    ap.add_argument("--mass", default=None, help="override: 'alice=2200'")
     ap.add_argument("--exclude", default="", help="components to keep off the menu")
     ap.add_argument("--force", default="", help="components that must be on the menu")
     ap.add_argument("--range", default="400:700:50", help="frontier sweep lo:hi:step")
@@ -277,6 +294,32 @@ def _run(a, timer):
                                          known_components=set(comps))
         except io_yaml.ValidationError as e:
             sys.exit(str(e))
+    # M1.8: the plan start date is an explicit input — no wall-clock default
+    plan_date = None
+    if a.date:
+        try:
+            plan_date = datetime.date.fromisoformat(a.date)
+        except ValueError:
+            sys.exit(f"--date must be an ISO date (YYYY-MM-DD), "
+                     f"got {a.date!r}")
+    leftovers = []
+    if pantry is not None and (pantry.stock or pantry.cooked):
+        if plan_date is None:
+            sys.exit("--date YYYY-MM-DD is required when the pantry has "
+                     "stock or cooked leftovers: stock aging and leftover "
+                     "residual life are computed relative to the plan start "
+                     "date, and the engine reads no wall clock (M1.8, "
+                     "PRD §8.1)")
+        try:
+            pantry_eff, stock_warnings = age_pantry(pantry, ing, settings,
+                                                    plan_date)
+        except ValueError as e:
+            sys.exit(str(e))
+        leftovers, leftover_warnings = cooked_leftovers(pantry, comps,
+                                                        settings, plan_date)
+        for w in stock_warnings + leftover_warnings:
+            print(f"[warning:{w['code']}] {w['message']}", file=sys.stderr)
+        pantry = pantry_eff
     if a.budget:
         settings["budget"] = parse_budget(a.budget)
     if a.mass:
@@ -298,9 +341,14 @@ def _run(a, timer):
             frontier(comps, ing, people, settings, lo, hi, st, a.n,
                      seed=a.seed, must=force)
         return
-    from .engine import doctor as _doctor
-    with timer.span("doctor"):
-        docmsg, _ = _doctor(comps, people, settings, ing=ing)
+    # M1.0 (§8.3): diagnostics run ON DEMAND — the doctor command and the
+    # --diagnose flag — never implicitly before every write/render (the old
+    # always-run cost was ~2.7s per command on the examples corpus).
+    docmsg = ""
+    if a.cmd == "doctor" or a.diagnose:
+        from .engine import doctor as _doctor
+        with timer.span("doctor"):
+            docmsg, _ = _doctor(comps, people, settings, ing=ing)
 
     if a.cmd == "doctor":
         print(docmsg)
@@ -340,9 +388,9 @@ def _run(a, timer):
     diag = {}      # P8: relaxation-ladder tiers surface in the rendered plan
     with timer.span("build_week"):
         weeks, demand = build_week(comps, people, settings, menu, seed=a.seed,
-                                   ing=ing, diag=diag)
+                                   ing=ing, diag=diag, leftovers=leftovers)
     with timer.span("session_plan"):
-        sp = session_plan(comps, ing, settings, weeks)
+        sp = session_plan(comps, ing, settings, weeks, leftovers=leftovers)
     with timer.span("render"):
         out = render(comps, ing, people, settings, menu, weeks, demand, docmsg,
                      menuinfo, sp, pantry=pantry, diag=diag)

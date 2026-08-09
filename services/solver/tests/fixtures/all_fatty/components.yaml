@@ -5,7 +5,10 @@ components:
   cuisine: test
   role: main
   yield_g: 500
-  serve_g: {min: 100, max: 600}
+  # main maxes sized so fatima's 1,925-kcal 0.77-scaled bands (M1.7) still
+  # let the two fatty mains REACH her protein band — the fat-forcing trade
+  # needs protein reachable, with fat dragged over
+  serve_g: {min: 100, max: 800}
   keeps_days: 5
   active_min: 25
   ingredients: {sausage_mix: 500}
@@ -14,7 +17,7 @@ components:
   cuisine: test2
   role: main
   yield_g: 500
-  serve_g: {min: 100, max: 600}
+  serve_g: {min: 100, max: 800}
   keeps_days: 6
   active_min: 35
   ingredients: {belly_mix: 500}
@@ -23,7 +26,9 @@ components:
   cuisine: test
   role: starch
   yield_g: 900
-  serve_g: {min: 100, max: 700}
+  # max sized so the 0.77-scaled band (M1.7) still carries fatima's 190g
+  # carb floor from rice alone (~635g at 30 c/100g)
+  serve_g: {min: 100, max: 1000}
   keeps_days: 7
   active_min: 15
   ingredients: {rice_mix: 900}
