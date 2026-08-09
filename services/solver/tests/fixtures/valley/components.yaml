@@ -1,0 +1,40 @@
+schema_version: 1
+components:
+- id: stew
+  name: stew
+  cuisine: test
+  role: main
+  anchor: lean
+  yield_g: 2000
+  serve_g: {min: 100, max: 650}
+  keeps_days: 3
+  freezes: false
+  active_min: 30
+  ingredients: {stew_mix: 2000}
+- id: rice_pot
+  name: rice_pot
+  cuisine: test
+  role: starch
+  yield_g: 2000
+  serve_g: {min: 100, max: 800}
+  keeps_days: 7
+  active_min: 15
+  ingredients: {rice_mix: 2000}
+- id: garden_veg
+  name: garden_veg
+  cuisine: test2
+  role: veg
+  yield_g: 400
+  serve_g: {min: 50, max: 300}
+  keeps_days: 7
+  active_min: 10
+  ingredients: {veg_mix: 400}
+- id: oil_drizzle
+  name: oil_drizzle
+  cuisine: test
+  role: accent
+  yield_g: 200
+  serve_g: {min: 5, max: 60}
+  keeps_days: 21
+  active_min: 2
+  ingredients: {oil_mix: 200}

@@ -1,0 +1,16 @@
+schema_version: 1
+people:
+  fatima:
+    # protein 180 from ~p17/100 mains means ~1050g of main, carrying ~130g of
+    # fat against a 45g target: reaching protein forces fat over.
+    targets: {protein: 180, fat: 45, carb: 200}
+    tolerance: 0.05
+    exclude: []
+    dislikes: []
+settings:
+  days: 7
+  active_min_budget: 400
+  batch_time_factor: 0.45
+  max_days_same_component: 4
+  cook_days: [0, 4]
+  shop_days: [0]

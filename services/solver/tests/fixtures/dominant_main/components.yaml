@@ -1,0 +1,54 @@
+schema_version: 1
+# 3 mains + 1 starch + 1 accent. power_bowl is a complete solo meal (1000g
+# hits dom's targets exactly); turkey_block/tofu_block need rice + oil to make
+# a plate. The plate-diversity score sums used_days^2 over PLATE MEMBERS, so
+# 1-component power_bowl plates keep out-scoring 3-component ensembles even
+# once power_bowl is the most-used component: without the hard main cap the
+# greedy provably serves it more than max_days_same_component days.
+components:
+- id: power_bowl
+  name: power_bowl
+  cuisine: test
+  role: main
+  yield_g: 1200
+  serve_g: {min: 300, max: 1200}
+  keeps_days: 5
+  active_min: 30
+  ingredients: {bowl_mix: 1200}
+- id: turkey_block
+  name: turkey_block
+  cuisine: test2
+  role: main
+  anchor: lean
+  yield_g: 600
+  serve_g: {min: 100, max: 700}
+  keeps_days: 6
+  active_min: 25
+  ingredients: {turkey_mix: 600}
+- id: tofu_block
+  name: tofu_block
+  cuisine: test3
+  role: main
+  yield_g: 600
+  serve_g: {min: 100, max: 700}
+  keeps_days: 6
+  active_min: 20
+  ingredients: {tofu_mix: 600}
+- id: rice_pot
+  name: rice_pot
+  cuisine: test
+  role: starch
+  yield_g: 2000
+  serve_g: {min: 100, max: 1000}
+  keeps_days: 7
+  active_min: 15
+  ingredients: {rice_mix: 2000}
+- id: oil_drizzle
+  name: oil_drizzle
+  cuisine: test2
+  role: accent
+  yield_g: 200
+  serve_g: {min: 5, max: 60}
+  keeps_days: 21
+  active_min: 2
+  ingredients: {oil_mix: 200}

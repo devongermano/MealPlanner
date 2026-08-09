@@ -35,8 +35,8 @@ config; one canonical computation per quantity; measured perf baselines recorded
 
 ### Measurement & fixtures
 - [ ] M0.14 Instrumentation: LP-solve counts and stage timings; record baselines on reference machine (PRD §8.5)
-- [ ] M0.15 Synthetic fixture households + libraries in `tests/fixtures/` (single person; several-person; conflicting exclusions; extreme targets; discrete-unit edges) — founder household is NOT a fixture (PRD §9)
-- [ ] M0.16 Capability test suite (PRD §9 names): composite-dish fat-forcing; binding-macro id; shelf-life valley → explained hole; variety caps don't starve late days; unit snapping in bounds; excluded tags never served; determinism golden (pinned reference env)
+- [x] M0.15 Synthetic fixture households + libraries in `tests/fixtures/` (single person; several-person; conflicting exclusions; extreme targets; discrete-unit edges) — founder household is NOT a fixture (PRD §9)
+- [x] M0.16 Capability test suite (PRD §9 names): composite-dish fat-forcing; binding-macro id; shelf-life valley → explained hole; variety caps don't starve late days; unit snapping in bounds; excluded tags never served; determinism golden (pinned reference env)
 - [ ] M0.17 Dev-corpus cleanup: fix tolerance advice in `people.yaml:4-5` + `SKILL.md:106` (structural fix first, tolerance last — PRD §8.3); remove `[0,3]` code-default for `cook_days` (config-required); unify `n` defaults; move founder library to `examples/`; delete dead code (`assign_week`, unused imports)
 
 ## M1 — Headless demo loop

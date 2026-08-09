@@ -1,0 +1,11 @@
+schema_version: 1
+components:
+- id: watery_pot
+  name: watery_pot
+  cuisine: test
+  role: starch
+  yield_g: 1000
+  serve_g: {min: 100, max: 4000}
+  keeps_days: 7
+  active_min: 15
+  ingredients: {water_starch: 1000}

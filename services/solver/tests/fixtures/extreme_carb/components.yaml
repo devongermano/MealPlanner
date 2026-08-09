@@ -1,0 +1,20 @@
+schema_version: 1
+components:
+- id: meat_plate
+  name: meat_plate
+  cuisine: test
+  role: main
+  yield_g: 500
+  serve_g: {min: 100, max: 500}
+  keeps_days: 5
+  active_min: 25
+  ingredients: {meat_mix: 500}
+- id: rice_pot
+  name: rice_pot
+  cuisine: test
+  role: starch
+  yield_g: 900
+  serve_g: {min: 100, max: 500}
+  keeps_days: 7
+  active_min: 15
+  ingredients: {rice_mix: 900}

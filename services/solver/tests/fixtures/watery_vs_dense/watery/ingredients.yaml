@@ -1,0 +1,5 @@
+schema_version: 1
+# watery_vs_dense/watery — 10 c/100g starch: the same 300g carb target needs
+# ~2,850g/day of food. Compare against ../dense (70 c/100g).
+ingredients:
+  water_starch: {p: 0.0, f: 0.0, c: 10.0, perishable: false, pack_g: 900, keeps_days: 999, cost: 3.00, tags: []}

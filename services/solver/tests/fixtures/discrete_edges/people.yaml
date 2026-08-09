@@ -1,0 +1,14 @@
+schema_version: 1
+people:
+  disco:
+    targets: {protein: 80, fat: 45, carb: 160}
+    tolerance: 0.15
+    exclude: []
+    dislikes: []
+settings:
+  days: 7
+  active_min_budget: 400
+  batch_time_factor: 0.45
+  max_days_same_component: 4
+  cook_days: [0, 4]
+  shop_days: [0]

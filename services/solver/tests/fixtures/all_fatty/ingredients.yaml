@@ -1,0 +1,11 @@
+schema_version: 1
+# all_fatty — NO lean-anchor mains: every main's protein/fat ratio is ~1.2-1.5
+# (a lean anchor is ~7-11). Fat/protein per gram is still < 1, so the plate LP
+# minimizes total violation by FILLING protein — dragging fat OVER its band
+# (positive fat miss): the composite-dish fat-forcing scenario. The oil accent
+# exists so the lean-anchor variant can still REACH its fat band from below.
+ingredients:
+  sausage_mix: {p: 18.0, f: 12.0, c: 2.0,  perishable: false, pack_g: 500, keeps_days: 999, cost: 6.00, tags: []}
+  belly_mix:   {p: 16.0, f: 13.0, c: 0.0,  perishable: false, pack_g: 500, keeps_days: 999, cost: 7.00, tags: []}
+  rice_mix:    {p: 2.0,  f: 0.5,  c: 30.0, perishable: false, pack_g: 900, keeps_days: 999, cost: 3.00, tags: []}
+  oil_mix:     {p: 0.0,  f: 100.0, c: 0.0, perishable: false, pack_g: 500, keeps_days: 999, cost: 5.00, tags: []}

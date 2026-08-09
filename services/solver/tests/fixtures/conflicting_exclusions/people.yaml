@@ -1,0 +1,20 @@
+schema_version: 1
+people:
+  alice:                      # excludes alpha — may eat only beta accents
+    targets: {protein: 110, fat: 55, carb: 200}
+    tolerance: 0.07
+    exclude: [alpha]
+    dislikes: []
+  bob:                        # excludes beta — may eat only alpha accents
+    targets: {protein: 110, fat: 55, carb: 200}
+    tolerance: 0.07
+    exclude: [beta]
+    dislikes: []
+settings:
+  days: 5
+  active_min_budget: 400
+  batch_time_factor: 0.45
+  max_days_same_component: 4
+  max_batches_per_component: 4
+  cook_days: [0, 4]
+  shop_days: [0]

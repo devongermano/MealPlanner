@@ -1,0 +1,5 @@
+schema_version: 1
+# watery_vs_dense/dense — 70 c/100g starch: same carbs as ../watery, far less
+# water, so the volume floor is far lower.
+ingredients:
+  dense_starch: {p: 0.0, f: 0.0, c: 70.0, perishable: false, pack_g: 900, keeps_days: 999, cost: 3.00, tags: []}

@@ -777,7 +777,7 @@ def assign_week(plates, days, maxsame):
     return chosen
 
 
-def build_week(comps, people, settings, menu, seed=0, ing=None):
+def build_week(comps, people, settings, menu, seed=0, ing=None, diag=None):
     """Day by day, because a component's eligibility depends on WHICH day it is.
     Guacamole keeps 2 days; it cannot be on the day-7 plate no matter how well
     the macros work out.
@@ -789,7 +789,14 @@ def build_week(comps, people, settings, menu, seed=0, ing=None):
 
     Deterministic (M0.3): per-day plate seeds derive from the explicit ``seed``
     and the sorted index of the person name — never from the builtin hash,
-    which PYTHONHASHSEED randomizes across interpreter runs."""
+    which PYTHONHASHSEED randomizes across interpreter runs.
+
+    Diagnostics: pass a dict as ``diag`` and it is populated with
+    ``diag["relax_tiers"][pname]`` — one entry per day: the index of the
+    relaxation-ladder tier that produced the day's plate (0 = strict caps,
+    1/2 = progressively relaxed, None = no tier fed the day, i.e. an
+    explained hole). Lets tests and doctors observe WHETHER the caps had to
+    be relaxed, which the served week alone cannot show."""
     days = settings["days"]
     cap_batches = settings.get("max_batches_per_component", 3)
     porder = {pn: k for k, pn in enumerate(sorted(people))}
@@ -808,11 +815,12 @@ def build_week(comps, people, settings, menu, seed=0, ing=None):
                             or used_days.get(i, 0) < cap_days)
                         and used_g.get(i, 0) < comps[i]["yield_g"] * cap_b]
 
-            best = None
+            best, tier_used = None, None
             # try strict first, then progressively relax rather than emit an empty day
-            for cd, cb in ((settings["max_days_same_component"], cap_batches),
-                           (settings["max_days_same_component"] + 1, cap_batches + 1),
-                           (days, cap_batches + 2)):
+            for tier, (cd, cb) in enumerate((
+                    (settings["max_days_same_component"], cap_batches),
+                    (settings["max_days_same_component"] + 1, cap_batches + 1),
+                    (days, cap_batches + 2))):
                 avail = pool(cd, cb)
                 bestsc = None
                 for pl in diverse_plates(p, comps, avail, k=10,
@@ -822,9 +830,13 @@ def build_week(comps, people, settings, menu, seed=0, ing=None):
                     if bestsc is None or sc < bestsc:
                         bestsc, best = sc, pl
                 if best:
+                    tier_used = tier
                     break
             if best is None:
                 best = {}
+            if diag is not None:
+                diag.setdefault("relax_tiers", {}).setdefault(
+                    pname, []).append(tier_used)
             wk.append(best)
             for c, gmz in best.items():
                 used_days[c] = used_days.get(c, 0) + 1

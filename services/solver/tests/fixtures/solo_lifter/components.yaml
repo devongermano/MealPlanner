@@ -1,0 +1,69 @@
+schema_version: 1
+# 3 mains (one lean anchor) + 1 starch + veg + 2 accents. Feasible for the one
+# person at tolerance; enough mains that the strict variety cap (3 days) can
+# cover 7 days without relaxation, while the single starch must run every day.
+components:
+- id: chicken_grill
+  name: chicken_grill
+  cuisine: test
+  role: main
+  anchor: lean
+  yield_g: 500
+  serve_g: {min: 100, max: 700}
+  keeps_days: 5
+  active_min: 25
+  ingredients: {chicken_mix: 500}
+- id: beef_braise
+  name: beef_braise
+  cuisine: test2
+  role: main
+  yield_g: 500
+  serve_g: {min: 100, max: 400}
+  keeps_days: 6
+  active_min: 35
+  ingredients: {beef_mix: 500}
+- id: pork_roast
+  name: pork_roast
+  cuisine: test3
+  role: main
+  yield_g: 500
+  serve_g: {min: 100, max: 400}
+  keeps_days: 6
+  active_min: 30
+  ingredients: {pork_mix: 500}
+- id: rice_pot
+  name: rice_pot
+  cuisine: test
+  role: starch
+  yield_g: 2000
+  serve_g: {min: 100, max: 1000}
+  keeps_days: 7
+  active_min: 15
+  ingredients: {rice_mix: 2000}
+- id: garden_veg
+  name: garden_veg
+  cuisine: test2
+  role: veg
+  yield_g: 400
+  serve_g: {min: 50, max: 300}
+  keeps_days: 6
+  active_min: 10
+  ingredients: {veg_mix: 400}
+- id: oil_drizzle
+  name: oil_drizzle
+  cuisine: test
+  role: accent
+  yield_g: 200
+  serve_g: {min: 5, max: 60}
+  keeps_days: 21
+  active_min: 2
+  ingredients: {oil_mix: 200}
+- id: herb_sauce
+  name: herb_sauce
+  cuisine: test3
+  role: accent
+  yield_g: 200
+  serve_g: {min: 10, max: 100}
+  keeps_days: 7
+  active_min: 10
+  ingredients: {herb_mix: 200}

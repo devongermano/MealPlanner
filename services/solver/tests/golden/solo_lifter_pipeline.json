@@ -1,0 +1,197 @@
+{
+ "broke": {},
+ "demand": {
+  "beef_braise": 1600,
+  "chicken_grill": 1534,
+  "herb_sauce": 58,
+  "oil_drizzle": 110,
+  "pork_roast": 1267,
+  "rice_pot": 5419
+ },
+ "feasible": true,
+ "fixture": "solo_lifter",
+ "menu": [
+  "beef_braise",
+  "chicken_grill",
+  "herb_sauce",
+  "oil_drizzle",
+  "pork_roast",
+  "rice_pot"
+ ],
+ "menu_kwargs": {
+  "iters": 600,
+  "n": 6,
+  "seed": 0,
+  "shortlist": 8
+ },
+ "purchase": [
+  [
+   "rice_mix",
+   6000,
+   7,
+   900,
+   300,
+   false,
+   999
+  ],
+  [
+   "beef_mix",
+   2000,
+   4,
+   500,
+   0,
+   false,
+   999
+  ],
+  [
+   "chicken_mix",
+   2000,
+   4,
+   500,
+   0,
+   false,
+   999
+  ],
+  [
+   "pork_mix",
+   1500,
+   3,
+   500,
+   0,
+   false,
+   999
+  ],
+  [
+   "herb_mix",
+   200,
+   1,
+   200,
+   0,
+   false,
+   999
+  ],
+  [
+   "oil_mix",
+   200,
+   1,
+   500,
+   300,
+   false,
+   999
+  ]
+ ],
+ "seed": 0,
+ "session_plan": {
+  "batches": {
+   "beef_braise": 4,
+   "chicken_grill": 4,
+   "herb_sauce": 1,
+   "oil_drizzle": 1,
+   "pork_roast": 3,
+   "rice_pot": 3
+  },
+  "freezer": [],
+  "minutes": 288,
+  "sessions": [
+   {
+    "batches": {
+     "beef_braise": 3,
+     "chicken_grill": 2,
+     "herb_sauce": 1,
+     "oil_drizzle": 1,
+     "pork_roast": 2,
+     "rice_pot": 3
+    },
+    "demand_g": {
+     "beef_braise": 1200,
+     "chicken_grill": 989,
+     "herb_sauce": 58,
+     "oil_drizzle": 110,
+     "pork_roast": 986,
+     "rice_pot": 5419
+    },
+    "freezer_notes": [],
+    "index": 0,
+    "made_g": {
+     "beef_braise": 1500,
+     "chicken_grill": 1000,
+     "herb_sauce": 200,
+     "oil_drizzle": 200,
+     "pork_roast": 1000,
+     "rice_pot": 6000
+    },
+    "minutes": 187,
+    "start": 0,
+    "thaw_notes": []
+   },
+   {
+    "batches": {
+     "beef_braise": 1,
+     "chicken_grill": 2,
+     "pork_roast": 1
+    },
+    "demand_g": {
+     "beef_braise": 400,
+     "chicken_grill": 545,
+     "pork_roast": 281
+    },
+    "freezer_notes": [],
+    "index": 1,
+    "made_g": {
+     "beef_braise": 500,
+     "chicken_grill": 1000,
+     "pork_roast": 500
+    },
+    "minutes": 101,
+    "start": 4,
+    "thaw_notes": []
+   }
+  ],
+  "unattributed": []
+ },
+ "waste_perishable": 0,
+ "waste_total": 600,
+ "weeks": {
+  "sol": [
+   {
+    "chicken_grill": 214,
+    "oil_drizzle": 23,
+    "pork_roast": 400,
+    "rice_pot": 783
+   },
+   {
+    "beef_braise": 400,
+    "chicken_grill": 230,
+    "herb_sauce": 48,
+    "rice_pot": 762
+   },
+   {
+    "beef_braise": 400,
+    "oil_drizzle": 5,
+    "pork_roast": 282,
+    "rice_pot": 770
+   },
+   {
+    "chicken_grill": 545,
+    "oil_drizzle": 41,
+    "rice_pot": 783
+   },
+   {
+    "beef_braise": 400,
+    "pork_roast": 304,
+    "rice_pot": 770
+   },
+   {
+    "chicken_grill": 545,
+    "oil_drizzle": 41,
+    "rice_pot": 783
+   },
+   {
+    "beef_braise": 400,
+    "herb_sauce": 10,
+    "pork_roast": 281,
+    "rice_pot": 768
+   }
+  ]
+ }
+}

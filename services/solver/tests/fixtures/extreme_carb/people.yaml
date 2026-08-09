@@ -1,0 +1,14 @@
+schema_version: 1
+people:
+  carl:
+    targets: {protein: 90, fat: 35, carb: 400}
+    tolerance: 0.05
+    exclude: []
+    dislikes: []
+settings:
+  days: 7
+  active_min_budget: 400
+  batch_time_factor: 0.45
+  max_days_same_component: 4
+  cook_days: [0, 4]
+  shop_days: [0]

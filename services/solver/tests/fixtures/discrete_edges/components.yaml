@@ -1,0 +1,50 @@
+schema_version: 1
+components:
+- id: tortilla
+  name: tortilla
+  cuisine: test
+  role: starch
+  yield_g: 425
+  unit_g: 85
+  serve_g: {min: 85, max: 340}
+  keeps_days: 7
+  active_min: 20
+  ingredients: {tortilla_mix: 425}
+- id: meatball
+  name: meatball
+  cuisine: test2
+  role: main
+  yield_g: 600
+  unit_g: 60
+  serve_g: {min: 120, max: 360}
+  keeps_days: 5
+  active_min: 30
+  ingredients: {meatball_mix: 600}
+- id: patty
+  name: patty
+  cuisine: test3
+  role: main
+  yield_g: 400
+  unit_g: 100
+  serve_g: {min: 100, max: 200}
+  keeps_days: 5
+  active_min: 20
+  ingredients: {patty_mix: 400}
+- id: rice_pot
+  name: rice_pot
+  cuisine: test
+  role: starch
+  yield_g: 900
+  serve_g: {min: 50, max: 600}
+  keeps_days: 7
+  active_min: 15
+  ingredients: {rice_mix: 900}
+- id: oil_drizzle
+  name: oil_drizzle
+  cuisine: test
+  role: accent
+  yield_g: 200
+  serve_g: {min: 5, max: 60}
+  keeps_days: 21
+  active_min: 2
+  ingredients: {oil_mix: 200}

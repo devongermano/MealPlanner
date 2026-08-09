@@ -1,0 +1,11 @@
+schema_version: 1
+# conflicting_exclusions — two people with DISJOINT exclusion tags (alpha,
+# beta) that jointly cover four of six components: shared tag-free base +
+# per-person accents (the accent-split scenario).
+ingredients:
+  base_mix:    {p: 20.0, f: 8.0,  c: 5.0,  perishable: false, pack_g: 500, keeps_days: 999, cost: 7.00, tags: []}
+  rice_mix:    {p: 2.0,  f: 0.5,  c: 30.0, perishable: false, pack_g: 900, keeps_days: 999, cost: 3.00, tags: []}
+  alpha_sauce: {p: 5.0,  f: 40.0, c: 10.0, perishable: false, pack_g: 250, keeps_days: 999, cost: 4.00, tags: [alpha]}
+  alpha_crunch: {p: 4.0, f: 20.0, c: 20.0, perishable: false, pack_g: 250, keeps_days: 999, cost: 4.00, tags: [alpha]}
+  beta_sauce:  {p: 5.0,  f: 40.0, c: 10.0, perishable: false, pack_g: 250, keeps_days: 999, cost: 4.00, tags: [beta]}
+  beta_cream:  {p: 4.0,  f: 35.0, c: 6.0,  perishable: false, pack_g: 250, keeps_days: 999, cost: 4.00, tags: [beta]}

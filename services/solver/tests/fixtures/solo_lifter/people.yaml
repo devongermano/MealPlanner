@@ -1,0 +1,15 @@
+schema_version: 1
+people:
+  sol:
+    targets: {protein: 150, fat: 65, carb: 250}
+    tolerance: 0.06
+    exclude: []
+    dislikes: []
+settings:
+  days: 7
+  active_min_budget: 400
+  batch_time_factor: 0.45
+  max_days_same_component: 4
+  max_batches_per_component: 4
+  cook_days: [0, 4]
+  shop_days: [0]

@@ -1,0 +1,30 @@
+schema_version: 1
+people:
+  bruno:                      # high-kcal, excludes dairy
+    targets: {protein: 170, fat: 80, carb: 330}
+    tolerance: 0.07
+    exclude: [dairy]
+    dislikes: []
+  petit:                      # low-kcal, excludes nut
+    targets: {protein: 70, fat: 40, carb: 110}
+    tolerance: 0.07
+    exclude: [nut]
+    dislikes: []
+  carla:
+    targets: {protein: 120, fat: 60, carb: 220}
+    tolerance: 0.07
+    exclude: []
+    dislikes: []
+  dave:
+    targets: {protein: 140, fat: 70, carb: 260}
+    tolerance: 0.07
+    exclude: []
+    dislikes: []
+settings:
+  days: 7
+  active_min_budget: 400
+  batch_time_factor: 0.45
+  max_days_same_component: 4
+  max_batches_per_component: 4
+  cook_days: [0, 4]
+  shop_days: [0]

@@ -1,0 +1,38 @@
+schema_version: 1
+components:
+- id: sausage_skillet
+  name: sausage_skillet
+  cuisine: test
+  role: main
+  yield_g: 500
+  serve_g: {min: 100, max: 600}
+  keeps_days: 5
+  active_min: 25
+  ingredients: {sausage_mix: 500}
+- id: belly_braise
+  name: belly_braise
+  cuisine: test2
+  role: main
+  yield_g: 500
+  serve_g: {min: 100, max: 600}
+  keeps_days: 6
+  active_min: 35
+  ingredients: {belly_mix: 500}
+- id: rice_pot
+  name: rice_pot
+  cuisine: test
+  role: starch
+  yield_g: 900
+  serve_g: {min: 100, max: 700}
+  keeps_days: 7
+  active_min: 15
+  ingredients: {rice_mix: 900}
+- id: oil_drizzle
+  name: oil_drizzle
+  cuisine: test
+  role: accent
+  yield_g: 200
+  serve_g: {min: 5, max: 60}
+  keeps_days: 21
+  active_min: 2
+  ingredients: {oil_mix: 200}

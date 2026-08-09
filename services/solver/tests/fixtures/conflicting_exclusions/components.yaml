@@ -1,0 +1,57 @@
+schema_version: 1
+components:
+- id: base_stew
+  name: base_stew
+  cuisine: test
+  role: main
+  anchor: lean
+  yield_g: 2000
+  serve_g: {min: 100, max: 600}
+  keeps_days: 7
+  active_min: 30
+  ingredients: {base_mix: 2000}
+- id: rice_pot
+  name: rice_pot
+  cuisine: test
+  role: starch
+  yield_g: 2000
+  serve_g: {min: 100, max: 700}
+  keeps_days: 7
+  active_min: 15
+  ingredients: {rice_mix: 2000}
+- id: salsa_alpha
+  name: salsa_alpha
+  cuisine: test2
+  role: accent
+  yield_g: 250
+  serve_g: {min: 10, max: 100}
+  keeps_days: 5
+  active_min: 5
+  ingredients: {alpha_sauce: 250}
+- id: crunch_alpha
+  name: crunch_alpha
+  cuisine: test3
+  role: accent
+  yield_g: 250
+  serve_g: {min: 10, max: 100}
+  keeps_days: 5
+  active_min: 5
+  ingredients: {alpha_crunch: 250}
+- id: salsa_beta
+  name: salsa_beta
+  cuisine: test2
+  role: accent
+  yield_g: 250
+  serve_g: {min: 10, max: 100}
+  keeps_days: 5
+  active_min: 5
+  ingredients: {beta_sauce: 250}
+- id: cream_beta
+  name: cream_beta
+  cuisine: test3
+  role: accent
+  yield_g: 250
+  serve_g: {min: 10, max: 100}
+  keeps_days: 5
+  active_min: 5
+  ingredients: {beta_cream: 250}

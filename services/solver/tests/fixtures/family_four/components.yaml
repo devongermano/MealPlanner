@@ -1,0 +1,77 @@
+schema_version: 1
+# Tags are DERIVED from ingredients: cheese_topping carries [dairy],
+# nut_drizzle carries [nut]; everything else is tag-free.
+components:
+- id: chicken_grill
+  name: chicken_grill
+  cuisine: test
+  role: main
+  anchor: lean
+  yield_g: 2000
+  serve_g: {min: 100, max: 600}
+  keeps_days: 5
+  active_min: 25
+  ingredients: {chicken_mix: 2000}
+- id: shrimp_saute
+  name: shrimp_saute
+  cuisine: test2
+  role: main
+  yield_g: 900
+  serve_g: {min: 100, max: 400}
+  keeps_days: 2
+  active_min: 15
+  ingredients: {shrimp_mix: 900}
+- id: fish_bake
+  name: fish_bake
+  cuisine: test3
+  role: main
+  yield_g: 1500
+  serve_g: {min: 100, max: 400}
+  keeps_days: 3
+  active_min: 20
+  ingredients: {fish_mix: 1500}
+- id: rice_pot
+  name: rice_pot
+  cuisine: test
+  role: starch
+  yield_g: 2500
+  serve_g: {min: 100, max: 700}
+  keeps_days: 7
+  active_min: 15
+  ingredients: {rice_mix: 2500}
+- id: pasta_bowl
+  name: pasta_bowl
+  cuisine: test2
+  role: starch
+  yield_g: 1500
+  serve_g: {min: 100, max: 600}
+  keeps_days: 6
+  active_min: 15
+  ingredients: {pasta_mix: 1500}
+- id: cheese_topping
+  name: cheese_topping
+  cuisine: test
+  role: accent
+  yield_g: 500
+  serve_g: {min: 10, max: 120}
+  keeps_days: 10
+  active_min: 5
+  ingredients: {cheese_mix: 500}
+- id: nut_drizzle
+  name: nut_drizzle
+  cuisine: test3
+  role: accent
+  yield_g: 500
+  serve_g: {min: 10, max: 100}
+  keeps_days: 10
+  active_min: 5
+  ingredients: {nut_mix: 500}
+- id: garden_greens
+  name: garden_greens
+  cuisine: test2
+  role: veg
+  yield_g: 600
+  serve_g: {min: 50, max: 300}
+  keeps_days: 6
+  active_min: 10
+  ingredients: {greens_mix: 600}

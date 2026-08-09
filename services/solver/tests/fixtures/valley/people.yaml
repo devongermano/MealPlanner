@@ -1,0 +1,16 @@
+schema_version: 1
+people:
+  val:
+    # protein 120 is only reachable through the stew (rice+veg max ~22g), so
+    # a day without stew is an infeasible (empty) day.
+    targets: {protein: 120, fat: 45, carb: 220}
+    tolerance: 0.06
+    exclude: []
+    dislikes: []
+settings:
+  days: 7
+  active_min_budget: 400
+  batch_time_factor: 0.45
+  max_days_same_component: 7
+  cook_days: [0, 3]
+  shop_days: [0]
