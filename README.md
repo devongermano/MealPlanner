@@ -19,6 +19,16 @@ Layout (per ARCHITECTURE.md):
 | `mealplan/` | **v1 prototype — untouched reference implementation** until the M0 parity gate | frozen |
 | `tools/fdc/` + `data/fdc/` | vendored USDA FDC raw-ingredient macro corpus (Track D) | done |
 
+## Method fragments & technique library (Track E, draft content)
+
+`data/methods-draft/` holds composable method-step fragments for every
+`examples/` component (stations, active/passive, provisional durations,
+temp-keyed oven steps) and `data/techniques/techniques.yaml` maps each step
+`operation` to a taught technique (video placeholders pending owner recordings).
+Draft **content** awaiting the M1.10 schema — the engine does not read these
+yet. Schema + integration contract: `data/methods-draft/README.md`; lint:
+`python3 data/methods-draft/lint.py`.
+
 Dev (M0/M1 needs only a Python venv):
 
 ```sh

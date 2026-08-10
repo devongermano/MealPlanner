@@ -1,0 +1,58 @@
+schema_version: 0
+component: rosemary_potatoes
+steps:
+  - phase: prep
+    text: Cut the potatoes into chunky wedges
+    station: prep
+    mode: active
+    duration_min: 8
+    operation: chop
+  - phase: prep
+    text: Mince the garlic; strip and chop the rosemary
+    station: prep
+    mode: active
+    duration_min: 3
+    operation: mince
+  - phase: cook
+    text: Cover the potatoes with salted water and bring to a boil
+    station: stove
+    mode: active
+    duration_min: 3
+    operation: boil
+  - phase: cook
+    text: Parboil until the edges just soften
+    station: stove
+    mode: passive
+    duration_min: 8
+    operation: boil
+  - phase: cook
+    text: Drain and shake in the colander to rough up the edges
+    station: prep
+    mode: active
+    duration_min: 2
+    operation: drain
+  - phase: cook
+    text: Roast in the olive oil on a hot sheet pan, turning once, until deep golden and crisp
+    station: oven
+    mode: passive
+    duration_min: 30
+    oven_temp_f: 425
+    operation: roast
+  - phase: finish
+    text: Toss the potatoes with the minced garlic, rosemary, and salt
+    station: prep
+    mode: active
+    duration_min: 2
+  - phase: finish
+    text: Return the potatoes to the oven to set the aromatics
+    station: oven
+    mode: passive
+    duration_min: 4
+    oven_temp_f: 425
+    operation: roast
+  - phase: finish
+    text: Portion into containers
+    station: none
+    mode: active
+    duration_min: 4
+    operation: portion

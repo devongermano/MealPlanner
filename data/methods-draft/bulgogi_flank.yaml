@@ -1,0 +1,39 @@
+schema_version: 0
+component: bulgogi_flank
+steps:
+  - phase: prep
+    text: Slice the flank steak thin against the grain
+    station: prep
+    mode: active
+    duration_min: 8
+    operation: slice
+  - phase: prep
+    text: Mince the garlic and the ginger; slice the scallions, whites and greens separated
+    station: prep
+    mode: active
+    duration_min: 5
+    operation: mince
+  - phase: prep
+    text: Marinate the sliced beef with the coconut aminos, honey, sesame oil, garlic, ginger, and scallion whites
+    station: none
+    mode: passive
+    duration_min: 30
+    operation: marinate
+  - phase: cook
+    text: Sear the beef in a screaming-hot pan, in thin single layers, until charred at the edges
+    station: stove
+    mode: active
+    duration_min: 12
+    operation: sear
+  - phase: finish
+    text: Toss with the scallion greens and the sesame seeds
+    station: stove
+    mode: active
+    duration_min: 2
+    operation: toss
+  - phase: finish
+    text: Portion into containers
+    station: none
+    mode: active
+    duration_min: 3
+    operation: portion

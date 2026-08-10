@@ -1,0 +1,51 @@
+schema_version: 0
+component: orange_chicken
+steps:
+  - phase: prep
+    text: Trim the chicken thighs and cut into bite-size pieces
+    station: prep
+    mode: active
+    duration_min: 10
+    operation: cube
+  - phase: prep
+    text: Mince the ginger and the garlic
+    station: prep
+    mode: active
+    duration_min: 3
+    operation: mince
+  - phase: prep
+    text: Stir together the orange juice, coconut aminos, honey, and rice vinegar for the sauce
+    station: prep
+    mode: active
+    duration_min: 3
+    operation: mix
+  - phase: prep
+    text: Toss the chicken in the cornstarch until evenly coated
+    station: prep
+    mode: active
+    duration_min: 4
+    operation: dredge
+  - phase: cook
+    text: Shallow-fry the coated chicken in the oil, in batches, until golden and crisp; drain on a rack
+    station: stove
+    mode: active
+    duration_min: 15
+    operation: fry
+  - phase: cook
+    text: Bloom the minced ginger and garlic in the pan, add the sauce, and simmer until syrupy
+    station: stove
+    mode: active
+    duration_min: 6
+    operation: reduce
+  - phase: cook
+    text: Toss the fried chicken through the glaze
+    station: stove
+    mode: active
+    duration_min: 2
+    operation: glaze
+  - phase: finish
+    text: Portion into containers
+    station: none
+    mode: active
+    duration_min: 4
+    operation: portion

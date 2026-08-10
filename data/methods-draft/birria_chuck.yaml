@@ -1,0 +1,69 @@
+schema_version: 0
+component: birria_chuck
+steps:
+  - phase: prep
+    text: Stem and seed the dried chiles, then toast in a dry skillet until fragrant
+    station: stove
+    mode: active
+    duration_min: 4
+    operation: toast
+  - phase: prep
+    text: Soak the toasted chiles in hot water until pliable
+    station: none
+    mode: passive
+    duration_min: 15
+    operation: soak
+  - phase: prep
+    text: Cut the beef chuck into large chunks
+    station: prep
+    mode: active
+    duration_min: 8
+    operation: cube
+  - phase: prep
+    text: Quarter the onion and halve the tomatoes
+    station: prep
+    mode: active
+    duration_min: 3
+    operation: chop
+  - phase: prep
+    text: Blend the soaked chiles, the tomatoes, the garlic, and the spices with the chicken stock
+    station: prep
+    mode: active
+    duration_min: 5
+    operation: blend
+  - phase: cook
+    text: Sear the chuck in the oil in a Dutch oven, in batches, until deeply browned
+    station: stove
+    mode: active
+    duration_min: 14
+    operation: sear
+  - phase: cook
+    text: Return all the beef, add the quartered onion, and pour the chile broth over; bring to a simmer
+    station: stove
+    mode: active
+    duration_min: 4
+    operation: simmer
+  - phase: cook
+    text: Cover and braise in the oven until the beef shreds easily
+    station: oven
+    mode: passive
+    duration_min: 240
+    oven_temp_f: 300
+    operation: braise
+  - phase: finish
+    text: Shred the beef into its braising liquid
+    station: prep
+    mode: active
+    duration_min: 10
+    operation: shred
+  - phase: finish
+    text: Skim the fat, season the consome, and fold the meat back through
+    station: prep
+    mode: active
+    duration_min: 3
+  - phase: finish
+    text: Portion into containers, moistening the beef with broth
+    station: none
+    mode: active
+    duration_min: 4
+    operation: portion

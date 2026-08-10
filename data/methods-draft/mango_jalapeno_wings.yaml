@@ -1,0 +1,54 @@
+schema_version: 0
+component: mango_jalapeno_wings
+steps:
+  - phase: prep
+    text: Pat the wings dry and toss with the cornstarch, salt, and spices
+    station: prep
+    mode: active
+    duration_min: 8
+    operation: dredge
+  - phase: prep
+    text: Blend the mango, jalapeno, honey, lime juice, rice vinegar, hot sauce, coconut aminos, and garlic
+    station: prep
+    mode: active
+    duration_min: 5
+    operation: blend
+  - phase: cook
+    text: Bake the wings on wire racks
+    station: oven
+    mode: passive
+    duration_min: 22
+    oven_temp_f: 425
+    operation: bake
+  - phase: cook
+    text: Flip the wings on their racks
+    station: oven
+    mode: active
+    duration_min: 2
+    oven_temp_f: 425
+  - phase: cook
+    text: Bake until the skin is crisp
+    station: oven
+    mode: passive
+    duration_min: 21
+    oven_temp_f: 425
+    operation: bake
+    operation: bake
+  - phase: cook
+    text: Simmer the blended mango sauce until glossy and thickened
+    station: stove
+    mode: active
+    duration_min: 8
+    operation: reduce
+  - phase: finish
+    text: Toss the hot wings through the glaze
+    station: prep
+    mode: active
+    duration_min: 4
+    operation: glaze
+  - phase: finish
+    text: Portion into containers
+    station: none
+    mode: active
+    duration_min: 4
+    operation: portion

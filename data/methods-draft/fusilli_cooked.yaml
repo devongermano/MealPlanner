@@ -1,0 +1,33 @@
+schema_version: 0
+component: fusilli_cooked
+steps:
+  - phase: cook
+    text: Bring a large pot of aggressively salted water to a boil
+    station: stove
+    mode: passive
+    duration_min: 10
+    operation: boil
+  - phase: cook
+    text: Drop the fusilli into the boiling water and give it a good stir
+    station: stove
+    mode: active
+    duration_min: 2
+    operation: boil
+  - phase: cook
+    text: Boil until just shy of al dente
+    station: stove
+    mode: passive
+    duration_min: 9
+    operation: boil
+  - phase: finish
+    text: Drain, toss with the olive oil, and spread on a sheet pan to cool
+    station: prep
+    mode: active
+    duration_min: 4
+    operation: toss
+  - phase: finish
+    text: Portion into containers
+    station: none
+    mode: active
+    duration_min: 3
+    operation: portion

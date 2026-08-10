@@ -1,0 +1,9 @@
+schema_version: 0
+component: mozzarella_shred
+steps:
+  - phase: prep
+    text: Portion from the package
+    station: none
+    mode: active
+    duration_min: 2
+    operation: portion

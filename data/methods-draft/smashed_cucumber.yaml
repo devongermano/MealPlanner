@@ -1,0 +1,33 @@
+schema_version: 0
+component: smashed_cucumber
+steps:
+  - phase: prep
+    text: Smash the cucumbers with the flat of a knife and cut into rough chunks
+    station: prep
+    mode: active
+    duration_min: 5
+    operation: smash
+  - phase: prep
+    text: Salt the smashed cucumbers and drain in a colander
+    station: none
+    mode: passive
+    duration_min: 15
+    operation: drain
+  - phase: prep
+    text: Mince the garlic
+    station: prep
+    mode: active
+    duration_min: 2
+    operation: mince
+  - phase: finish
+    text: Whisk the rice vinegar, sesame oil, gochugaru, and minced garlic, then toss with the drained cucumbers
+    station: prep
+    mode: active
+    duration_min: 4
+    operation: toss
+  - phase: finish
+    text: Portion into containers
+    station: none
+    mode: active
+    duration_min: 3
+    operation: portion

@@ -1,0 +1,39 @@
+schema_version: 0
+component: egg_potato_scramble
+steps:
+  - phase: prep
+    text: Dice the potatoes small; dice the onion
+    station: prep
+    mode: active
+    duration_min: 8
+    operation: dice
+  - phase: prep
+    text: Whisk the eggs with salt
+    station: prep
+    mode: active
+    duration_min: 3
+    operation: whisk
+  - phase: cook
+    text: Fry the diced potatoes in the oil until browned and tender
+    station: stove
+    mode: active
+    duration_min: 12
+    operation: fry
+  - phase: cook
+    text: Add the diced onion and cook until soft
+    station: stove
+    mode: active
+    duration_min: 4
+    operation: saute
+  - phase: cook
+    text: Pour in the whisked eggs and the spices; scramble softly until just set
+    station: stove
+    mode: active
+    duration_min: 4
+    operation: scramble
+  - phase: finish
+    text: Cool briefly, then portion into containers
+    station: none
+    mode: active
+    duration_min: 5
+    operation: portion

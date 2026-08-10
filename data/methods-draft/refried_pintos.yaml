@@ -1,0 +1,45 @@
+schema_version: 0
+component: refried_pintos
+steps:
+  - phase: prep
+    text: Dice the onion
+    station: prep
+    mode: active
+    duration_min: 4
+    operation: dice
+  - phase: prep
+    text: Mince the garlic
+    station: prep
+    mode: active
+    duration_min: 2
+    operation: mince
+  - phase: cook
+    text: Sweat the diced onion in the lard until translucent
+    station: stove
+    mode: active
+    duration_min: 6
+    operation: saute
+  - phase: cook
+    text: Stir in the minced garlic and the spices; cook until fragrant
+    station: stove
+    mode: active
+    duration_min: 1
+    operation: bloom
+  - phase: cook
+    text: Add the beans with their liquid and simmer until heated through
+    station: stove
+    mode: passive
+    duration_min: 8
+    operation: simmer
+  - phase: cook
+    text: Mash to a coarse puree and fry, stirring, until thick and glossy
+    station: stove
+    mode: active
+    duration_min: 6
+    operation: mash
+  - phase: finish
+    text: Portion into containers
+    station: none
+    mode: active
+    duration_min: 4
+    operation: portion

@@ -1,0 +1,50 @@
+schema_version: 0
+component: sausage_sugo
+steps:
+  - phase: prep
+    text: Dice the onion
+    station: prep
+    mode: active
+    duration_min: 4
+    operation: dice
+  - phase: prep
+    text: Mince the garlic
+    station: prep
+    mode: active
+    duration_min: 2
+    operation: mince
+  - phase: cook
+    text: Brown the sausage in the olive oil, breaking it into crumbles
+    station: stove
+    mode: active
+    duration_min: 8
+    operation: brown
+  - phase: cook
+    text: Add the diced onion and cook until soft
+    station: stove
+    mode: active
+    duration_min: 5
+    operation: saute
+  - phase: cook
+    text: Stir in the tomato paste, the minced garlic, and the spices; cook until brick red
+    station: stove
+    mode: active
+    duration_min: 3
+    operation: bloom
+  - phase: cook
+    text: Add the crushed tomatoes and simmer, stirring occasionally, until thick and rich
+    station: stove
+    mode: passive
+    duration_min: 40
+    operation: simmer
+  - phase: finish
+    text: Season to taste
+    station: stove
+    mode: active
+    duration_min: 2
+  - phase: finish
+    text: Portion into containers
+    station: none
+    mode: active
+    duration_min: 4
+    operation: portion

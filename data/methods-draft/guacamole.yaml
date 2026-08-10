@@ -1,0 +1,26 @@
+schema_version: 0
+component: guacamole
+steps:
+  - phase: prep
+    text: Mince the onion and the jalapeno; chop the cilantro
+    station: prep
+    mode: active
+    duration_min: 5
+    operation: mince
+  - phase: prep
+    text: Halve, pit, and scoop the avocados
+    station: prep
+    mode: active
+    duration_min: 5
+  - phase: finish
+    text: Mash the avocado with the lime juice and salt, then fold in the onion, jalapeno, and cilantro
+    station: prep
+    mode: active
+    duration_min: 5
+    operation: mash
+  - phase: finish
+    text: Pack into containers with plastic pressed onto the surface
+    station: none
+    mode: active
+    duration_min: 3
+    operation: portion

@@ -1,0 +1,27 @@
+schema_version: 0
+component: charred_salsa_roja
+steps:
+  - phase: prep
+    text: Halve the tomatoes and quarter the onion
+    station: prep
+    mode: active
+    duration_min: 3
+    operation: chop
+  - phase: cook
+    text: Char the tomatoes, onion, jalapenos, and garlic on a dry comal, turning, until blackened in spots
+    station: stove
+    mode: active
+    duration_min: 12
+    operation: char
+  - phase: finish
+    text: Blend the charred vegetables with the lime juice, the cilantro, and salt to a coarse salsa
+    station: prep
+    mode: active
+    duration_min: 4
+    operation: blend
+  - phase: finish
+    text: Cool and portion into containers
+    station: none
+    mode: active
+    duration_min: 3
+    operation: portion
