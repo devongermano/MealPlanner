@@ -363,9 +363,12 @@ def _engine_side_source():
     # meal_slots / pairs_with (via model.resolve_meal_slots, also included).
     # dishes joined in M1.13: the dish layer consumes Dish.* plus
     # Settings.dish_layer and Person.max_dishes_per_slot.
-    from mealplan import artifacts, dishes, meals
+    # schedule joined in M1.12: the timeline compiler consumes
+    # Settings.stations (station capacities) and batch_time_factor.
+    from mealplan import artifacts, dishes, meals, schedule
     srcs = [inspect.getsource(m)
-            for m in (engine, costing, cli, artifacts, meals, dishes)]
+            for m in (engine, costing, cli, artifacts, meals, dishes,
+                      schedule)]
     srcs.append(inspect.getsource(model.derive_component))
     srcs.append(inspect.getsource(model.resolve_meal_slots))
     return "".join(strip_comments_and_docstrings(s) for s in srcs)

@@ -27,6 +27,10 @@ SLOW_MODULES = {
                                 # test_meals.py by construction)
     "test_n_coverage",          # n=1..4 full pipelines across fixtures
     "test_sessions_freshness",  # session_plan scenarios solve weeks
+    "test_timeline_e2e",        # M1.12: the ONE timeline e2e (real solve on
+                                # examples + --methods; the scheduler itself
+                                # is pure — its unit/property tests are
+                                # FAST-tier in test_schedule.py)
     "test_score_scale",         # frontier points run choose_menu
     "test_plate_bounds_replate",  # 20-seed property over plate solves
     "test_contracts_roundtrip",  # full pipeline + doctor vs pydantic mirrors
