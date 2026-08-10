@@ -167,6 +167,47 @@ def reconcile(world) -> None:
         if best is not None and best_score:
             by_row.setdefault(best.line_no, []).append(line)
 
+    # Ambiguity: a row that names a CATEGORY several distinct products
+    # satisfy. `dried_chiles` is the type case — guajillo, ancho and árbol
+    # are different ingredients with different heat, and the sheet gives no
+    # basis to choose. The deterministic robot silently takes the top hit,
+    # which is exactly the silent decision worth surfacing; a human cook
+    # records the same thing as an assumption.
+    for r in rows:
+        if r.buys_nothing:
+            continue
+        cands = world.store.search(r.ingredient)
+        if len(cands) < 2:
+            continue
+        # Only products matching EVERY word of the row are real rivals.
+        # Loose fuzzy hits are not a choice a shopper faces: 'flour_tortilla'
+        # nominally matched cornstarch, but nobody stands in the aisle
+        # weighing tortillas against cornstarch. Requiring full-token
+        # coverage leaves the genuine forks — ancho vs guajillo, bone-in vs
+        # boneless, 21/25 vs 31/40 count shrimp.
+        want = _stems(set(r.ingredient.split("_")))
+        rivals = [c for c in cands
+                  if want <= _stems(set(re.split(r"[^a-z0-9]+",
+                                                 c.search_text.lower())))]
+        top = {c.id for c in rivals}
+        # Fold plurals: "Lime" and "Limes, 2 lb bag" are the same food in two
+        # pack formats, not a decision anyone agonises over. What survives is
+        # a real fork — boneless vs split breast, ancho vs guajillo, 21/25 vs
+        # 31/40 count shrimp.
+        distinct_kinds = {" ".join(sorted(_stems(set(
+            re.split(r"[^a-z0-9]+",
+                     c.display_name.split(",")[0].strip().lower())))))
+            for c in rivals}
+        if len(top) >= 2 and len(distinct_kinds) >= 2:
+            world.record(
+                "product_ambiguous",
+                f"the row says '{r.ingredient}', but the shelf has "
+                f"{len(distinct_kinds)} different products that answer to "
+                f"it ({', '.join(sorted(distinct_kinds)[:4])}) and the "
+                f"sheet gives no way to choose between them",
+                evidence=[_ev("shopping_list", r.line_no, r.raw)],
+                ingredient=r.ingredient, candidates=sorted(top))
+
     bought_ingredients = set()
     for r in rows:
         lines = by_row.get(r.line_no, [])
@@ -185,7 +226,14 @@ def reconcile(world) -> None:
         if r.buys_nothing:
             continue
 
-        # 2. short of the stated need
+        # 2. the row's own waste arithmetic, checked against real packages.
+        #
+        # A driver that rounds up can never come up SHORT, so testing only
+        # for shortfall made this check unreachable — the first run caught
+        # that. The honest test is the planner's own claim: it states how
+        # much will be left over after buying its stated packs. Buy real
+        # packs instead and compare. A large gap means the plan is
+        # budgeting waste against packages that do not exist.
         got = sum(c.grams for c in lines)
         if got + 1e-6 < r.need_g:
             world.record(
@@ -195,6 +243,22 @@ def reconcile(world) -> None:
                 f"{r.need_g - got:g}g",
                 evidence=[_ev("shopping_list", r.line_no, r.raw)],
                 ingredient=r.ingredient, need_g=r.need_g, bought_g=got)
+        else:
+            real_left = got - r.need_g
+            claimed = r.leftover_g
+            # one whole package of slack, or 25%, before this is worth saying
+            slack = max(0.25 * max(r.need_g, 1.0),
+                        lines[0].sku.pack_g if lines else 0.0)
+            if abs(real_left - claimed) > slack:
+                world.record(
+                    "quantity_deviation",
+                    f"the sheet predicts {claimed:g}g of '{r.ingredient}' "
+                    f"left over; buying real packages leaves "
+                    f"{real_left:g}g — the plan's waste arithmetic assumes "
+                    f"a package size the shelf does not carry",
+                    evidence=[_ev("shopping_list", r.line_no, r.raw)],
+                    ingredient=r.ingredient, claimed_leftover_g=claimed,
+                    actual_leftover_g=real_left)
 
         # 6. unit the store does not sell in
         for c in lines:

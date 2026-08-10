@@ -148,3 +148,28 @@ def test_full_naive_trip_finds_the_must_hit_predictions(store):
     assert "water" in prose, "P5: water likewise"
     assert prose == {"salt", "water"}, (
         f"prose scan regressed to false positives: {sorted(prose)}")
+
+    # the whole report must stay readable — PREDICTIONS.md sets ~40 as the
+    # point where a finding list stops being triageable and starts being noise
+    assert len(w.findings) < 40, (
+        f"{len(w.findings)} findings — the taxonomy has become too eager")
+
+
+def test_ambiguity_ignores_pack_format_and_plural_variants(store):
+    """CATCHES the ambiguity check regressing to noise.
+
+    'Lime' vs 'Limes, 2 lb bag' is one food in two pack formats — not a
+    decision anyone agonises over, and flagging it buries the forks that
+    matter (bone-in vs boneless pork shoulder, ancho vs guajillo chiles,
+    21/25 vs 31/40 shrimp). An earlier revision fired on all of them.
+    """
+    from kitchen_sim.naive_shopper import shop
+    w = World(store, Sheets(SHEETS), {})
+    shop(w)
+    amb = {f.state["ingredient"] for f in w.findings
+           if f.defect_class == "product_ambiguous"}
+    for plural_pair in ("lime", "avocado", "potato_russet", "onion_yellow"):
+        assert plural_pair not in amb, (
+            f"{plural_pair}: singular/plural pack variants are not a fork")
+    assert {"dried_chiles", "pork_shoulder", "shrimp_raw"} <= amb, (
+        "the genuine forks must survive the noise filter")
