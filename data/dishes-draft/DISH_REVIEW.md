@@ -23,9 +23,23 @@ the amounts, then tick one box:
 - **reject** — this isn't a real dish, or we'd never eat it. Say so and it's gone.
 
 The **baseline** is one normal serving — the shape of the dish. The range next to it is
-how far the amounts may move for a bigger or smaller eater before the plate stops
-reading as that dish. So: what's the smallest serving of this you'd still call a real
-one, and the biggest you'd put in front of someone without embarrassment?
+tighter than you might expect, and it's worth knowing why.
+
+**That range is not how much a hungry person gets.** Appetite is handled by servings:
+Jimbo eats one and a half or two servings of the same dish, and *everything* scales
+together — more shells and more filling, in the same proportions. The plate still looks
+like gorditas, just bigger.
+
+So the range answers a narrower question: **within one serving, how far can this one
+part shift and still be the same dish?** More picadillo and fewer shells is still a
+gordita. Four shells with the smallest scoop of filling is a dry, sad gordita — and an
+earlier version of this document allowed exactly that, which is the "random ingredients"
+problem all over again, just inside one plate instead of across a day. The ranges are
+now tight enough that anything inside them still looks like the real thing.
+
+What to check, then: is the **baseline** what you'd actually put on a plate, and is the
+**range** an honest amount of wiggle room — more meat, less starch, that sort of thing?
+If a number is wrong, write the right one.
 
 **Optional** items are per-person finishing. That's the whole reason salsa and cheese
 are separate recipes: one pot stays universal until it hits the plate, so Devon's
@@ -52,8 +66,8 @@ salsa, crumbled queso and crema.*
 **Where it comes from:** the barefoodtim gorditas de picadillo recipe (Vitamina T).
 This is a real recipe's own assembly — highest confidence in this document.
 
-- Gordita shells — **170 g** (2 shells) · may go 85–340 g (1–4 shells)
-- Beef picadillo — **160 g** (about 80 g per shell) · may go 80–340 g
+- Gordita shells — **170 g** (2 shells) · may vary 170–255 g (2–3 shells)
+- Beef picadillo — **160 g** (about 80 g per shell) · may vary 110–210 g
 - Charred salsa roja *(optional)* — 30 g · up to 100 g
 - Queso fresco *(optional)* — 25 g · up to 80 g
 - Mexican crema *(optional)* — 20 g · up to 60 g
@@ -79,8 +93,8 @@ One serving: **27 g protein · 58 g fat · 66 g carb · 890 kcal**
 **Where it comes from:** the carnitas recipe is yours (house), so there's no document
 saying how you serve it. Tacos is the obvious format; the amounts are a guess.
 
-- Flour tortillas — **142 g** (2 tortillas) · may go 71–284 g (1–4)
-- Carnitas — **140 g** (about 70 g per taco) · may go 80–280 g
+- Flour tortillas — **142 g** (2 tortillas) · may vary 142–213 g (2–3)
+- Carnitas — **140 g** (about 70 g per taco) · may vary 105–180 g
 - Charred salsa roja *(optional)* — 30 g · up to 100 g
 - Guacamole *(optional)* — 40 g · up to 120 g
 - Queso fresco *(optional)* — 20 g · up to 60 g
@@ -103,9 +117,9 @@ no tortilla.*
 
 **Where it comes from:** inferred. Same house recipe, second obvious format.
 
-- Cilantro-lime rice — **200 g** (a bit over a cup) · may go 100–400 g
-- Carnitas — **140 g** · may go 80–280 g
-- Refried beans — **100 g** · may go 80–250 g
+- Cilantro-lime rice — **200 g** (a bit over a cup) · may vary 140–260 g
+- Carnitas — **140 g** · may vary 105–180 g
+- Refried beans — **100 g** · may vary 80–130 g
 - Charred salsa roja *(optional)* — 30 g · up to 100 g
 - Guacamole *(optional)* — 40 g · up to 120 g
 - Mexican crema *(optional)* — 20 g · up to 60 g
@@ -128,8 +142,8 @@ One serving: **46 g protein · 60 g fat · 83 g carb · 1,050 kcal**
 **Where it comes from:** inferred. The braise is a house recipe with no serving
 instructions attached.
 
-- Flour tortillas — **142 g** (2 tortillas) · may go 71–284 g (1–4)
-- Birria chuck — **150 g** (75 g per taco) · may go 80–300 g
+- Flour tortillas — **142 g** (2 tortillas) · may vary 142–213 g (2–3)
+- Birria chuck — **150 g** (75 g per taco) · may vary 112–195 g
 - Charred salsa roja *(optional)* — 30 g · up to 100 g
 - Queso fresco *(optional)* — 25 g · up to 80 g
 
@@ -155,9 +169,9 @@ One serving: **43 g protein · 42 g fat · 82 g carb · 880 kcal**
 
 **Where it comes from:** inferred, same house braise.
 
-- Cilantro-lime rice — **200 g** · may go 100–400 g
-- Birria chuck — **160 g** · may go 80–320 g
-- Refried beans — **100 g** · may go 80–250 g
+- Cilantro-lime rice — **200 g** · may vary 140–260 g
+- Birria chuck — **160 g** · may vary 120–208 g
+- Refried beans — **100 g** · may vary 80–130 g
 - Charred salsa roja *(optional)* — 30 g · up to 100 g
 - Mexican crema *(optional)* — 20 g · up to 60 g
 - Queso fresco *(optional)* — 20 g · up to 60 g
@@ -177,8 +191,8 @@ One serving: **44 g protein · 48 g fat · 82 g carb · 930 kcal**
 **Where it comes from:** inferred, but confidently — the pineapple *is* the al pastor
 signature, and al pastor goes in a tortilla.
 
-- Flour tortillas — **142 g** (2 tortillas) · may go 71–284 g (1–4)
-- Shrimp al pastor — **150 g** · may go 80–300 g
+- Flour tortillas — **142 g** (2 tortillas) · may vary 142–213 g (2–3)
+- Shrimp al pastor — **150 g** · may vary 112–195 g
 - Guacamole *(optional)* — 40 g · up to 120 g
 - Charred salsa roja *(optional)* — 30 g · up to 100 g
 
@@ -199,8 +213,8 @@ One serving: **44 g protein · 22 g fat · 88 g carb · 720 kcal**
 
 **Where it comes from:** inferred.
 
-- Cilantro-lime rice — **220 g** · may go 100–420 g
-- Shrimp al pastor — **160 g** · may go 80–320 g
+- Cilantro-lime rice — **220 g** · may vary 154–286 g
+- Shrimp al pastor — **160 g** · may vary 120–208 g
 - Guacamole *(optional)* — 40 g · up to 120 g
 - Charred salsa roja *(optional)* — 30 g · up to 100 g
 - Mexican crema *(optional)* — 15 g · up to 50 g
@@ -219,8 +233,8 @@ One serving: **40 g protein · 19 g fat · 74 g carb · 630 kcal**
 
 **Where it comes from:** inferred. House recipe, no serving instructions.
 
-- Flour tortillas — **142 g** (2 tortillas) · may go 71–284 g (1–4)
-- Salsa verde chicken — **150 g** · may go 80–300 g
+- Flour tortillas — **142 g** (2 tortillas) · may vary 142–213 g (2–3)
+- Salsa verde chicken — **150 g** · may vary 112–195 g
 - Guacamole *(optional)* — 40 g · up to 120 g
 - Mexican crema *(optional)* — 20 g · up to 60 g
 - Queso fresco *(optional)* — 20 g · up to 60 g
@@ -242,9 +256,9 @@ One serving: **56 g protein · 34 g fat · 83 g carb · 860 kcal**
 
 **Where it comes from:** inferred.
 
-- Cilantro-lime rice — **200 g** · may go 100–400 g
-- Salsa verde chicken — **160 g** · may go 80–320 g
-- Refried beans — **100 g** · may go 80–250 g
+- Cilantro-lime rice — **200 g** · may vary 140–260 g
+- Salsa verde chicken — **160 g** · may vary 120–208 g
+- Refried beans — **100 g** · may vary 80–130 g
 - Guacamole *(optional)* — 40 g · up to 120 g
 - Mexican crema *(optional)* — 20 g · up to 60 g
 - Cheddar *(optional)* — 25 g · up to 70 g
@@ -267,8 +281,8 @@ salsa.*
 
 **Where it comes from:** the barefoodtim breakfast burrito recipe. Real assembly.
 
-- Flour tortilla — **71 g** (1 tortilla) · may go 71–142 g (1–2)
-- Egg and potato scramble — **220 g** · may go 100–380 g
+- Flour tortilla — **71 g** (1 tortilla) · fixed — one tortilla is one burrito
+- Egg and potato scramble — **220 g** · may vary 165–275 g
 - Cheddar *(optional)* — 30 g · up to 80 g
 - Charred salsa roja *(optional)* — 30 g · up to 100 g
 
@@ -293,9 +307,9 @@ bowl and scallion-ginger oil spooned over.*
 
 **Where it comes from:** inferred. House recipe; this is the standard format.
 
-- Jasmine rice — **220 g** (about 1¼ cups) · may go 100–420 g
-- Bulgogi flank — **130 g** · may go 60–280 g
-- Smashed cucumber — **80 g** · may go 50–200 g
+- Jasmine rice — **220 g** (about 1¼ cups) · may vary 154–286 g
+- Bulgogi flank — **130 g** · may vary 98–170 g
+- Smashed cucumber — **80 g** · may vary 56–104 g
 - Scallion-ginger oil *(optional)* — 15 g · up to 45 g
 
 Sides you may add: none
@@ -317,8 +331,8 @@ One serving: **38 g protein · 32 g fat · 77 g carb · 750 kcal**
 **Where it comes from:** the barefoodtim orange chicken recipe (soy swapped for coconut
 aminos) — but that recipe is for the chicken alone, so "over rice" is inferred.
 
-- Jasmine rice — **220 g** · may go 100–420 g
-- Orange chicken — **180 g** · may go 80–360 g
+- Jasmine rice — **220 g** · may vary 154–286 g
+- Orange chicken — **180 g** · may vary 135–234 g
 - Scallion-ginger oil *(optional)* — 10 g · up to 40 g
 
 Sides you may add: smashed cucumber
@@ -342,8 +356,8 @@ One serving: **34 g protein · 31 g fat · 83 g carb · 750 kcal**
 recipe's own: its sauce batch is 1,500 g against 1,000 g of cooked pasta, so 1.5 g of
 sugo per gram of pasta.
 
-- Sausage sugo — **225 g** · may go 80–375 g
-- Cooked fusilli — **150 g** · may go 100–300 g
+- Sausage sugo — **225 g** · may vary 170–290 g
+- Cooked fusilli — **150 g** · may vary 112–195 g
 - Mozzarella *(optional)* — 45 g · up to 90 g
 
 Sides you may add: none
@@ -367,9 +381,9 @@ and the sugo belongs to the fusilli al forno; no recipe puts them together. It's
 because the sugo is the only red sauce in the library and the meatballs would otherwise
 have no dish at all.
 
-- Turkey meatballs — **160 g** (4 meatballs) · may go 80–320 g (2–8)
-- Sausage sugo — **180 g** · may go 80–360 g
-- Cooked fusilli — **150 g** · may go 100–300 g
+- Turkey meatballs — **160 g** (4 meatballs) · may vary 120–200 g (3–5)
+- Sausage sugo — **180 g** · may vary 135–234 g
+- Cooked fusilli — **150 g** · may vary 112–195 g
 - Mozzarella *(optional)* — 30 g · up to 90 g
 
 Sides you may add: none
@@ -392,9 +406,10 @@ One serving: **67 g protein · 57 g fat · 77 g carb · 1,080 kcal**
 **Where it comes from: the plate is invented.** Both halves are real recipes
 (barefoodtim 013 and 008); nothing says they go together.
 
-- Mango jalapeno wings — **270 g** (6 wings, weighed with the bone) · may go 90–450 g
+- Mango jalapeno wings — **270 g** (6 wings, weighed with the bone) · may vary
+  225–315 g (5–7 wings)
   (2–10 wings)
-- Rosemary potatoes — **200 g** · may go 100–400 g
+- Rosemary potatoes — **200 g** · may vary 140–260 g
 
 Sides you may add: smashed cucumber
 Eaten at: lunch, dinner
@@ -416,8 +431,8 @@ One serving: **53 g protein · 52 g fat · 64 g carb · 930 kcal**
 **Where it comes from: invented, and the weakest dish in this document.** It exists so
 breakfast isn't only a burrito, and so there's a breakfast with no wheat in it.
 
-- Egg and potato scramble — **220 g** · may go 100–400 g
-- Rosemary potatoes — **150 g** · may go 100–350 g
+- Egg and potato scramble — **220 g** · may vary 165–275 g
+- Rosemary potatoes — **150 g** · may vary 105–195 g
 - Cheddar *(optional)* — 30 g · up to 80 g
 - Charred salsa roja *(optional)* — 30 g · up to 100 g
 

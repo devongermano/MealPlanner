@@ -34,10 +34,15 @@ schema_version: 0
 #                of the FINISHED component (cooked weight, as it comes out of the
 #                batch container).
 #                  base_g — the canonical serving. The dish's shape.
-#                  min_g / max_g — the ratio band. How far the solver may move this
-#                    component for a bigger or smaller eater and still have the plate
-#                    read as this dish. Devon's gordita = more picadillo, no queso;
-#                    Jimbo's = the same dish, more of everything.
+#                  min_g / max_g — how far this component may flex WITHIN ONE SERVING
+#                    and still read as this dish. This is Devon's gordita: more
+#                    picadillo, less shell, same dish.
+#                    These bands are NOT the appetite range. A bigger eater gets more
+#                    by eating more SERVINGS — M1.13 §5's continuous scalar `t` scales
+#                    every member together, so the ratio survives at any size, up to
+#                    T_MAX = min over members of serve_g.max / base_g. Widening a band
+#                    to feed someone is therefore always a mistake: it adds no food,
+#                    it only legalises a worse-looking plate.
 #   cuisine:     the dish's cuisine. M1.13 §2 DERIVES this from the main-role member
 #                when absent; stating it explicitly removes the ambiguity for a dish
 #                with two mains and keeps the value stable if a component is ever
@@ -96,27 +101,38 @@ schema_version: 0
 #     worst-case pairwise (max_i/min_j)/(base_i/base_j) over 3.0. See below.
 #
 #
-# THE BAND-WIDTH QUESTION — ALL 16 DISHES CURRENTLY WARN
-# -----------------------------------------------------
-# These bands were authored BEFORE the M1.13 spec existed, and they were written to
-# do two jobs at once: express how far the ratio may flex, AND cover the appetite
-# range from the smallest eater to the largest. That is why gorditas allow 85–340 g
-# of shell against 80–340 g of picadillo — and why "in band" currently includes four
-# shells with the minimum filling (a dry gordita) and one shell with 340 g of meat
-# (a bowl of meat with a shell in it). Exactly the incoherence the dish layer exists
-# to prevent, which is what the spec's DISH_BAND_LOOSE lint is designed to catch.
+# BAND WIDTH — RE-AUTHORED 2026-08-10
+# -----------------------------------
+# The first draft of these bands was written before M1.13 existed, and every one of
+# them made each band do two jobs at once: express how far the ratio may flex, AND
+# cover the whole appetite range from the smallest eater to the largest. That is why
+# gorditas once allowed 85-340 g of shell against 80-340 g of picadillo — a band that
+# legalised four shells with the minimum filling (a dry gordita) and one shell under
+# 340 g of meat (a bowl of meat with a shell in it). All 16 dishes tripped the spec's
+# DISH_BAND_LOOSE lint at ratio errors of 4.0-6.0 against a 3.0 threshold. Exactly the
+# incoherence the dish layer exists to prevent, quantified.
 #
-# The spec removes the need for the second job: `t[s]` (M1.13 §5) is a continuous
-# SERVINGS scalar, so appetite is served by eating 1.5 or 2 servings of the dish —
-# every component scaling together, ratio preserved — up to T_MAX = min over core
-# members of serve_g.max / base_g. Bands then only need to cover ratio flex within
-# ONE serving, which is far narrower (a ±30% band scores 1.86, comfortably inside
-# the 3.0 threshold).
+# M1.13 §5 removes the second job: `t` is a continuous SERVINGS scalar, so appetite is
+# served by eating 1.5 or 2 servings with every member scaling together and the ratio
+# preserved, capped by T_MAX = min over members of serve_g.max / base_g. Bands now
+# cover ratio flex within ONE serving only.
 #
-# Rewriting all 16 dishes on that reinterpretation changes every number the owner is
-# about to review, so it is NOT done here — it is a design decision for the panel,
-# raised with the measurement rather than actioned unilaterally. `lint.py` reports
-# the ratio per dish so the size of the change is visible.
+# Re-authored on that meaning, roughly +/-30% around base for continuous members, with
+# culinary judgement where a percentage is the wrong tool:
+#   - Discrete carriers flex by whole pieces, not percentages. Tacos are 2-3 tortillas
+#     (142-213 g), gorditas 2-3 shells (170-255 g), wings 5-7 (225-315 g), meatballs
+#     3-5 (120-200 g).
+#   - The breakfast burrito's tortilla is PINNED at 71 g. One 10-inch tortilla is what
+#     a burrito is; two is two burritos, which is t = 2, not a wider band.
+#   - refried_pintos bottoms out at 80 g rather than 70 g in every bowl, because 80 g
+#     is the component's own authored serve_g minimum — a dish may not ask for a
+#     portion smaller than the smallest sensible one.
+#
+# Result: worst-case ratio errors now run 1.33-2.18, all inside the 3.0 threshold, and
+# no dish lost reach — T_MAX runs 1.78-3.00, so a ~1570 kcal meal is reachable on core
+# members alone for ten of the sixteen dishes and on core-plus-sides for the rest
+# (M1.13 §7's ladder, in order: scale within bands, then hearty sides, then the opt-in
+# second dish).
 #
 #
 # KNOWN GAPS, FOR THE OWNER (details in DISH_REVIEW.md)
@@ -171,8 +187,8 @@ dishes:
   source: "barefoodtim - gorditas de picadillo (Vitamina T)"
   reconstruction: from_source
   components:
-    gordita_shell:         {base_g: 170, min_g: 85, max_g: 340}
-    picadillo:             {base_g: 160, min_g: 80, max_g: 340}
+    gordita_shell:         {base_g: 170, min_g: 170, max_g: 255}
+    picadillo:             {base_g: 160, min_g: 110, max_g: 210}
   # authored accent amounts, per serving — documentation, not engine input:
   #   charred_salsa_roja 30 g (up to 100)
   #   queso_fresco_crumbled 25 g (up to 80)
@@ -193,8 +209,8 @@ dishes:
   source: "house recipe (orange-lard carnitas) — taco format inferred, no source document"
   reconstruction: inferred
   components:
-    flour_tortilla:        {base_g: 142, min_g: 71, max_g: 284}
-    carnitas:              {base_g: 140, min_g: 80, max_g: 280}
+    flour_tortilla:        {base_g: 142, min_g: 142, max_g: 213}
+    carnitas:              {base_g: 140, min_g: 105, max_g: 180}
   # authored accent amounts, per serving — documentation, not engine input:
   #   charred_salsa_roja 30 g (up to 100)
   #   guacamole 40 g (up to 120)
@@ -213,9 +229,9 @@ dishes:
   source: "house recipe (orange-lard carnitas) — bowl format inferred, no source document"
   reconstruction: inferred
   components:
-    cilantro_lime_rice:  {base_g: 200, min_g: 100, max_g: 400}
-    carnitas:            {base_g: 140, min_g: 80,  max_g: 280}
-    refried_pintos:      {base_g: 100, min_g: 80,  max_g: 250}
+    cilantro_lime_rice:  {base_g: 200, min_g: 140, max_g: 260}
+    carnitas:            {base_g: 140, min_g: 105, max_g: 180}
+    refried_pintos:      {base_g: 100, min_g: 80, max_g: 130}
   # authored accent amounts, per serving — documentation, not engine input:
   #   charred_salsa_roja 30 g (up to 100)
   #   guacamole 40 g (up to 120)
@@ -234,8 +250,8 @@ dishes:
   source: "house recipe (chile-braised chuck) — taco format inferred, no source document"
   reconstruction: inferred
   components:
-    flour_tortilla:        {base_g: 142, min_g: 71, max_g: 284}
-    birria_chuck:          {base_g: 150, min_g: 80, max_g: 300}
+    flour_tortilla:        {base_g: 142, min_g: 142, max_g: 213}
+    birria_chuck:          {base_g: 150, min_g: 112, max_g: 195}
   # authored accent amounts, per serving — documentation, not engine input:
   #   charred_salsa_roja 30 g (up to 100)
   #   queso_fresco_crumbled 25 g (up to 80)
@@ -257,9 +273,9 @@ dishes:
   source: "house recipe (chile-braised chuck) — bowl format inferred, no source document"
   reconstruction: inferred
   components:
-    cilantro_lime_rice:    {base_g: 200, min_g: 100, max_g: 400}
-    birria_chuck:          {base_g: 160, min_g: 80,  max_g: 320}
-    refried_pintos:        {base_g: 100, min_g: 80,  max_g: 250}
+    cilantro_lime_rice:    {base_g: 200, min_g: 140, max_g: 260}
+    birria_chuck:          {base_g: 160, min_g: 120, max_g: 208}
+    refried_pintos:        {base_g: 100, min_g: 80, max_g: 130}
   # authored accent amounts, per serving — documentation, not engine input:
   #   charred_salsa_roja 30 g (up to 100)
   #   mexican_crema 20 g (up to 60)
@@ -276,8 +292,8 @@ dishes:
   source: "house recipe (achiote-pineapple shrimp) — taco format inferred, no source document"
   reconstruction: inferred
   components:
-    flour_tortilla:     {base_g: 142, min_g: 71, max_g: 284}
-    shrimp_al_pastor:   {base_g: 150, min_g: 80, max_g: 300}
+    flour_tortilla:     {base_g: 142, min_g: 142, max_g: 213}
+    shrimp_al_pastor:   {base_g: 150, min_g: 112, max_g: 195}
   # authored accent amounts, per serving — documentation, not engine input:
   #   guacamole 40 g (up to 120)
   #   charred_salsa_roja 30 g (up to 100)
@@ -295,8 +311,8 @@ dishes:
   source: "house recipe (achiote-pineapple shrimp) — bowl format inferred, no source document"
   reconstruction: inferred
   components:
-    cilantro_lime_rice: {base_g: 220, min_g: 100, max_g: 420}
-    shrimp_al_pastor:   {base_g: 160, min_g: 80,  max_g: 320}
+    cilantro_lime_rice: {base_g: 220, min_g: 154, max_g: 286}
+    shrimp_al_pastor:   {base_g: 160, min_g: 120, max_g: 208}
   # authored accent amounts, per serving — documentation, not engine input:
   #   guacamole 40 g (up to 120)
   #   charred_salsa_roja 30 g (up to 100)
@@ -314,8 +330,8 @@ dishes:
   source: "house recipe (salsa verde shredded chicken) — taco format inferred, no source document"
   reconstruction: inferred
   components:
-    flour_tortilla:        {base_g: 142, min_g: 71, max_g: 284}
-    salsa_verde_chicken:   {base_g: 150, min_g: 80, max_g: 300}
+    flour_tortilla:        {base_g: 142, min_g: 142, max_g: 213}
+    salsa_verde_chicken:   {base_g: 150, min_g: 112, max_g: 195}
   # authored accent amounts, per serving — documentation, not engine input:
   #   guacamole 40 g (up to 120)
   #   mexican_crema 20 g (up to 60)
@@ -333,9 +349,9 @@ dishes:
   source: "house recipe (salsa verde shredded chicken) — bowl format inferred, no source document"
   reconstruction: inferred
   components:
-    cilantro_lime_rice:  {base_g: 200, min_g: 100, max_g: 400}
-    salsa_verde_chicken: {base_g: 160, min_g: 80,  max_g: 320}
-    refried_pintos:      {base_g: 100, min_g: 80,  max_g: 250}
+    cilantro_lime_rice:  {base_g: 200, min_g: 140, max_g: 260}
+    salsa_verde_chicken: {base_g: 160, min_g: 120, max_g: 208}
+    refried_pintos:      {base_g: 100, min_g: 80, max_g: 130}
   # authored accent amounts, per serving — documentation, not engine input:
   #   guacamole 40 g (up to 120)
   #   mexican_crema 20 g (up to 60)
@@ -353,8 +369,8 @@ dishes:
   source: "barefoodtim - breakfast burritos"
   reconstruction: from_source
   components:
-    flour_tortilla:      {base_g: 71,  min_g: 71,  max_g: 142}
-    egg_potato_scramble: {base_g: 220, min_g: 100, max_g: 380}
+    flour_tortilla:      {base_g: 71, min_g: 71, max_g: 71}
+    egg_potato_scramble: {base_g: 220, min_g: 165, max_g: 275}
   # authored accent amounts, per serving — documentation, not engine input:
   #   cheddar_shred 30 g (up to 80)
   #   charred_salsa_roja 30 g (up to 100)
@@ -376,9 +392,9 @@ dishes:
   source: "house recipe (soy-free bulgogi flank) — bowl format inferred, no source document"
   reconstruction: inferred
   components:
-    jasmine_rice:        {base_g: 220, min_g: 100, max_g: 420}
-    bulgogi_flank:       {base_g: 130, min_g: 60,  max_g: 280}
-    smashed_cucumber:    {base_g: 80,  min_g: 50,  max_g: 200}
+    jasmine_rice:        {base_g: 220, min_g: 154, max_g: 286}
+    bulgogi_flank:       {base_g: 130, min_g: 98, max_g: 170}
+    smashed_cucumber:    {base_g: 80, min_g: 56, max_g: 104}
   # authored accent amounts, per serving — documentation, not engine input:
   #   scallion_ginger_oil 15 g (up to 45)
   accents: [scallion_ginger_oil]
@@ -396,8 +412,8 @@ dishes:
   source: "barefoodtim (orange chicken, soy swapped for coconut aminos) — plate format inferred"
   reconstruction: inferred
   components:
-    jasmine_rice:        {base_g: 220, min_g: 100, max_g: 420}
-    orange_chicken:      {base_g: 180, min_g: 80,  max_g: 360}
+    jasmine_rice:        {base_g: 220, min_g: 154, max_g: 286}
+    orange_chicken:      {base_g: 180, min_g: 135, max_g: 234}
   # authored accent amounts, per serving — documentation, not engine input:
   #   scallion_ginger_oil 10 g (up to 40)
   accents: [scallion_ginger_oil]
@@ -416,8 +432,8 @@ dishes:
   source: "barefoodtim 010 - spicy sausage fusilli al forno"
   reconstruction: from_source
   components:
-    fusilli_cooked:   {base_g: 150, min_g: 100, max_g: 300}
-    sausage_sugo:     {base_g: 225, min_g: 80,  max_g: 375}
+    fusilli_cooked:   {base_g: 150, min_g: 112, max_g: 195}
+    sausage_sugo:     {base_g: 225, min_g: 170, max_g: 290}
   # authored accent amounts, per serving — documentation, not engine input:
   #   mozzarella_shred 45 g (up to 90)
   accents: [mozzarella_shred]
@@ -437,9 +453,9 @@ dishes:
   source: "no source recipe — house turkey meatballs + barefoodtim 010 sugo, paired here"
   reconstruction: invented
   components:
-    turkey_meatballs: {base_g: 160, min_g: 80,  max_g: 320}
-    sausage_sugo:     {base_g: 180, min_g: 80,  max_g: 360}
-    fusilli_cooked:   {base_g: 150, min_g: 100, max_g: 300}
+    turkey_meatballs: {base_g: 160, min_g: 120, max_g: 200}
+    sausage_sugo:     {base_g: 180, min_g: 135, max_g: 234}
+    fusilli_cooked:   {base_g: 150, min_g: 112, max_g: 195}
   # authored accent amounts, per serving — documentation, not engine input:
   #   mozzarella_shred 30 g (up to 90)
   accents: [mozzarella_shred]
@@ -460,8 +476,8 @@ dishes:
   source: "no source recipe for the plate — barefoodtim 013 wings + barefoodtim 008 potatoes"
   reconstruction: invented
   components:
-    mango_jalapeno_wings: {base_g: 270, min_g: 90,  max_g: 450}
-    rosemary_potatoes:    {base_g: 200, min_g: 100, max_g: 400}
+    mango_jalapeno_wings: {base_g: 270, min_g: 225, max_g: 315}
+    rosemary_potatoes:    {base_g: 200, min_g: 140, max_g: 260}
   accents: []
   compatible_sides: [smashed_cucumber]
   meal_affinity: [lunch, dinner]
@@ -478,8 +494,8 @@ dishes:
   source: "no source recipe — barefoodtim breakfast-burrito scramble + barefoodtim 008 potatoes"
   reconstruction: invented
   components:
-    egg_potato_scramble: {base_g: 220, min_g: 100, max_g: 400}
-    rosemary_potatoes:   {base_g: 150, min_g: 100, max_g: 350}
+    egg_potato_scramble: {base_g: 220, min_g: 165, max_g: 275}
+    rosemary_potatoes:   {base_g: 150, min_g: 105, max_g: 195}
   # authored accent amounts, per serving — documentation, not engine input:
   #   cheddar_shred 30 g (up to 80)
   #   charred_salsa_roja 30 g (up to 100)

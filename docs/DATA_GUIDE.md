@@ -200,18 +200,26 @@ and stuffed with picadillo, topped with salsa and queso in roughly these proport
   reconstruction: from_source
   cuisine: mexican
   components:
-    gordita_shell:         {base_g: 170, min_g: 85, max_g: 340}
-    picadillo:             {base_g: 160, min_g: 80, max_g: 340}
+    gordita_shell:         {base_g: 170, min_g: 170, max_g: 255}
+    picadillo:             {base_g: 160, min_g: 110, max_g: 210}
   accents: [charred_salsa_roja, queso_fresco_crumbled, mexican_crema]
   compatible_sides: [refried_pintos, cilantro_lime_rice]
   meal_affinity: [lunch, dinner]
 ```
 
 - **`base_g`** — one normal serving. The shape of the dish: two shells, 160 g of filling.
-- **`min_g` / `max_g`** — how far each amount may move for a bigger or smaller eater
-  before the plate stops reading as that dish. This is where the two-people-one-kitchen
-  trick actually happens: same pots, same dish, Devon's gordita has more picadillo and
-  no queso, Jimbo's has more of everything.
+- **`min_g` / `max_g`** — how far that one part may shift *within a single serving* and
+  still be the same dish. Devon's gordita has more picadillo and no queso; it's still a
+  gordita. This is where the two-people-one-kitchen trick happens: same pots, same dish,
+  different plates.
+
+  These are deliberately **not** the appetite range, which is the single easiest thing
+  to get wrong here. A bigger eater doesn't get a wider band, he gets more **servings** —
+  the solver scales every part of the dish together (1.5 servings, 2 servings) so the
+  proportions survive at any size, up to the point where one of the components hits its
+  own `serve_g` ceiling. Widening a band to feed someone adds no food; it just permits
+  an uglier plate. The first draft of `dishes.yaml` made exactly that mistake and
+  allowed four gordita shells with the smallest scoop of filling.
 - **`accents`** — the finishing layer, which any one person may skip entirely. Just a
   list of names: an accent has no per-dish amount here, because the engine lets each
   one be either nothing or anything within that component's own sensible serving range.
