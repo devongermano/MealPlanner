@@ -542,7 +542,7 @@ answer resolves it; until then the proposal stands as default.
 | # | Proposal | Devon said | Status |
 |---|---|---|---|
 | PR-1 | Path to parity: web app ships the collaborative loop at M2; the operator layer reaches full capability parity at M3; from M3 onward, new capabilities land on both surfaces within the same milestone. M2 is an acknowledged web-only gap | "Both, equal weight" | Proposed sequencing, not a priority override |
-| PR-2 | Per-person accounts are a requirement of the collaborative loop (not merely nice) | "Would be cool for everyone to have an account" | Proposed as requirement at M2 |
+| PR-2 | Per-person accounts are a requirement of the collaborative loop (not merely nice) | "Would be cool for everyone to have an account" | **RATIFIED 2026-08-09** ("User management, FE stuff, Auth on the BE… can all be done right now") — accounts/auth/household work green-lit ahead of M1 completion, per owner |
 | PR-3 | Veto-window notifications default ON, 48h before shop day | "Maybe everyone gets a notification 2 days before" | Proposed default; trivially off-switchable |
 | PR-4 | North-star bar: a stranger reaches the demo in ten minutes without documentation (measured at M2/M4) | Not stated by Devon | Proposed acceptance bar |
 | PR-5 | M3 ships Claude-assisted recipe conversion (format + protocol) as the stepping stone; automated scraping stays post-M4 | "Figure that out later; right now, use my existing corpus" | Proposed timing |
