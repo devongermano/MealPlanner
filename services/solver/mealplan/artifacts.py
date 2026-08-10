@@ -47,6 +47,7 @@ import math
 from pathlib import Path
 
 from . import methods as methods_mod
+from . import schedule as schedule_mod
 from .engine import available_on, from_freezer
 from .units import MACROS, human_pack, kcal_of
 
@@ -377,6 +378,111 @@ def _step_lines(cid, b, comps, steps, merged_keys, used_ops):
     return L
 
 
+def _timeline_entry_line(e, comps, used_ops):
+    """One timeline entry as a timestamped checkbox line: relative
+    timestamps from 0:00, timer callouts for passive waits, 'Meanwhile'
+    framing for active work done while something cooks itself."""
+    t0 = schedule_mod.format_min(e["t_start"])
+    t1 = schedule_mod.format_min(e["t_end"])
+    dur = e["t_end"] - e["t_start"]
+    if e["component"] == schedule_mod.SHARED:
+        who, text = "Shared prep", e["step_text"]
+    else:
+        who = comps[e["component"]]["name"]
+        qty = (f" ({e['grams']:g}g {e['ingredient']})"
+               if e["ingredient"] else "")
+        text = e["step_text"] + qty
+    temp = (f" {e['oven_temp_f']}°F" if e.get("oven_temp_f") is not None
+            else "")
+    ref = ""
+    if e.get("operation"):
+        used_ops.add(e["operation"])
+        ref = f" · [{e['operation']}]"
+    if e["mode"] == "passive":
+        return (f"- [ ] **{t0}–{t1}** {who}: {text} — _{e['station']}{temp} "
+                f"· passive{ref}_ — ⏱ set a timer for {dur:g} min "
+                f"(up at {t1})")
+    mw = "Meanwhile — " if e["meanwhile"] else ""
+    return (f"- [ ] **{t0}–{t1}** {mw}{who}: {text} — _{e['station']}{temp} "
+            f"· active ~{dur:g} min{ref}_")
+
+
+def _idle_injection_lines(win, pp_lines):
+    """Portioning-matrix work injected into an idle-hands window — the
+    kitchen is working, the cook is not (M1.12)."""
+    a, b = win
+    L = [f"- **{schedule_mod.format_min(a)}–{schedule_mod.format_min(b)}** "
+         "Idle hands — everything is cooking itself; portion & pack now:"]
+    L.extend(pp_lines)
+    return L
+
+
+def _timeline_session_lines(s, comps, settings, methods, matrix, used_ops,
+                            h):
+    """One session as the interleaved timeline stream (M1.12): greedy
+    schedule (schedule.compile_session — timeline households only), mise
+    en place, timestamped stream with timers and 'meanwhile' framing,
+    portion & pack injected into the widest idle-hands window, recipe
+    blocks for fragment-less components, and the honest makespan-vs-naive
+    line."""
+    sched = schedule_mod.compile_session(s["batches"], comps, methods,
+                                         settings)
+    L = []
+    saved = sched["naive_min"] - sched["makespan_min"]
+    L.append(f"Interleaved: **{sched['makespan_min']} min** start to "
+             f"finish vs {sched['naive_min']} min one-thing-at-a-time — "
+             + (f"parallelization saves you **{saved} min**."
+                if saved > 0 else "no overlap available this session.")
+             + " _Times are estimates; calibrate by cooking._\n")
+    scheduled_cids = sorted(set(s["batches"]) - set(sched["unscheduled"]))
+    if scheduled_cids:
+        L.append(f"{h}# Mise en place — batch-scaled quantities\n")
+        for cid in scheduled_cids:
+            b = s["batches"][cid]
+            c = comps[cid]
+            ings = ", ".join(f"{iname} {grams * b:g}g"
+                             for iname, grams in c["ingredients"].items())
+            L.append(f"- [ ] **{c['name']}** × {b} "
+                     f"batch{'es' if b != 1 else ''} "
+                     f"(makes {s['made_g'][cid]:g}g, need "
+                     f"{s['demand_g'][cid]:g}g): {ings}")
+        L.append("")
+    L.append(f"{h}# Timeline — 0:00 is when you start\n")
+    pp = _portion_pack_lines(s, matrix, comps, h)
+    win = None
+    if pp and sched["idle_windows"]:
+        # widest window wins; earliest breaks ties (deterministic)
+        win = max(sched["idle_windows"],
+                  key=lambda w: (w[1] - w[0], -w[0]))
+    injected = False
+    for e in sched["entries"]:
+        if win and not injected and e["t_start"] >= win[0]:
+            L.extend(_idle_injection_lines(win, pp))
+            injected = True
+        L.append(_timeline_entry_line(e, comps, used_ops))
+    if win and not injected:
+        L.extend(_idle_injection_lines(win, pp))
+        injected = True
+    L.append("")
+    for cid in sched["unscheduled"]:
+        b = s["batches"][cid]
+        c = comps[cid]
+        L.append(f"{h}# {c['name']} × {b} batch{'es' if b != 1 else ''} "
+                 f"(makes {s['made_g'][cid]:g}g, need "
+                 f"{s['demand_g'][cid]:g}g)\n")
+        L.append(f"Scaled for {b} batch{'es' if b != 1 else ''}:")
+        for iname, grams in c["ingredients"].items():
+            L.append(f"- [ ] {iname}: {grams * b:g}g")
+        for step in (c.get("method") or []):
+            L.append(f"1. {step}")
+        L.append("")
+    if pp and not injected:
+        L.extend(pp)
+    for w in sched["warnings"]:
+        L.append(f"- NOTE: {w['message']}")
+    return L
+
+
 def cook_script_lines(comps, settings, sp, methods=None, techniques=None,
                       matrix=None, h="##"):
     """The compiled session script — THE one renderer behind both
@@ -388,10 +494,14 @@ def cook_script_lines(comps, settings, sp, methods=None, techniques=None,
     used_ops = set()
     L = []
     style = settings.get("cook_plan_style") or "recipe"
-    if style == "timeline":
-        L.append("> **cook_plan_style: timeline** is not compiled yet — the "
-                 "interleaved schedule ships with M1.12. Rendering recipe "
-                 "blocks (per-dish) for now, never silently.\n")
+    timeline = style == "timeline"
+    if timeline:
+        L.append("> **Timeline cook plan** (M1.12) — one interleaved "
+                 "stream per session: longest passive work starts first, "
+                 "one active task at a time, a timer for every unattended "
+                 "wait. Times are ESTIMATES — calibrate by cooking "
+                 "(durations are provisional until cook-day "
+                 "calibration).\n")
     for s in sp["sessions"]:
         L.append(f"{h} Session {s['index']} — cook day {s['start']} — "
                  f"{s['minutes']} min hands-on\n")
@@ -403,6 +513,16 @@ def cook_script_lines(comps, settings, sp, methods=None, techniques=None,
         if summary:
             L.append(f"Stations (single-batch step estimates, provisional "
                      f"until cook-day calibration): {summary}\n")
+        if timeline and any(methods.get(cid) for cid in s["batches"]):
+            # M1.12: the interleaved stream — scheduler runs ONLY here
+            L.extend(_timeline_session_lines(s, comps, settings, methods,
+                                             matrix, used_ops, h))
+            L.extend(_session_tail_lines(s, comps))
+            continue
+        if timeline:
+            L.append("_No method fragments loaded for this session — "
+                     "recipe blocks below (run with --methods to get the "
+                     "interleaved timeline)._\n")
         merged, merged_keys = (
             methods_mod.consolidate_shared_prep(s["batches"], s["batches"],
                                                 comps, methods)
@@ -443,19 +563,27 @@ def cook_script_lines(comps, settings, sp, methods=None, techniques=None,
                     L.append(f"1. {step}")
             L.append("")
         L.extend(_portion_pack_lines(s, matrix, comps, h))
-        # shortest cooked shelf life in this session — eat it first
-        short = min(s["batches"], key=lambda cid: (comps[cid]["keeps_days"],
-                                                   cid))
-        kd = comps[short]["keeps_days"]
-        L.append(f"> Shortest keeps this session: **{comps[short]['name']}** "
-                 f"— {kd}d cooked; good through day "
-                 f"{s['start'] + kd - 1}. Eat it first.")
-        for n in s["thaw_notes"]:
-            L.append(f"- THAW: {n['note']}")
-        for n in s.get("freezer_notes", []):
-            L.append(f"- FREEZER: {n['note']}")
-        L.append("")
+        L.extend(_session_tail_lines(s, comps))
     return L, used_ops
+
+
+def _session_tail_lines(s, comps):
+    """Per-session closing notes shared by both cook-plan styles: the
+    shortest-keeps callout, thaw notes, freezer notes."""
+    L = []
+    # shortest cooked shelf life in this session — eat it first
+    short = min(s["batches"], key=lambda cid: (comps[cid]["keeps_days"],
+                                               cid))
+    kd = comps[short]["keeps_days"]
+    L.append(f"> Shortest keeps this session: **{comps[short]['name']}** "
+             f"— {kd}d cooked; good through day "
+             f"{s['start'] + kd - 1}. Eat it first.")
+    for n in s["thaw_notes"]:
+        L.append(f"- THAW: {n['note']}")
+    for n in s.get("freezer_notes", []):
+        L.append(f"- FREEZER: {n['note']}")
+    L.append("")
+    return L
 
 
 def technique_glossary_lines(used_ops, techniques, h="##"):
