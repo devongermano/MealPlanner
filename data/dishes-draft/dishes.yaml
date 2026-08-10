@@ -85,7 +85,9 @@ schema_version: 0
 #   - No corn tortilla component. Carnitas, birria and al pastor tacos all want one;
 #     the corpus has flour only (corn_tortilla exists as an INGREDIENT, unused).
 #   - No raw-onion/cilantro garnish component — the standard taco finish.
-#   - No consommé component for birria.
+#   - No RESERVED consommé for birria. The braise keeps its liquid inside the component
+#     (the method portions the beef moistened with broth), so there is nothing to
+#     griddle a tortilla in or drink alongside. Quesabirria needs that plus a melter.
 #   - Exactly one vegetable in the whole corpus (smashed_cucumber, Korean). The
 #     Italian and Mexican dishes have no salad or green side to offer.
 #   - No melting cheese labelled for Mexican food (quesabirria). The corpus's only
@@ -165,10 +167,13 @@ dishes:
   compatible_sides: [cilantro_lime_rice, refried_pintos]
   meal_affinity: [lunch, dinner]
   notes: >
-    Reconstructed as plain birria tacos, NOT quesabirria: the corpus has no melting
-    cheese labelled for Mexican food and no consommé component to dip the tortillas
-    in or drink alongside. If you want quesabirria, the cheese and the consommé have
-    to be added to components.yaml first.
+    Reconstructed as plain birria tacos, NOT quesabirria. Two reasons, both from the
+    recipe itself: the corpus has no melting cheese labelled for Mexican food, and the
+    method folds the skimmed consommé back into the meat and portions the beef
+    moistened with broth — so the braising liquid is already inside this component's
+    1500 g yield. There is no separate consommé to griddle the tortillas in or drink
+    alongside; that ritual needs its own component (reserved broth) plus a melting
+    cheese before quesabirria is a dish this library can make.
 
 - id: birria_bowl
   name: Birria rice bowl

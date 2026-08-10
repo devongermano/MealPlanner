@@ -135,10 +135,13 @@ Sides you may add: cilantro-lime rice, refried beans
 Eaten at: lunch, dinner
 One serving: **43 g protein · 42 g fat · 81 g carb · 880 kcal**
 
-> This is plain birria tacos, **not quesabirria**. There's no melting cheese in the
-> library labelled for Mexican food, and no consommé component to dip the tortillas in
-> or drink alongside. If you want quesabirria, both of those have to be added as
-> recipes first — say so and they go on the list.
+> This is plain birria tacos, **not quesabirria** — for two reasons that both come from
+> your own recipe. There's no melting cheese in the library labelled for Mexican food.
+> And the braise folds the skimmed consommé back into the meat and portions the beef
+> moistened with broth, so the liquid is already *inside* the 1,500 g of birria — there
+> is no separate cup of consommé to griddle the tortillas in or sip alongside.
+> Quesabirria needs two new recipes: a reserved broth, and a melting cheese. Say the
+> word and they go on the list.
 
 `[ ] approve`  `[ ] edit: ______________________________`  `[ ] reject`
 
