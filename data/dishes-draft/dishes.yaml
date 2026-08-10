@@ -92,6 +92,35 @@ schema_version: 0
 #     Italian and Mexican dishes have no salad or green side to offer.
 #   - No melting cheese labelled for Mexican food (quesabirria). The corpus's only
 #     melters are mozzarella_shred (italian) and cheddar_shred (crossover).
+#
+#
+# INTEGRATION NOTES, FOR WHOEVER BUILDS M1.13 (not owner-facing)
+# -------------------------------------------------------------
+# This file is data. Nothing consumes it yet. Four things this corpus makes visible
+# that the design panel should settle BEFORE the dealer becomes a dish-dealer:
+#
+# 1. serve_g is per-DAY in the engine, per-SERVING here. M19_SPEC §3.3 records the
+#    mismatch already ("serve_g is authored per SERVING but the day pool applies it to
+#    day totals"). Dish bands are unambiguously per serving. Eat carnitas_tacos twice in
+#    one day and flour_tortilla lands at 284 g — exactly its component max. The next
+#    dish eaten twice will collide. Decide which layer owns the absolute.
+#
+# 2. Exactly one dish has two `main`-role components: turkey_meatballs_al_sugo
+#    (meatballs + sugo). The M1.9 dealer treats mains as ATOMIC and enforces a distinct
+#    main per slot. Under dish-dealing, the variety rule should key on DISH id, not on
+#    main component id — PRD Amendment 2's "no repeated main across slots" becomes "no
+#    repeated dish", which is what a human means by variety anyway.
+#
+# 3. `anchor: lean` is a component property and does not survive assembly.
+#    turkey_meatballs is a lean anchor; turkey_meatballs_al_sugo is 57 g of fat a
+#    serving, because the sugo is built on hot Italian sausage. If `min_lean_anchors`
+#    starts operating on dishes, derive leanness from the dish's own baseline macros —
+#    do not inherit the flag from the main.
+#
+# 4. Batching is genuinely unaffected, and the corpus proves the consolidation is
+#    load-bearing: charred_salsa_roja is a component of 9 of the 16 dishes,
+#    flour_tortilla of 5, cilantro_lime_rice of 4. Components stay the batch unit;
+#    dishes only decide what lands together on the plate.
 
 dishes:
 
