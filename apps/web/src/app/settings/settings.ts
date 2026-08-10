@@ -8,6 +8,7 @@ import {
   type HouseholdRole,
 } from '../household/household-api';
 import { HouseholdStore } from '../household/household-store';
+import { PERSON_NAME_RULE, isValidPersonName } from '../household/person-name';
 import { Alert } from '../ui/alert';
 import { PendingNote } from '../ui/pending-note';
 
@@ -32,6 +33,9 @@ export class Settings {
 
   protected readonly pending = signal(false);
   protected readonly failure = signal<string | null>(null);
+  protected readonly personNameRule = PERSON_NAME_RULE;
+  /** Id of the member whose plan identity was last rejected, if any. */
+  protected readonly invalidPersonName = signal<string | null>(null);
 
   protected readonly memberForm = inject(FormBuilder).nonNullable.group({
     displayName: ['', [Validators.required, Validators.maxLength(60)]],
@@ -54,6 +58,21 @@ export class Settings {
   protected async changeRole(member: HouseholdMember, event: Event): Promise<void> {
     const role = (event.target as HTMLSelectElement).value as HouseholdRole;
     await this.guard(() => this.store.updateMemberRole(member.id, role));
+  }
+
+  /**
+   * An empty plan identity is not an error — it means this person holds a role but
+   * has no portions cooked for them, which is exactly what a planner who does not
+   * eat looks like.
+   */
+  protected async changePersonName(member: HouseholdMember, event: Event): Promise<void> {
+    const value = (event.target as HTMLInputElement).value.trim();
+    if (value && !isValidPersonName(value)) {
+      this.invalidPersonName.set(member.id);
+      return;
+    }
+    this.invalidPersonName.set(null);
+    await this.guard(() => this.store.updateMemberPersonName(member.id, value || null));
   }
 
   protected async removeMember(member: HouseholdMember): Promise<void> {

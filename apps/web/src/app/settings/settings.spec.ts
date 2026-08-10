@@ -32,6 +32,24 @@ function roleSelects(fixture: ComponentFixture<Settings>): HTMLSelectElement[] {
   );
 }
 
+function personNameInputs(fixture: ComponentFixture<Settings>): HTMLInputElement[] {
+  return Array.from(
+    (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLInputElement>('.person-name'),
+  );
+}
+
+async function editPersonName(
+  fixture: ComponentFixture<Settings>,
+  index: number,
+  value: string,
+): Promise<void> {
+  const input = personNameInputs(fixture)[index];
+  input.value = value;
+  input.dispatchEvent(new Event('change'));
+  await fixture.whenStable();
+  fixture.detectChanges();
+}
+
 describe('Settings', () => {
   beforeEach(() => {
     localStorage.clear();
@@ -55,6 +73,41 @@ describe('Settings', () => {
     fixture.detectChanges();
 
     expect(store.members().find((member) => member.id === 'mem-2')?.role).toBe('cook');
+  });
+
+  it("shows each member's plan identity", async () => {
+    const fixture = await mount();
+
+    expect(personNameInputs(fixture).map((input) => input.value)).toEqual(['devon', 'alex']);
+  });
+
+  it('saves an edited plan identity', async () => {
+    const fixture = await mount();
+    const store = TestBed.inject(HouseholdStore);
+
+    await editPersonName(fixture, 1, 'alexandra');
+
+    expect(store.members().find((member) => member.id === 'mem-2')?.personName).toBe('alexandra');
+  });
+
+  it('clearing the plan identity unlinks the member rather than erroring', async () => {
+    const fixture = await mount();
+    const store = TestBed.inject(HouseholdStore);
+
+    await editPersonName(fixture, 1, '   ');
+
+    expect(store.members().find((member) => member.id === 'mem-2')?.personName).toBeNull();
+    expect((fixture.nativeElement as HTMLElement).querySelector('.row-error')).toBeNull();
+  });
+
+  it('refuses a plan identity the engine could not key on, without saving it', async () => {
+    const fixture = await mount();
+    const store = TestBed.inject(HouseholdStore);
+
+    await editPersonName(fixture, 1, 'Alex Smith');
+
+    expect(store.members().find((member) => member.id === 'mem-2')?.personName).toBe('alex');
+    expect((fixture.nativeElement as HTMLElement).querySelector('.row-error')).not.toBeNull();
   });
 
   it('never offers to remove the signed-in account from its own household', async () => {

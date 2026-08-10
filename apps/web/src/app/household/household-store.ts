@@ -6,6 +6,7 @@ import {
   type Household,
   type HouseholdMember,
   type HouseholdRole,
+  type UpdateMemberInput,
 } from './household-api';
 
 const ACTIVE_KEY = 'mealplan.activeHouseholdId';
@@ -70,9 +71,18 @@ export class HouseholdStore {
     this.memberList.update((list) => [...list, member]);
   }
 
-  async updateMemberRole(memberId: string, role: HouseholdRole): Promise<void> {
+  updateMemberRole(memberId: string, role: HouseholdRole): Promise<void> {
+    return this.patchMember(memberId, { role });
+  }
+
+  /** Null unlinks: the member keeps their role and stops being an eater in the plan. */
+  updateMemberPersonName(memberId: string, personName: string | null): Promise<void> {
+    return this.patchMember(memberId, { personName });
+  }
+
+  private async patchMember(memberId: string, patch: UpdateMemberInput): Promise<void> {
     const household = this.requireActive();
-    const updated = await this.api.updateMemberRole(household.id, memberId, role);
+    const updated = await this.api.updateMember(household.id, memberId, patch);
     this.memberList.update((list) =>
       list.map((member) => (member.id === memberId ? updated : member)),
     );
