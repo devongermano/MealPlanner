@@ -1,4 +1,4 @@
-import type { ApiErrorBody, ApiErrorResponse } from '../household/contracts';
+import type { ApiErrorBody, ApiErrorResponse } from '../household/household-api';
 
 /**
  * The single place an API failure becomes text a person reads. Every view routes

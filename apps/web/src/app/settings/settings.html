@@ -85,7 +85,7 @@
             [id]="'person-' + member.id"
             [value]="member.personName ?? ''"
             [disabled]="pending()"
-            [attr.aria-invalid]="invalidPersonName() === member.id"
+            [attr.aria-invalid]="personNameProblem()?.memberId === member.id"
             placeholder="does not eat"
             autocapitalize="off"
             spellcheck="false"
@@ -124,8 +124,10 @@
         @if (invalidDisplayName() === member.id) {
           <p class="row-error">Everyone on the plan needs a name.</p>
         }
-        @if (invalidPersonName() === member.id) {
-          <p class="row-error">{{ personNameRule }}</p>
+        @if (personNameProblem(); as problem) {
+          @if (problem.memberId === member.id) {
+            <p class="row-error">{{ problem.message }}</p>
+          }
         }
       </li>
     } @empty {

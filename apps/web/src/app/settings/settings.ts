@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Auth } from '../auth/auth';
-import { describeApiError } from '../errors/api-error';
+import { describeApiError, isApiErrorResponse } from '../errors/api-error';
 import {
   HOUSEHOLD_ROLES,
   ROLE_DESCRIPTIONS,
@@ -41,8 +41,10 @@ export class Settings {
   protected readonly pending = signal(false);
   protected readonly failure = signal<string | null>(null);
   protected readonly personNameRule = PERSON_NAME_RULE;
-  /** Id of the member whose plan identity was last rejected, if any. */
-  protected readonly invalidPersonName = signal<string | null>(null);
+  /** Which row's plan identity was rejected, and why. Shown on that row. */
+  protected readonly personNameProblem = signal<{ memberId: string; message: string } | null>(
+    null,
+  );
   protected readonly invalidDisplayName = signal<string | null>(null);
 
   protected readonly memberForm = inject(FormBuilder).nonNullable.group({
@@ -106,11 +108,25 @@ export class Settings {
   protected async changePersonName(member: HouseholdMemberRow, event: Event): Promise<void> {
     const value = (event.target as HTMLInputElement).value.trim();
     if (value && !isValidPersonName(value)) {
-      this.invalidPersonName.set(member.id);
+      this.personNameProblem.set({ memberId: member.id, message: PERSON_NAME_RULE });
       return;
     }
-    this.invalidPersonName.set(null);
-    await this.guard(() => this.saveProfile(member, { personName: value || null }));
+    this.personNameProblem.set(null);
+    this.pending.set(true);
+    this.failure.set(null);
+    try {
+      await this.saveProfile(member, { personName: value || null });
+    } catch (cause) {
+      // A plan identity is unique per household, so a clash is about THIS field
+      // on THIS row — a page-level banner would make the reader hunt for it.
+      if (isApiErrorResponse(cause) && cause.error.code === 'conflict') {
+        this.personNameProblem.set({ memberId: member.id, message: describeApiError(cause) });
+      } else {
+        this.failure.set(describeApiError(cause, 'That change did not save. Try again.'));
+      }
+    } finally {
+      this.pending.set(false);
+    }
   }
 
   /** Your own profile goes through the self route; a placeholder's through the planner one. */

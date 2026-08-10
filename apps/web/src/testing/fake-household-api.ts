@@ -85,6 +85,8 @@ export class FakeHouseholdApi implements HouseholdApi {
     return household;
   }
 
+  // Implemented without the householdId the interface passes: this double holds
+  // one household's members, so there is nothing to filter by.
   async listMembers(): Promise<readonly HouseholdMemberView[]> {
     return this.members;
   }
@@ -146,10 +148,24 @@ export class FakeHouseholdApi implements HouseholdApi {
     this.members = this.members.filter((member) => member.id !== memberId);
   }
 
+  /** personName is unique per household, so both routes can answer 409. */
+  private assertPersonNameFree(personName: string | null | undefined, memberId: string): void {
+    if (!personName) {
+      return;
+    }
+    const taken = this.members.some(
+      (member) => member.id !== memberId && member.personName === personName,
+    );
+    if (taken) {
+      throw toApiError('conflict', 'That person is already linked to another member.');
+    }
+  }
+
   private apply(
     target: HouseholdMemberView,
     patch: UpdateHouseholdMemberRequest,
   ): HouseholdMemberView {
+    this.assertPersonNameFree(patch.personName, target.id);
     const updated: HouseholdMemberView = {
       ...target,
       role: patch.role ?? target.role,

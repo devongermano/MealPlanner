@@ -1,36 +1,29 @@
 import { InjectionToken } from '@angular/core';
-import type {
-  AddHouseholdMemberRequest,
-  CreateHouseholdRequest,
-  HouseholdMemberView,
-  HouseholdRole,
-  HouseholdSummary,
-  MeResponse,
-  UpdateHouseholdMemberRequest,
-  UpdateOwnMembershipRequest,
-} from './contracts';
+import type { components } from '@mealplan/contracts-api';
 
 /*
- * The household seam. Every shape below now comes from packages/contracts-api,
- * generated from the NestJS API's own OpenAPI document — nothing here is a
- * hand-written mirror, per ARCHITECTURE.md. (The one narrowing this app applies,
- * and why, is documented in ./contracts.ts.)
+ * The household seam. Every shape below is the generated type from
+ * packages/contracts-api, built from the NestJS API's own OpenAPI document —
+ * nothing here is a hand-written mirror, per ARCHITECTURE.md.
  *
- * The interface remains because the UI should depend on a capability, not on
- * HttpClient. It is what let the whole app be built and tested before these
+ * The interface remains because the UI should depend on a capability rather than
+ * on HttpClient. It is what let the whole app be built and tested before these
  * endpoints existed.
  */
 
-export type {
-  AddHouseholdMemberRequest,
-  CreateHouseholdRequest,
-  HouseholdMemberView,
-  HouseholdRole,
-  HouseholdSummary,
-  MeResponse,
-  UpdateHouseholdMemberRequest,
-  UpdateOwnMembershipRequest,
-};
+type Schemas = components['schemas'];
+
+export type HouseholdMemberView = Schemas['HouseholdMemberView'];
+export type HouseholdSummary = Schemas['HouseholdSummary'];
+export type HouseholdDetail = Schemas['HouseholdDetail'];
+export type MeResponse = Schemas['MeResponse'];
+export type CreateHouseholdRequest = Schemas['CreateHouseholdRequest'];
+export type AddHouseholdMemberRequest = Schemas['AddHouseholdMemberRequest'];
+export type UpdateHouseholdMemberRequest = Schemas['UpdateHouseholdMemberRequest'];
+export type UpdateOwnMembershipRequest = Schemas['UpdateOwnMembershipRequest'];
+export type ApiErrorResponse = Schemas['ApiErrorResponse'];
+export type ApiErrorBody = Schemas['ApiErrorBody'];
+export type HouseholdRole = Schemas['HouseholdMemberView']['role'];
 
 /** PRD §4.2. planner configures and approves, cook preps, eater sees sheets and vetoes. */
 export const HOUSEHOLD_ROLES: readonly HouseholdRole[] = ['planner', 'cook', 'eater'];

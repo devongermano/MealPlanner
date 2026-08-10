@@ -196,6 +196,17 @@ describe('Settings', () => {
     expect(rows(fixture)[0].querySelector('.row-error')).not.toBeNull();
   });
 
+  it('reports a duplicate plan identity on the offending row, not as a page banner', async () => {
+    const fixture = await mount();
+    const store = TestBed.inject(HouseholdStore);
+
+    // 'devon' already belongs to another member; plan identity is unique per household.
+    await editPersonName(fixture, 1, 'devon');
+
+    expect(rows(fixture)[1].querySelector('.row-error')?.textContent).toContain('already linked');
+    expect(store.members().find((member) => member.id === 'mem-2')?.personName).toBe('alex');
+  });
+
   it('never offers to remove the signed-in account from its own household', async () => {
     const fixture = await mount();
 

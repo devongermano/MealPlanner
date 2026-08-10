@@ -9,10 +9,10 @@ import type {
   HouseholdMemberView,
   HouseholdSummary,
   MeResponse,
+  HouseholdDetail,
   UpdateHouseholdMemberRequest,
   UpdateOwnMembershipRequest,
 } from './household-api';
-import type { HouseholdDetail } from './contracts';
 
 /**
  * The real household client. Talks to the NestJS API — never to Supabase, which
