@@ -18,6 +18,19 @@ schema_version: 1
 #             if you let it. These stop that.
 #   unit_g:   set for DISCRETE things (tortillas, meatballs, wings). Grams snap to
 #             multiples of this. Omit for continuous things (rice, braise, sauce).
+#   household_unit: {name, grams} — how someone who doesn't own a scale takes this
+#             ("about 2/3 cup of picadillo", "2 tablespoons of salsa"). Relaxed mode
+#             and family-style slots render with it; the engine always solves grams.
+#             EVERY grams-per-unit here is PROVISIONAL: weigh one real cup or spoon
+#             from the actual recipe and correct it. Cups for anything scoopable
+#             (rice, beans, braises, sauces, shredded cheese), tablespoons for
+#             accents you spoon over a plate.
+#             DELIBERATELY OMITTED where grams-only is the honest answer — the four
+#             discrete components (gordita_shell, flour_tortilla, turkey_meatballs,
+#             mango_jalapeno_wings) are already counted in pieces via unit_g, and a
+#             volume measure for them would be worse than the count they already have.
+#             Bone-in wings are the sharpest case: they are weighed GROSS, so a "cup
+#             of wings" would be meaningless. See docs/DATA_GUIDE.md.
 #   source:   where the recipe came from. barefoodtim = Tim Laielli's substack.
 
 components:
@@ -31,6 +44,7 @@ components:
   source: "barefoodtim - gorditas de picadillo (Vitamina T)"
   yield_g: 1000
   serve_g: {min: 80, max: 450}
+  household_unit: {name: cup, grams: 240}
   keeps_days: 5
   freezes: true
   active_min: 40
@@ -67,6 +81,7 @@ components:
   source: house
   yield_g: 1500
   serve_g: {min: 80, max: 400}
+  household_unit: {name: cup, grams: 240}
   keeps_days: 5
   freezes: true
   active_min: 30      # + 4h unattended in the oven
@@ -87,6 +102,7 @@ components:
   source: house
   yield_g: 1300
   serve_g: {min: 80, max: 400}
+  household_unit: {name: cup, grams: 150}
   keeps_days: 5
   freezes: true
   active_min: 25      # + 3h unattended
@@ -107,6 +123,7 @@ components:
   source: house
   yield_g: 900
   serve_g: {min: 80, max: 450}
+  household_unit: {name: cup, grams: 145}
   keeps_days: 3
   freezes: false
   active_min: 20
@@ -182,6 +199,7 @@ components:
   source: house
   yield_g: 600
   serve_g: {min: 20, max: 150}
+  household_unit: {name: tablespoon, grams: 16}
   keeps_days: 7
   freezes: false
   active_min: 15
@@ -201,6 +219,7 @@ components:
   source: house
   yield_g: 700
   serve_g: {min: 20, max: 150}
+  household_unit: {name: tablespoon, grams: 15}
   keeps_days: 2
   freezes: false
   active_min: 10
@@ -219,6 +238,7 @@ components:
   source: store
   yield_g: 340
   serve_g: {min: 15, max: 120}
+  household_unit: {name: tablespoon, grams: 12}
   keeps_days: 14
   freezes: false
   active_min: 0
@@ -232,6 +252,7 @@ components:
   source: store
   yield_g: 425
   serve_g: {min: 15, max: 100}
+  household_unit: {name: tablespoon, grams: 15}
   keeps_days: 14
   freezes: false
   active_min: 0
@@ -249,6 +270,7 @@ components:
   source: "barefoodtim (orange chicken) - soy swapped"
   yield_g: 1100
   serve_g: {min: 80, max: 450}
+  household_unit: {name: cup, grams: 190}
   keeps_days: 4
   freezes: true
   active_min: 35
@@ -270,6 +292,7 @@ components:
   source: house
   yield_g: 600
   serve_g: {min: 60, max: 350}
+  household_unit: {name: cup, grams: 150}
   keeps_days: 4
   freezes: true
   active_min: 25
@@ -306,6 +329,7 @@ components:
   source: house
   yield_g: 620
   serve_g: {min: 50, max: 300}
+  household_unit: {name: cup, grams: 130}
   keeps_days: 3
   freezes: false
   active_min: 10
@@ -324,6 +348,7 @@ components:
   source: house
   yield_g: 280
   serve_g: {min: 10, max: 60}      # dense fat lever, mostly for the 4700 side
+  household_unit: {name: tablespoon, grams: 14}
   keeps_days: 14
   freezes: false
   active_min: 10
@@ -342,6 +367,7 @@ components:
   source: "barefoodtim 010 - spicy sausage fusilli al forno (sauce base)"
   yield_g: 1500
   serve_g: {min: 80, max: 400}
+  household_unit: {name: cup, grams: 245}
   keeps_days: 5
   freezes: true
   active_min: 35
@@ -361,6 +387,7 @@ components:
   source: house
   yield_g: 1000
   serve_g: {min: 100, max: 500}
+  household_unit: {name: cup, grams: 140}
   keeps_days: 4
   freezes: false
   active_min: 12
@@ -396,6 +423,7 @@ components:
   source: store
   yield_g: 227
   serve_g: {min: 15, max: 120}
+  household_unit: {name: cup, grams: 112}
   keeps_days: 14
   freezes: true
   active_min: 0
@@ -409,6 +437,7 @@ components:
   source: "barefoodtim 008 - crispy rosemary potatoes"
   yield_g: 1100
   serve_g: {min: 100, max: 500}
+  household_unit: {name: cup, grams: 150}
   keeps_days: 4
   freezes: false
   active_min: 15
@@ -453,6 +482,7 @@ components:
   source: "barefoodtim - breakfast burritos"
   yield_g: 950
   serve_g: {min: 80, max: 450}
+  household_unit: {name: cup, grams: 220}
   keeps_days: 3
   freezes: true
   active_min: 25
@@ -470,6 +500,7 @@ components:
   source: store
   yield_g: 227
   serve_g: {min: 15, max: 120}
+  household_unit: {name: cup, grams: 113}
   keeps_days: 14
   freezes: true
   active_min: 0
@@ -487,6 +518,7 @@ components:
   source: house
   yield_g: 1200
   serve_g: {min: 80, max: 500}
+  household_unit: {name: cup, grams: 220}
   keeps_days: 5
   freezes: true
   active_min: 20

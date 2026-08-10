@@ -42,6 +42,7 @@ examples/                  THE LIBRARY — your actual food, hand-written
 data/                      SUPPORTING DATA — mostly not hand-written
   dishes-draft/              NEW: how components assemble into plates (draft)
     dishes.yaml                16 dishes with per-serving amounts
+    accent_baselines.yaml      how much of each finishing touch, per dish
     DISH_REVIEW.md             your approve/edit/reject checklist
     lint.py                    consistency checker
   methods-draft/             cooking steps for each component, one file each
@@ -164,7 +165,11 @@ a meal-prep kitchen actually works in — you cook a pot of picadillo, not one g
   their protein without blowing past their fat.
 - **`household_unit`** — for people who don't use a scale: `{name: cup, grams: 185}`
   lets a sheet say "about 2 cups of rice" instead of "370 g". The gram figures are the
-  truth; this is a translation at the edge.
+  truth; this is a translation at the edge. 23 of the 26 components carry one — cups
+  for anything scoopable, tablespoons for accents you spoon over a plate. The three
+  without are the ones already counted in pieces (gordita shells, meatballs, wings),
+  where a count beats a volume. Every grams-per-unit is a provisional estimate until
+  someone weighs a real cup from the real recipe.
 - **`source`** — where the recipe came from. `house`, `store`, or a named recipe such as
   `barefoodtim 010 - spicy sausage fusilli al forno (sauce base)`. §6.
 
@@ -193,24 +198,39 @@ and stuffed with picadillo, topped with salsa and queso in roughly these proport
   name: Gorditas de picadillo
   source: "barefoodtim - gorditas de picadillo (Vitamina T)"
   reconstruction: from_source
+  cuisine: mexican
   components:
-    gordita_shell:         {base_g: 170, min_g: 85, max_g: 340}
-    picadillo:             {base_g: 160, min_g: 80, max_g: 340}
-    charred_salsa_roja:    {base_g: 30,  min_g: 0,  max_g: 100}
-    queso_fresco_crumbled: {base_g: 25,  min_g: 0,  max_g: 80}
-    mexican_crema:         {base_g: 20,  min_g: 0,  max_g: 60}
+    gordita_shell:         {base_g: 170, min_g: 170, max_g: 255}
+    picadillo:             {base_g: 160, min_g: 110, max_g: 210}
   accents: [charred_salsa_roja, queso_fresco_crumbled, mexican_crema]
   compatible_sides: [refried_pintos, cilantro_lime_rice]
   meal_affinity: [lunch, dinner]
 ```
 
 - **`base_g`** — one normal serving. The shape of the dish: two shells, 160 g of filling.
-- **`min_g` / `max_g`** — how far each amount may move for a bigger or smaller eater
-  before the plate stops reading as that dish. This is where the two-people-one-kitchen
-  trick actually happens: same pots, same dish, Devon's gordita has more picadillo and
-  no queso, Jimbo's has more of everything.
-- **`accents`** — the amounts that may go to zero for a given person. Their `min_g` is
-  0 by rule.
+- **`min_g` / `max_g`** — how far that one part may shift *within a single serving* and
+  still be the same dish. Devon's gordita has more picadillo and no queso; it's still a
+  gordita. This is where the two-people-one-kitchen trick happens: same pots, same dish,
+  different plates.
+
+  These are deliberately **not** the appetite range, which is the single easiest thing
+  to get wrong here. A bigger eater doesn't get a wider band, he gets more **servings** —
+  the solver scales every part of the dish together (1.5 servings, 2 servings) so the
+  proportions survive at any size, up to the point where one of the components hits its
+  own `serve_g` ceiling. Widening a band to feed someone adds no food; it just permits
+  an uglier plate. The first draft of `dishes.yaml` made exactly that mistake and
+  allowed four gordita shells with the smallest scoop of filling.
+- **`accents`** — the finishing layer, which any one person may skip entirely. Just a
+  list of names: an accent has no per-dish amount here, because the engine lets each
+  one be either nothing or anything within that component's own sensible serving range.
+  The amounts this reconstruction *did* author (30 g of salsa, 25 g of queso) live in
+  `accent_baselines.yaml` next door, which is where the review document and the macro
+  figures get them. Whether accents should carry a per-dish amount after all is an open
+  question — 45 g of mozzarella baked onto pasta really isn't the 20 g crumbled over a
+  taco.
+- **`cuisine`** — stated outright, though the engine can work it out from the dish's
+  main component. It matters for the one dish with two mains, and it keeps the value
+  steady if a component is ever relabelled.
 - **`compatible_sides`** — things that may be served alongside but aren't part of the
   dish (beans next to gorditas). No amounts here; the component's own `serve_g` governs.
 - **`meal_affinity`** — which meal slots this belongs in. Breakfast-ness is a property
