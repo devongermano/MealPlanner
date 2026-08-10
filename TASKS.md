@@ -10,6 +10,47 @@ green, not before.
 
 ---
 
+## OPERATIONS BOARD *(live orchestration state — updated every landing; added 2026-08-09 when the fleet outgrew a flat checklist)*
+
+**Tracking model:** this file is the durable truth; the session task board mirrors
+it. Every workstream lands via branch → PR → CI gates → orchestrator review → merge.
+
+### Workstreams
+
+| Lane | Scope | Owner / tier | Branch | Status |
+|---|---|---|---|---|
+| Main chain | M1 phases + dish layer (engine files — single-writer, serialized) | Workflows (Fable) | main | M1.10 in flight |
+| Track F | Data: DATA_GUIDE, dish reconstruction, corpus curation | `data-steward` (Opus, persistent) | track-f-data | in flight |
+| Track G | API: Supabase auth, households, roles, contracts-api types | `api-steward` (Opus, persistent) | track-g-api | in flight |
+| Track H | Web: shell, auth flows, onboarding, settings | `web-steward` (Opus, persistent) | track-h-web | in flight |
+| Design | Dish-layer mechanism panel → M1.13 spec | Workflow (Fable, read-only) | — | in flight |
+| Queued | M1.11 ∥ M1.12 (parallel worktrees on M1.10 landing) | Workflows (Fable) | — | queued |
+| Done | Track B contracts · Track C scaffolds · Track D USDA corpus · Track E method fragments · M1.9 meal layer | — | merged | ✅ |
+
+### The frozen zone
+
+Nothing may build against **meal/dish result shapes** (plan views, eat-sheet UI,
+solve endpoints, WeekPlanResult meal structure) until **M1.13 (dish layer) lands** —
+those shapes are mid-churn by owner correction. Auth/households/shell/settings are
+engine-independent and green-lit (PR-2 ratified).
+
+### Steward roster (persistent, name-addressable — say "have the X-steward do Y")
+
+- **data-steward** (Opus): corpus truth. Queue: dishes draft → DISH_REVIEW.md for
+  owner → FDC lint cleanup (16 warnings) → household_units/affinity coverage.
+- **api-steward** (Opus): apps/api. Queue: auth + households + authz matrix →
+  contracts-api drift-gated types. Security gets a Fable review at PR.
+- **web-steward** (Opus): apps/web. Queue: shell + auth + onboarding behind mock
+  seams awaiting contracts-api.
+
+### Owner inputs on the critical path
+
+- 🧠 **Dish braindump** (answer key for DISH_REVIEW.md) — highest leverage
+- 🥘 M1.6 real week (after sheets stabilize post-M1.13)
+- PR-3/OQ-P1 (notifications) before Track G builds any notify path; OQ-N1 (name)
+
+---
+
 ## M0 — Engine correctness *(✅ complete 2026-08-09 — commits ce8f3f8→bc9b306; gate evidence in bc9b306's message + PHASE5_FIXNOTES.md)*
 
 Extract the engine from the prototype and make it tell the truth. Gate: full suite
@@ -39,7 +80,7 @@ config; one canonical computation per quantity; measured perf baselines recorded
 - [x] M0.16 Capability test suite (PRD §9 names): composite-dish fat-forcing; binding-macro id; shelf-life valley → explained hole; variety caps don't starve late days; unit snapping in bounds; excluded tags never served; determinism golden (pinned reference env)
 - [x] M0.17 Dev-corpus cleanup: fix tolerance advice in `people.yaml:4-5` + `SKILL.md:106` (structural fix first, tolerance last — PRD §8.3); remove `[0,3]` code-default for `cook_days` (config-required); unify `n` defaults; move founder library to `examples/`; delete dead code (`assign_week`, unused imports)
 
-## M1 — Headless demo loop *(next — awaiting go)*
+## M1 — Headless demo loop *(in progress — M1.0-M1.5, M1.7-M1.9 done; M1.10 in flight)*
 
 Gate: §3 demo from a fresh config file with format docs at hand; a real week cooked
 and eaten from M1 output. Targets are arbitrary by design (owner, 2026-08-09:
@@ -54,6 +95,11 @@ and eaten from M1 output. Targets are arbitrary by design (owner, 2026-08-09:
 - [ ] M1.6 🥘 **Real-week gate:** founder household cooks and eats one week from M1 output
 - [x] M1.7 ~~Per-person-scalable `serve_g` bounds~~ **REVOKED same day** (lard-beans incident; PRD Appendix B item 2 — bounds are per-dish absolutes; mechanism dormant) (PRD §8.1, Appendix A confirmed defect "serve_g shared across divergent eaters"): **explicitly deferred from M0** in the Phase 5 review — `plate()` still applies one shared serve band per component to every eater (PRD Appendix B, item 2). Implement kcal-proportional scaling (provisional) or ratify dropping it, with the M1.6 real week as the measuring stick
 - [x] M1.8 Pantry aging + cooked leftovers (PRD §8.1): consume stock `acquired` dates (age reduces effective raw `keeps_days` — validated but unconsumed in M0, PRD Appendix B item 3); integrate pantry `cooked` list into availability (documented M1+ since M0.12)
+- [x] M1.9 Meal layer: post-solve dealer per `M19_SPEC.md` (judge-ratified) — meals_per_day LIVE, per-slot serving models, composed meals, conservation + inertness constitutional, strict-opt-in interchangeability *(22782be)*
+- [~] M1.10 Sheet rework: serving-model phrasing, compiled cook script from method fragments, shared-prep consolidation, portioning matrix *(workflow in flight)*
+- [ ] M1.13 **THE DISH LAYER** (owner correction: "these aren't meals") — dishes.yaml assembly restored; meals = one dish portioned + sides; menu selects dishes; design panel + data-steward draft converging *(runs after M1.10; spec + data in flight)*
+- [ ] M1.11 Target profiles: day-type cycling anchored to plan date *(parallel worktree after M1.10)*
+- [ ] M1.12 Timeline compiler v0: greedy interleaved cook schedule with timers, station buckets, cook_plan_style: timeline *(parallel worktree after M1.10; dish-independent — cooking is by component)*
 
 ## M2 — Collaborative web app *(service posture begins)*
 
@@ -63,7 +109,9 @@ Render/Turbo). Blocked-on-decisions: OQ-P1 (channel), PR-2/PR-3.
 
 - [ ] Contract-codegen pipeline: pydantic → OpenAPI/JSON Schema → generated `packages/contracts` TS, CI drift test — **blocks all other M2 API work**
 - [ ] Solver service: FastAPI wrapper, stateless, Render-private (`ARCHITECTURE.md`)
-- [ ] Service API (NestJS) wrapping solver; Supabase Auth (JWT verify in Nest); per-household isolation (authz in Nest, RLS safety net); transactional writes + audit trail; Postgres via Prisma (YAML stays interchange/fixture format)
+- [~] **Auth/households/roles pulled forward** (PR-2 ratified 2026-08-09): Supabase Auth JWT verify in Nest, Prisma households/members/roles + RLS safety net, authz matrix tests, contracts-api types — **Track G in flight**. Solve-wrapping API stays gated on the frozen zone
+- [~] **Shell/auth/onboarding pulled forward**: responsive shell, supabase-js auth flows, onboarding wizard behind contracts-api mock seams — **Track H in flight**. Plan/eat views stay frozen-zone
+- [ ] Service API (NestJS) wrapping solver; transactional writes + audit trail; Postgres via Prisma (YAML stays interchange/fixture format) — after frozen zone lifts
 - [ ] Household setup flow; propose → veto → lock loop; deliverable views; day rebalance; pantry stock UI; responsive/PWA
 - [ ] Cook mode: full-screen tap-next timeline renderer (PRD §10) — timers, wake lock, offline locked plan; technique-library hooks (operation → explanation/video)
 - [ ] Browser-automation test of the two-account loop (dev dependency, outside pinned core)
