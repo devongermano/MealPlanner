@@ -319,7 +319,10 @@ def test_cook_script_degrades_without_fragments():
     assert "Shared prep" not in out and "Techniques" not in out
 
 
-def test_cook_script_timeline_style_falls_back_loudly():
+def test_cook_script_timeline_style_renders_interleaved_stream():
+    """M1.12: cook_plan_style timeline renders the scheduled stream (the
+    scheduler runs ONLY for timeline households); its full rendering is
+    covered in test_schedule.py — here just the style switch."""
     st = model.Settings.from_raw(
         dict(days=7, active_min_budget=100, batch_time_factor=0.45,
              max_days_same_component=4, cook_days=[0, 4], shop_days=[0],
@@ -327,8 +330,14 @@ def test_cook_script_timeline_style_falls_back_loudly():
         {"mode": "off"})
     out = render_cook_plan(COMPS, st, _sp_one_session(), meta=META,
                            methods=METHODS, techniques=TECHNIQUES)
-    assert "timeline** is not compiled yet" in out
-    assert "M1.12" in out
+    assert "**Timeline cook plan** (M1.12)" in out
+    assert "### Timeline — 0:00 is when you start" in out
+    assert "⏱ set a timer for" in out
+    # recipe style must NOT invoke the scheduler's rendering
+    out_recipe = render_cook_plan(COMPS, SET, _sp_one_session(), meta=META,
+                                  methods=METHODS, techniques=TECHNIQUES)
+    assert "Timeline —" not in out_recipe
+    assert "⏱" not in out_recipe
 
 
 def test_cook_script_is_deterministic():

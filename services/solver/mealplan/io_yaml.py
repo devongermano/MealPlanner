@@ -25,8 +25,9 @@ from typing import Any, Optional
 import yaml
 
 from .model import (COOK_PLAN_STYLES, DISH_LAYER_MODES, DISH_RECONSTRUCTIONS,
-                    PERSON_MODES, SERVING_MODELS, Dish, Ingredient, Pantry,
-                    Person, Settings, derive_component, resolve_meal_slots)
+                    PERSON_MODES, SERVING_MODELS, STATIONS_DEFAULTS, Dish,
+                    Ingredient, Pantry, Person, Settings, derive_component,
+                    resolve_meal_slots)
 
 SCHEMA_VERSION = 1
 KNOWN_SCHEMA_VERSIONS = (1,)
@@ -617,6 +618,37 @@ def validate_people_doc(doc: Any, fname: str = "people.yaml"
                 "bad_enum", f"{fname}: settings, field 'dish_layer'",
                 f"dish_layer must be one of {'|'.join(DISH_LAYER_MODES)} "
                 f"(got {dl!r})"))
+        # M1.12: household station inventory (optional; PROVISIONAL
+        # defaults in model.STATIONS_DEFAULTS). A partial mapping is fine —
+        # unstated fields keep their defaults; unknown fields are errors
+        # (a typo'd 'burnners' silently ignored would be a lying schedule).
+        stns = st.get("stations")
+        if stns is not None:
+            swhere = f"{fname}: settings, field 'stations'"
+            if not isinstance(stns, dict):
+                issues.append(ValidationIssue(
+                    "bad_stations", swhere,
+                    f"stations must be a mapping of station counts "
+                    f"(got {type(stns).__name__})"))
+            else:
+                unknown = sorted(set(stns) - set(STATIONS_DEFAULTS))
+                if unknown:
+                    issues.append(ValidationIssue(
+                        "bad_stations", swhere,
+                        f"unknown station field(s) {unknown} — allowed: "
+                        f"{sorted(STATIONS_DEFAULTS)}"))
+                for k in ("burners", "oven_slots", "prep"):
+                    v = stns.get(k)
+                    if v is not None and (not isinstance(v, int)
+                                          or isinstance(v, bool) or v < 1):
+                        issues.append(ValidationIssue(
+                            "bad_stations", f"{swhere}.{k}",
+                            f"{k} must be a positive integer (got {v!r})"))
+                g = stns.get("grill")
+                if g is not None and not isinstance(g, bool):
+                    issues.append(ValidationIssue(
+                        "bad_stations", f"{swhere}.grill",
+                        f"grill must be a boolean (got {g!r})"))
     # budget (optional; defaults to {"mode": "off"} at load). mode is an
     # enum; 'by_consumption' means NO ceiling — cost splits by consumption
     # share (costing.attribute), which render applies to every mode anyway.
