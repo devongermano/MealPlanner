@@ -583,13 +583,19 @@ disagreeing. Each item is a decision, not an omission.
    interruptible-background posture applies when it reaches a service
    surface). What §5.2 defers is budget *optimization as a product feature*
    (budget↔outcome sweeps in the product loop), unchanged.
-2. **Per-person `serve_g` scaling (Appendix A) deferred to M1.** The
-   confirmed v1 defect "serve_g shared across divergent eaters → §8.1
-   per-person scaling (provisional)" is NOT implemented in M0: `plate()`
-   still applies one shared serve band per component to every eater. Deferred
-   to M1 (TASKS M1.7) where the real-week gate can measure it against real
-   targets (OQ-D1) — a shared band across a 1.65× kcal spread survives until
-   then by this decision.
+2. **Per-person `serve_g` scaling: implemented, measured, REVOKED (owner,
+   2026-08-09 — the lard-beans incident).** M1.7 shipped kcal-proportional
+   scaling; the same evening a real plan legalized 720g of refried beans in a
+   day (400g authored cap × 1.8 clamp) and the owner rejected it on sight.
+   Ruling: authored `serve_g` bounds are per-dish palatability **absolutes**
+   ("more than this much of one dish is gross, period"), already written with
+   the household's biggest eater in mind — kcal-scaling them double-counts
+   appetite. The mechanism remains in the engine, dormant behind identity
+   defaults, testable under explicit override; any future revival requires
+   per-dish opt-in data (e.g. `scalable: true`), never blanket math. The
+   Appendix A disposition for "serve_g shared across divergent eaters" is
+   thereby closed as **working as intended**: appetite differences are served
+   by which and how many dishes, not bigger single-dish piles.
 3. **Pantry `acquired`-age rule deferred to M1.** §8.1's "age reduces
    effective raw keeps_days" is validated (ISO date required) but consumed
    nowhere: `purchase()` deducts stock grams only, and `raw_freshness`

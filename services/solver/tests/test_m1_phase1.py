@@ -260,58 +260,89 @@ def test_strip_helper_removes_comments_and_docstrings():
 
 
 # =========================================================================== #
-#  M1.7 — per-person serve_g scaling (PROVISIONAL, PRD §8.1)
+#  M1.7 — serve_g scaling: REVOKED (owner, 2026-08-09 — the lard-beans
+#  incident, PRD Appendix B item 2). Authored serve_g bounds are per-dish
+#  palatability ABSOLUTES. The mechanism stays dormant (identity defaults);
+#  these tests pin the default AND keep the dormant machinery honest under
+#  an explicit monkeypatch.
 # =========================================================================== #
-def test_scaling_registry_is_named_and_provisional_shaped():
-    assert SCALING["reference_kcal"] == 2500
-    assert SCALING["scale_min"] == 0.6
-    assert SCALING["scale_max"] == 1.8
-    assert all(isinstance(v, (int, float)) and not isinstance(v, bool)
-               for v in SCALING.values())
+def _enable_scaling(monkeypatch, lo=0.6, hi=1.8):
+    """Wake the dormant mechanism for a single test."""
+    monkeypatch.setitem(engine.SCALING, "scale_min", lo)
+    monkeypatch.setitem(engine.SCALING, "scale_max", hi)
 
 
-def test_person_scale_reference_and_clamps():
+def test_scaling_default_is_identity_revoked():
+    """The shipped default is identity: authored bounds are absolute for
+    EVERY eater, regardless of kcal (owner revocation after the real-plan
+    test that emitted 720g of refried beans)."""
+    assert SCALING["scale_min"] == 1.0 and SCALING["scale_max"] == 1.0
+    for t in (REF_TARGETS,
+              {k: 2 * v for k, v in REF_TARGETS.items()},
+              {"protein": 75, "fat": 50, "carb": 125}):
+        assert person_scale(_person(t)) == 1.0
+
+
+def test_beans_regression_authored_bounds_absolute():
+    """THE regression: a 4500-kcal eater still may not exceed a dish's
+    authored serve_g max. Reaching protein through one main is impossible
+    past the cap — the plate caps at 400g and reports the shortfall loudly
+    (negative miss), instead of legalizing a bucket of one dish."""
+    comps = {"meat": _comp("meat", {"kcal": 145.0, "protein": 25.0,
+                                    "fat": 5.0, "carb": 0.0},
+                           serve=(100, 400))}
+    big = _person({"protein": 150, "fat": 300, "carb": 300})     # 4500 kcal
+    res = plate(big, comps, list(comps))
+    assert res.items_g.get("meat", 0) <= 400, res.items_g
+    assert res.ok is False and res.miss["protein"] < 0           # SHORT, loud
+
+
+def test_effective_bounds_identity_by_default():
+    c = _comp("c", {"kcal": 100.0, "protein": 10.0, "fat": 2.0,
+                    "carb": 10.0}, serve=(100, 400))
+    for t in (REF_TARGETS, {"protein": 150, "fat": 100, "carb": 375}):
+        lo, hi, w = effective_serve_bounds(c, _person(t))
+        assert (lo, hi) == (100, 400) and w is None
+
+
+def test_scaling_mechanism_person_scale(monkeypatch):
+    _enable_scaling(monkeypatch)
     assert person_scale(_person(REF_TARGETS)) == 1.0
-    # 2x reference kcal -> clamped at scale_max
     double = {k: 2 * v for k, v in REF_TARGETS.items()}
     assert person_scale(_person(double)) == SCALING["scale_max"]
-    # half reference kcal (1250) -> 0.5 raw, clamped up to scale_min
     half = {"protein": 75, "fat": 50, "carb": 125}
     assert kcal_of(half) == 1250
     assert person_scale(_person(half)) == SCALING["scale_min"]
-    # 3000 kcal -> exactly 1.2, inside the clamp band
     mid = {"protein": 150, "fat": 100, "carb": 375}
     assert kcal_of(mid) == 3000
     assert person_scale(_person(mid)) == pytest.approx(1.2)
 
 
-def test_effective_bounds_scale_proportionally():
+def test_scaling_mechanism_bounds_proportional(monkeypatch):
+    _enable_scaling(monkeypatch)
     c = _comp("c", {"kcal": 100.0, "protein": 10.0, "fat": 2.0,
                     "carb": 10.0}, serve=(100, 400))
     mid = _person({"protein": 150, "fat": 100, "carb": 375})     # scale 1.2
     lo, hi, w = effective_serve_bounds(c, mid)
     assert (lo, hi) == (pytest.approx(120), pytest.approx(480))
     assert w is None
-    # reference person: bounds untouched — the golden continuity anchor
     lo0, hi0, w0 = effective_serve_bounds(c, _person(REF_TARGETS))
     assert (lo0, hi0) == (100, 400) and w0 is None
 
 
-def test_effective_bounds_unit_realigned_to_grid():
+def test_scaling_mechanism_unit_realigned_to_grid(monkeypatch):
+    _enable_scaling(monkeypatch)
     c = _comp("c", {"kcal": 100.0, "protein": 10.0, "fat": 2.0,
                     "carb": 10.0}, serve=(80, 400), unit=40)
     mid = _person({"protein": 150, "fat": 100, "carb": 375})     # scale 1.2
     lo, hi, w = effective_serve_bounds(c, mid)
-    # raw scaled bounds are (96, 480): min ceils UP the grid, max floors DOWN
     assert (lo, hi) == (120, 480)
     assert lo % 40 == 0 and hi % 40 == 0 and w is None
     assert lo >= 80 * 1.2 and hi <= 400 * 1.2
 
 
-def test_effective_bounds_inversion_falls_back_unscaled_with_warning():
-    """unit 100, serve exactly [100, 100]: scaling to 0.6 gives (60, 60);
-    grid alignment inverts (ceil->100, floor->0) — fall back to the raw,
-    already-aligned bounds and attach a structured warning."""
+def test_scaling_mechanism_inversion_warning(monkeypatch):
+    _enable_scaling(monkeypatch)
     c = _comp("c", {"kcal": 100.0, "protein": 10.0, "fat": 2.0,
                     "carb": 10.0}, serve=(100, 100), unit=100)
     low = _person({"protein": 75, "fat": 50, "carb": 125})       # scale 0.6
@@ -321,10 +352,8 @@ def test_effective_bounds_inversion_falls_back_unscaled_with_warning():
     assert w["component"] == "c" and w["unit_g"] == 100
 
 
-def test_plate_higher_kcal_person_can_exceed_raw_serve_max():
-    """The confirmed v1 defect: one shared band across divergent eaters. A
-    4500-kcal person (scale 1.8) needs 600g of a 25p/100g main to hit a 150g
-    protein target — over the raw 400g cap, inside the scaled 720g cap."""
+def test_scaling_mechanism_plate_exceeds_raw_max(monkeypatch):
+    _enable_scaling(monkeypatch)
     comps = {"meat": _comp("meat", {"kcal": 145.0, "protein": 25.0,
                                     "fat": 5.0, "carb": 0.0},
                            serve=(100, 400))}
@@ -332,12 +361,11 @@ def test_plate_higher_kcal_person_can_exceed_raw_serve_max():
     assert person_scale(big) == SCALING["scale_max"]
     res = plate(big, comps, list(comps))
     assert res.items_g.get("meat", 0) > 400, res.items_g
-    # anywhere in the protein band (570-630g) — beyond the raw 400g cap,
-    # under the scaled 720g cap
     assert 570 <= res.items_g["meat"] <= 630, res.items_g
 
 
-def test_plate_lower_kcal_person_capped_at_scaled_max_short_is_negative():
+def test_scaling_mechanism_plate_low_capped_short_negative(monkeypatch):
+    _enable_scaling(monkeypatch)
     comps = {"meat": _comp("meat", {"kcal": 145.0, "protein": 25.0,
                                     "fat": 5.0, "carb": 0.0},
                            serve=(100, 400))}
@@ -346,10 +374,9 @@ def test_plate_lower_kcal_person_capped_at_scaled_max_short_is_negative():
     res = plate(small, comps, list(comps))
     assert res.items_g.get("meat") == 240                        # 400 * 0.6
     assert res.ok is False and res.miss["protein"] < 0           # SHORT
-    # sign semantics (M1.0): short misses are negative even at the cap
 
 
-def test_plate_unit_alignment_preserved_after_scaling():
+def test_plate_unit_alignment_preserved():
     comps = {
         "balls": _comp("balls", {"kcal": 180.0, "protein": 15.0, "fat": 9.0,
                                  "carb": 9.0}, serve=(80, 400), unit=40),
@@ -357,7 +384,6 @@ def test_plate_unit_alignment_preserved_after_scaling():
                                "carb": 25.0}, role="starch", serve=(50, 500)),
     }
     mid = _person({"protein": 60, "fat": 36, "carb": 379}, tol=0.2)
-    assert kcal_of(mid["targets"]) == 2080                       # scale 0.832
     res = plate(mid, comps, list(comps))
     g = res.items_g.get("balls", 0)
     if g:
@@ -365,7 +391,8 @@ def test_plate_unit_alignment_preserved_after_scaling():
         assert lo <= g <= hi and g % 40 == 0, (g, lo, hi)
 
 
-def test_plate_attaches_inversion_warning():
+def test_plate_attaches_inversion_warning(monkeypatch):
+    _enable_scaling(monkeypatch)
     comps = {
         "brick": _comp("brick", {"kcal": 180.0, "protein": 15.0, "fat": 9.0,
                                  "carb": 9.0}, serve=(100, 100), unit=100),
@@ -379,22 +406,25 @@ def test_plate_attaches_inversion_warning():
         res.warnings
 
 
-def test_carb_headroom_uses_scaled_serve_max():
+def test_carb_headroom_identity_by_default_scaled_when_enabled(monkeypatch):
     comps = {"rice": _comp("rice", {"kcal": 120.0, "protein": 2.0,
                                     "fat": 0.5, "carb": 27.0},
                            role="starch", serve=(100, 400), keeps=7)}
-    ref = _person(REF_TARGETS)                                   # scale 1.0
-    mid = _person({"protein": 150, "fat": 100, "carb": 375})     # scale 1.2
+    ref = _person(REF_TARGETS)
+    mid = _person({"protein": 150, "fat": 100, "carb": 375})
     ch_ref = engine.carb_headroom(ref, comps, SET)
     ch_mid = engine.carb_headroom(mid, comps, SET)
     assert ch_ref["worst_headroom_g"] == pytest.approx(400 * 0.27)
-    assert ch_mid["worst_headroom_g"] == pytest.approx(480 * 0.27)
+    assert ch_mid["worst_headroom_g"] == pytest.approx(400 * 0.27)  # identity
+    _enable_scaling(monkeypatch)
+    ch_mid2 = engine.carb_headroom(mid, comps, SET)
+    assert ch_mid2["worst_headroom_g"] == pytest.approx(480 * 0.27)
 
 
 def test_score_menu_carb_check_uses_scaled_max(monkeypatch):
-    """score_menu's cheap worst-day carb check must consume the SCALED serve
-    max: with the reference lowered so the person's scale doubles, the same
-    person/library flips from carb-short (penalized) to clear."""
+    """score_menu's cheap worst-day carb check consumes the (possibly
+    scaled) serve max through the same effective-bounds path — verified by
+    waking the mechanism with an aggressive scale."""
     comps = {
         "meat": _comp("meat", {"kcal": 145.0, "protein": 25.0, "fat": 5.0,
                                "carb": 0.0}, keeps=7),
@@ -403,11 +433,8 @@ def test_score_menu_carb_check_uses_scaled_max(monkeypatch):
                       keeps=7),
     }
     people = {"p1": _person(REF_TARGETS, tol=0.2)}   # carb 250 target
-    # scale 1.0: headroom 400*0.27 = 108 < 250 -> shortfall penalty
+    # identity: headroom 400*0.27 = 108 < 250 -> shortfall penalty
     s_short, _ = engine.score_menu(comps, ING, sorted(comps), SET, people)
-    # halve the reference -> scale clamps to 1.8: headroom 720*0.27 = 194.4;
-    # still short. Use scale via bigger drop: reference 500 -> scale
-    # clamps to 1.8 as well — so instead RAISE scale_max for the check.
     monkeypatch.setitem(engine.SCALING, "reference_kcal", 1000)
     monkeypatch.setitem(engine.SCALING, "scale_max", 2.5)
     # scale = 2500/1000 = 2.5 -> headroom 1000*0.27 = 270 >= 250 -> clear
@@ -416,12 +443,11 @@ def test_score_menu_carb_check_uses_scaled_max(monkeypatch):
         engine.SCORE_WEIGHTS["carb_headroom_shortfall"], (s_short, s_clear)
 
 
-def test_volume_floor_responds_to_scaling(monkeypatch):
-    """doctor's volume floor runs through the scaled plate: the 4500-kcal
-    person's 150g protein target needs ~600g of the only main — reachable
-    only because their serve cap scales to 720. Forcing the scale down to
-    0.6 caps the main at 240g: infeasible at ANY mass cap (floor None) —
-    the floor responds to scaling."""
+def test_volume_floor_identity_default_responds_when_enabled(monkeypatch):
+    """Under identity defaults the 4500-kcal person cannot reach 150g
+    protein past the 400g authored cap: floor is None (loudly infeasible).
+    Waking the mechanism (cap 720) makes the floor real — the floor runs
+    through the same effective-bounds path."""
     comps = {
         "meat": _comp("meat", {"kcal": 145.0, "protein": 25.0, "fat": 5.0,
                                "carb": 0.0}, serve=(100, 400)),
@@ -432,12 +458,11 @@ def test_volume_floor_responds_to_scaling(monkeypatch):
                       serve=(50, 2000)),
     }
     big = _person({"protein": 150, "fat": 300, "carb": 300}, tol=0.4)
-    assert person_scale(big) == SCALING["scale_max"]
-    vf = engine.volume_floor(big, comps)
-    assert vf["floor_g"] is not None and vf["floor_g"] > 400, vf
-    monkeypatch.setitem(engine.SCALING, "scale_max", 0.6)
-    vf2 = engine.volume_floor(big, comps)
-    assert vf2["floor_g"] is None, vf2
+    vf_id = engine.volume_floor(big, comps)
+    assert vf_id["floor_g"] is not None, vf_id      # identity: band reachable
+    _enable_scaling(monkeypatch, lo=0.6, hi=0.6)    # shrink caps: 400 -> 240
+    vf_low = engine.volume_floor(big, comps)
+    assert vf_low["floor_g"] is None, vf_low        # protein band unreachable
 
 
 # =========================================================================== #

@@ -19,19 +19,19 @@ load -> choose_menu(n=6, seed=0, iters=600, shortlist=8) -> build_week -> sessio
 | stage | CBC invocations |
 |---|---|
 | menu-verify | 1 |
-| plate | 304 |
-| **total** | **305** |
+| plate | 323 |
+| **total** | **324** |
 
 ### Wall timings over 5 runs (recorded-only — never asserted in CI, PRD §8.5)
 
 | stage | median ms | min ms | max ms |
 |---|---|---|---|
-| load | 4.0 | 3.9 | 4.1 |
-| choose_menu | 70.8 | 69.9 | 72.1 |
-| build_week | 5,758.5 | 5,710.3 | 6,109.3 |
+| load | 4.0 | 4.0 | 4.1 |
+| choose_menu | 67.0 | 65.6 | 68.8 |
+| build_week | 6,422.2 | 6,413.2 | 6,437.8 |
 | session_plan | 0.1 | 0.1 | 0.1 |
 | purchase | 0.0 | 0.0 | 0.0 |
-| **pipeline total** | **5,833.5** | 5,784.2 | 6,183.5 |
+| **pipeline total** | **6,493.3** | 6,485.9 | 6,509.1 |
 
 ## Examples corpus — `mealplan week` pipeline
 
@@ -41,25 +41,25 @@ load -> doctor -> choose_menu(n=12, seed=0; CLI defaults) -> build_week -> sessi
 
 | stage | CBC invocations |
 |---|---|
-| doctor-ablation | 18 |
+| doctor-ablation | 12 |
 | doctor-binding | 44 |
 | doctor-feasibility | 4 |
-| doctor-volume | 44 |
+| doctor-volume | 46 |
 | menu-verify | 4 |
-| plate | 1340 |
-| **total** | **1454** |
+| plate | 588 |
+| **total** | **698** |
 
 ### Wall timings over 5 runs (recorded-only — never asserted in CI, PRD §8.5)
 
 | stage | median ms | min ms | max ms |
 |---|---|---|---|
-| load | 28.2 | 27.0 | 29.6 |
-| doctor | 2,689.1 | 2,582.0 | 2,854.9 |
-| choose_menu | 1,589.2 | 1,583.3 | 1,608.0 |
-| build_week | 26,659.6 | 26,036.6 | 28,898.4 |
-| session_plan | 0.1 | 0.1 | 0.2 |
+| load | 26.8 | 26.2 | 27.0 |
+| doctor | 2,567.4 | 2,541.7 | 2,593.3 |
+| choose_menu | 1,495.0 | 1,490.7 | 1,499.2 |
+| build_week | 11,489.4 | 11,442.1 | 11,606.4 |
+| session_plan | 0.2 | 0.2 | 0.2 |
 | purchase | 0.0 | 0.0 | 0.0 |
-| **pipeline total** | **30,966.3** | 30,356.3 | 33,252.2 |
+| **pipeline total** | **15,565.7** | 15,528.9 | 15,710.2 |
 
 ## Interactive primitives — tests/fixtures/solo_lifter
 
@@ -78,9 +78,9 @@ One plate LP and one replate (day rebalance, §4.4) on the golden menu — the s
 
 | stage | median ms | min ms | max ms |
 |---|---|---|---|
-| plate | 20.6 | 18.6 | 22.2 |
-| replate | 20.5 | 19.4 | 22.5 |
-| **pipeline total** | **41.0** | 40.6 | 41.7 |
+| plate | 17.5 | 17.3 | 19.0 |
+| replate | 18.9 | 17.6 | 20.2 |
+| **pipeline total** | **36.4** | 34.9 | 39.3 |
 
 ## Lock round trip — tests/fixtures/solo_lifter (M1.3)
 
@@ -91,16 +91,16 @@ One plate LP and one replate (day rebalance, §4.4) on the golden menu — the s
 | stage | CBC invocations |
 |---|---|
 | menu-verify | 2 |
-| plate | 608 |
-| **total** | **610** |
+| plate | 646 |
+| **total** | **648** |
 
 ### Wall timings over 5 runs (recorded-only — never asserted in CI, PRD §8.5)
 
 | stage | median ms | min ms | max ms |
 |---|---|---|---|
-| lock | 6,676.4 | 6,478.3 | 7,119.7 |
-| verify-plan | 6,928.7 | 6,435.6 | 7,327.9 |
-| **pipeline total** | **13,605.2** | 13,111.9 | 14,447.6 |
+| lock | 6,822.9 | 6,774.0 | 6,876.9 |
+| verify-plan | 6,790.2 | 6,765.4 | 6,831.9 |
+| **pipeline total** | **13,605.9** | 13,583.1 | 13,667.1 |
 
 ## Targets (provisional) — M1.5, PRD §8.5
 
@@ -108,7 +108,7 @@ Interactive-latency targets set FROM the measured medians above with **2x headro
 
 | interaction | measured median | provisional target (2x) |
 |---|---|---|
-| interactive single plate (plate LP, solo golden menu) | 20.6 ms | 41.1 ms |
-| replate — day rebalance (engine.replate, solo golden menu) | 20.5 ms | 41.0 ms |
-| full pipeline (`mealplan week` shape, examples corpus) | 30,966.3 ms | 61,932.6 ms |
-| lock round trip (`mealplan lock` + `mealplan verify-plan`, solo_lifter) | 13,605.2 ms | 27,210.4 ms |
+| interactive single plate (plate LP, solo golden menu) | 17.5 ms | 35.1 ms |
+| replate — day rebalance (engine.replate, solo golden menu) | 18.9 ms | 37.7 ms |
+| full pipeline (`mealplan week` shape, examples corpus) | 15,565.7 ms | 31,131.4 ms |
+| lock round trip (`mealplan lock` + `mealplan verify-plan`, solo_lifter) | 13,605.9 ms | 27,211.8 ms |

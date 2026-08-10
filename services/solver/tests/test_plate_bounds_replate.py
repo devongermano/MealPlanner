@@ -159,9 +159,9 @@ def test_pin_below_min_clamps_up():
 def test_pin_above_max_clamps_down():
     comps, p = _pin_lib()
     ok, pl, miss = engine.plate(p, comps, list(comps), locked={"balls": 900})
-    # clamped down to this PERSON's effective serve_max (M1.7): the 1,440
-    # kcal person's scale clamps at 0.6 -> 400g authored max becomes 240g
-    assert pl.get("balls") == 240
+    # clamped down to the effective serve_max — with scaling revoked
+    # (identity defaults), that is the authored 400g cap for every eater
+    assert pl.get("balls") == 400
 
 
 def test_pin_off_grid_snaps_to_unit():

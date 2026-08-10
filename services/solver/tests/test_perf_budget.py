@@ -42,7 +42,9 @@ FIXTURES = Path(__file__).resolve().parent / "fixtures"
 # of solves — see services/solver/M1P1_NOTES.md.
 GOLDEN_SOLO_COUNTS = {
     "menu-verify": 1,
-    "plate": 304,
+    "plate": 323,   # re-recorded 2026-08-09: identity serve bounds (scaling
+                    # revoked — the lard-beans incident) changed plate retry
+                    # paths; see BASELINES.md + PRD Appendix B item 2
 }
 
 # Examples (founder corpus) `week`-command pipeline (doctor + choose_menu at

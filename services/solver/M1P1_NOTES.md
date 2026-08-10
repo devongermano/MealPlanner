@@ -160,3 +160,11 @@ untouched and GOLDEN_SOLO_COUNTS had been hand-edited). Both are now real:
   across runs — the tool aborts on any drift); BASELINES.md and
   test_perf_budget.py carry the SAME tool-recorded numbers; exact counts
   asserted on-reference only (refenv gate unchanged).
+
+## Addendum (2026-08-09, later): M1.7 REVOKED
+
+The owner rejected kcal-proportional serve scaling the same evening after a
+real plan emitted 720g of refried beans in one day (400g authored cap x 1.8
+clamp). SCALING defaults are now identity (mechanism dormant, tested under
+explicit override); golden + solve-count baselines re-recorded (plate 304 ->
+323 on the solo pipeline). Full ruling: PRD Appendix B item 2.

@@ -115,16 +115,19 @@ SCORE_WEIGHTS = {
 # --------------------------------------------------------------------------- #
 #  per-person serve_g scaling (M1.7, PRD §8.1) — PROVISIONAL, never hidden
 # --------------------------------------------------------------------------- #
-# EVERY value below is provisional (P9), exactly like SCORE_WEIGHTS: the
-# scaling curve is linear in the person's Atwater kcal against a named
-# reference, clamped to a band — chosen as the simplest labeled curve that
-# fixes the confirmed v1 defect (one shared serve band across divergent
-# eaters), to be measured against the M1.6 real week.
+# REVOKED BY OWNER (2026-08-09, the lard-beans incident — PRD Appendix B
+# item 2): kcal-proportional scaling of serve bounds was implemented (M1.7),
+# measured against a real plan the same day, and rejected — authored serve_g
+# bounds are per-dish palatability ABSOLUTES ("more than this much of one
+# dish is gross, period"), already written with the household's biggest
+# eater in mind. Scaling them by person-kcal double-counts appetite: it
+# legalized 720g of refried beans in a day (400g cap x 1.8 clamp).
+# The mechanism stays, DORMANT (identity defaults), for a possible future
+# per-dish opt-in (e.g. component-level scalable: true) — never blanket math.
 SCALING = {
-    "reference_kcal": 2500,   # provisional (P9): serve_g bounds are authored
-                              # for a person at this Atwater kcal
-    "scale_min": 0.6,         # provisional (P9): clamp floor
-    "scale_max": 1.8,         # provisional (P9): clamp ceiling
+    "reference_kcal": 2500,   # reference point if scaling is ever re-enabled
+    "scale_min": 1.0,         # identity: authored bounds are absolute
+    "scale_max": 1.0,         # identity: authored bounds are absolute
 }
 
 
