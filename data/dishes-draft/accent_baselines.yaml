@@ -1,0 +1,69 @@
+schema_version: 0
+# accent_baselines.yaml — STEWARD TOOLING DATA, not engine input.
+#
+# M1.13 §5 gives every accent the range {0} ∪ [serve_min, serve_max] of the
+# component itself, so dishes.yaml carries accents as a bare id list with no
+# per-dish band (§2 requires `accents` disjoint from `components`).
+#
+# But the reconstruction DID author a per-serving amount for each accent, and those
+# amounts are what DISH_REVIEW.md shows the owner and what the per-serving macro
+# figures include. Keeping them here — machine-readable, in one place — means the
+# owner-facing numbers stay reproducible by `lint.py` instead of drifting away from
+# a comment nobody recomputes.
+#
+# If the design panel decides accents SHOULD carry per-dish bands (the open question
+# in dishes.yaml — 45 g of mozzarella on fusilli al forno is not 20 g on a taco),
+# this file is the data for it, already reviewed. If it decides they should not,
+# this file stays exactly what it is: documentation of authoring intent.
+#
+# base_g / max_g are PROVISIONAL, like every number in this directory.
+
+accent_baselines:
+  gorditas_de_picadillo:
+    charred_salsa_roja: {base_g: 30, max_g: 100}
+    queso_fresco_crumbled: {base_g: 25, max_g: 80}
+    mexican_crema: {base_g: 20, max_g: 60}
+  carnitas_tacos:
+    charred_salsa_roja: {base_g: 30, max_g: 100}
+    guacamole: {base_g: 40, max_g: 120}
+    queso_fresco_crumbled: {base_g: 20, max_g: 60}
+  carnitas_bowl:
+    charred_salsa_roja: {base_g: 30, max_g: 100}
+    guacamole: {base_g: 40, max_g: 120}
+    mexican_crema: {base_g: 20, max_g: 60}
+  birria_tacos:
+    charred_salsa_roja: {base_g: 30, max_g: 100}
+    queso_fresco_crumbled: {base_g: 25, max_g: 80}
+  birria_bowl:
+    charred_salsa_roja: {base_g: 30, max_g: 100}
+    mexican_crema: {base_g: 20, max_g: 60}
+    queso_fresco_crumbled: {base_g: 20, max_g: 60}
+  shrimp_al_pastor_tacos:
+    guacamole: {base_g: 40, max_g: 120}
+    charred_salsa_roja: {base_g: 30, max_g: 100}
+  shrimp_al_pastor_bowl:
+    guacamole: {base_g: 40, max_g: 120}
+    charred_salsa_roja: {base_g: 30, max_g: 100}
+    mexican_crema: {base_g: 15, max_g: 50}
+  salsa_verde_chicken_tacos:
+    guacamole: {base_g: 40, max_g: 120}
+    mexican_crema: {base_g: 20, max_g: 60}
+    queso_fresco_crumbled: {base_g: 20, max_g: 60}
+  salsa_verde_chicken_bowl:
+    guacamole: {base_g: 40, max_g: 120}
+    mexican_crema: {base_g: 20, max_g: 60}
+    cheddar_shred: {base_g: 25, max_g: 70}
+  breakfast_burrito:
+    cheddar_shred: {base_g: 30, max_g: 80}
+    charred_salsa_roja: {base_g: 30, max_g: 100}
+  bulgogi_rice_bowl:
+    scallion_ginger_oil: {base_g: 15, max_g: 45}
+  orange_chicken_rice:
+    scallion_ginger_oil: {base_g: 10, max_g: 40}
+  sausage_fusilli_al_forno:
+    mozzarella_shred: {base_g: 45, max_g: 90}
+  turkey_meatballs_al_sugo:
+    mozzarella_shred: {base_g: 30, max_g: 90}
+  breakfast_scramble_plate:
+    cheddar_shred: {base_g: 30, max_g: 80}
+    charred_salsa_roja: {base_g: 30, max_g: 100}
