@@ -6,11 +6,16 @@ import {
   ROLE_DESCRIPTIONS,
   type HouseholdMember,
   type HouseholdRole,
+  type UpdateSelfInput,
 } from '../household/household-api';
 import { HouseholdStore } from '../household/household-store';
 import { PERSON_NAME_RULE, isValidPersonName } from '../household/person-name';
+import { describeApiError } from '../errors/api-error';
 import { Alert } from '../ui/alert';
 import { PendingNote } from '../ui/pending-note';
+
+/** A placeholder is fully editable, a claimed member is role-only, you edit yourself. */
+type MemberKind = 'placeholder' | 'claimed' | 'self';
 
 @Component({
   selector: 'app-settings',
@@ -36,6 +41,7 @@ export class Settings {
   protected readonly personNameRule = PERSON_NAME_RULE;
   /** Id of the member whose plan identity was last rejected, if any. */
   protected readonly invalidPersonName = signal<string | null>(null);
+  protected readonly invalidDisplayName = signal<string | null>(null);
 
   protected readonly memberForm = inject(FormBuilder).nonNullable.group({
     displayName: ['', [Validators.required, Validators.maxLength(60)]],
@@ -55,9 +61,32 @@ export class Settings {
     });
   }
 
+  /**
+   * Which controls a row gets. The API decides this, not us: a placeholder is
+   * fully editable by a planner; a member who has an account owns their profile,
+   * so only their role can be changed; and your own row goes through the self
+   * route, which carries no role at all.
+   */
+  protected memberKind(member: HouseholdMember): MemberKind {
+    if (member.isSelf) {
+      return 'self';
+    }
+    return member.userId === null ? 'placeholder' : 'claimed';
+  }
+
   protected async changeRole(member: HouseholdMember, event: Event): Promise<void> {
     const role = (event.target as HTMLSelectElement).value as HouseholdRole;
-    await this.guard(() => this.store.updateMemberRole(member.id, role));
+    await this.guard(() => this.store.updateMember(member.id, { role }));
+  }
+
+  protected async changeDisplayName(member: HouseholdMember, event: Event): Promise<void> {
+    const displayName = (event.target as HTMLInputElement).value.trim();
+    if (!displayName) {
+      this.invalidDisplayName.set(member.id);
+      return;
+    }
+    this.invalidDisplayName.set(null);
+    await this.guard(() => this.saveProfile(member, { displayName }));
   }
 
   /**
@@ -72,7 +101,14 @@ export class Settings {
       return;
     }
     this.invalidPersonName.set(null);
-    await this.guard(() => this.store.updateMemberPersonName(member.id, value || null));
+    await this.guard(() => this.saveProfile(member, { personName: value || null }));
+  }
+
+  /** Your own profile goes through the self route; a placeholder's through the planner one. */
+  private saveProfile(member: HouseholdMember, patch: UpdateSelfInput): Promise<void> {
+    return member.isSelf
+      ? this.store.updateSelf(member.id, patch)
+      : this.store.updateMember(member.id, patch);
   }
 
   protected async removeMember(member: HouseholdMember): Promise<void> {
@@ -85,9 +121,7 @@ export class Settings {
     try {
       await work();
     } catch (cause) {
-      this.failure.set(
-        cause instanceof Error ? cause.message : 'That change did not save. Try again.',
-      );
+      this.failure.set(describeApiError(cause, 'That change did not save. Try again.'));
     } finally {
       this.pending.set(false);
     }

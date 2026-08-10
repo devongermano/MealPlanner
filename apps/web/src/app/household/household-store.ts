@@ -5,8 +5,8 @@ import {
   type CreateHouseholdInput,
   type Household,
   type HouseholdMember,
-  type HouseholdRole,
   type UpdateMemberInput,
+  type UpdateSelfInput,
 } from './household-api';
 
 const ACTIVE_KEY = 'mealplan.activeHouseholdId';
@@ -71,18 +71,22 @@ export class HouseholdStore {
     this.memberList.update((list) => [...list, member]);
   }
 
-  updateMemberRole(memberId: string, role: HouseholdRole): Promise<void> {
-    return this.patchMember(memberId, { role });
-  }
-
-  /** Null unlinks: the member keeps their role and stops being an eater in the plan. */
-  updateMemberPersonName(memberId: string, personName: string | null): Promise<void> {
-    return this.patchMember(memberId, { personName });
-  }
-
-  private async patchMember(memberId: string, patch: UpdateMemberInput): Promise<void> {
+  /**
+   * Planner route. The API accepts profile fields only when the target is a
+   * placeholder; for a member with an account it is role-only.
+   */
+  async updateMember(memberId: string, patch: UpdateMemberInput): Promise<void> {
     const household = this.requireActive();
-    const updated = await this.api.updateMember(household.id, memberId, patch);
+    this.replace(memberId, await this.api.updateMember(household.id, memberId, patch));
+  }
+
+  /** Self route. Carries no role by design — see UpdateSelfInput. */
+  async updateSelf(memberId: string, patch: UpdateSelfInput): Promise<void> {
+    const household = this.requireActive();
+    this.replace(memberId, await this.api.updateSelf(household.id, patch));
+  }
+
+  private replace(memberId: string, updated: HouseholdMember): void {
     this.memberList.update((list) =>
       list.map((member) => (member.id === memberId ? updated : member)),
     );

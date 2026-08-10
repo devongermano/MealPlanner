@@ -107,6 +107,27 @@ dd {
   gap: var(--space-2);
 }
 
+.display-name {
+  width: auto;
+  min-width: 8rem;
+  max-width: 12rem;
+  padding-block: 0.25rem;
+  font-weight: 500;
+}
+
+/* A claimed member's profile is theirs to edit, so ours renders it as a value. */
+.person-name-static {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--ink-muted);
+}
+
+.person-name-static.unlinked {
+  font-family: var(--font-sans);
+  font-style: italic;
+  color: var(--ink-faint);
+}
+
 /* Monospaced because it is a slug the engine keys on, not prose. */
 .person-name {
   width: auto;
@@ -122,6 +143,14 @@ dd {
   min-width: 7.5rem;
   padding-block: 0.25rem;
   font-size: var(--text-sm);
+  text-transform: capitalize;
+}
+
+/* Matches the select's width so rows line up whether or not the role is editable. */
+.controls .role-tag {
+  min-width: 7.5rem;
+  justify-content: center;
+  padding-block: 0.25rem;
   text-transform: capitalize;
 }
 

@@ -84,12 +84,30 @@ export interface AddMemberInput {
 }
 
 /**
- * Partial update of a member. Shaped as one patch rather than a method per field
- * because the API is one endpoint — PATCH …/members/:id — taking both optionally.
- * A `personName` of null unlinks: the member keeps their role and stops eating.
+ * A planner editing someone else — PATCH …/members/:memberId.
+ *
+ * How much of this the API accepts depends on the target. A PLACEHOLDER member is
+ * fully editable; a member who has an account is ROLE-ONLY, because their profile
+ * belongs to them. Sending a displayName or personName for a claimed member is a
+ * 403 pointing at the self route, so the UI must not offer it — `userId === null`
+ * is the flag that decides which controls a row gets.
  */
 export interface UpdateMemberInput {
   readonly role?: HouseholdRole;
+  readonly displayName?: string;
+  /** Null unlinks: the member keeps their role and stops eating. */
+  readonly personName?: string | null;
+}
+
+/**
+ * A member editing themselves — PATCH …/members/me.
+ *
+ * Deliberately carries no `role`, and never will: the route is open to eaters, so
+ * a role field here would be one-request self-promotion. The API answers 400
+ * rather than ignoring one silently.
+ */
+export interface UpdateSelfInput {
+  readonly displayName?: string;
   readonly personName?: string | null;
 }
 
@@ -104,6 +122,8 @@ export interface HouseholdApi {
     memberId: string,
     patch: UpdateMemberInput,
   ): Promise<HouseholdMember>;
+  /** Edits the caller's own membership. The API resolves the target from the token. */
+  updateSelf(householdId: string, patch: UpdateSelfInput): Promise<HouseholdMember>;
   removeMember(householdId: string, memberId: string): Promise<void>;
 }
 

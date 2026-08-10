@@ -7,6 +7,7 @@ import {
   type HouseholdApi,
   type HouseholdMember,
   type UpdateMemberInput,
+  type UpdateSelfInput,
 } from './household-api';
 import { slugifyPersonName } from './person-name';
 
@@ -86,14 +87,45 @@ export class HouseholdApiMock implements HouseholdApi {
     if (!target) {
       throw new Error(`No member ${memberId} in household ${householdId}`);
     }
+    // The real API answers 403 here rather than ignoring the extra fields, so the
+    // mock refuses too. A mock more permissive than the thing it stands in for
+    // teaches the UI a habit that breaks at the swap.
+    if (
+      target.userId !== null &&
+      (patch.displayName !== undefined || patch.personName !== undefined)
+    ) {
+      throw new Error(
+        'A member with an account edits their own name and plan identity. You can change their role.',
+      );
+    }
+    return this.applyPatch(state, target, patch);
+  }
+
+  async updateSelf(householdId: string, patch: UpdateSelfInput): Promise<HouseholdMember> {
+    const state = this.read();
+    const target = state.members.find(
+      (member) => member.householdId === householdId && member.isSelf,
+    );
+    if (!target) {
+      throw new Error(`Not a member of household ${householdId}`);
+    }
+    return this.applyPatch(state, target, patch);
+  }
+
+  private applyPatch(
+    state: MockState,
+    target: HouseholdMember,
+    patch: UpdateMemberInput,
+  ): HouseholdMember {
     const updated: HouseholdMember = {
       ...target,
       role: patch.role ?? target.role,
+      displayName: patch.displayName?.trim() || target.displayName,
       personName: patch.personName === undefined ? target.personName : patch.personName,
     };
     this.write({
       ...state,
-      members: state.members.map((member) => (member.id === memberId ? updated : member)),
+      members: state.members.map((member) => (member.id === target.id ? updated : member)),
     });
     return updated;
   }

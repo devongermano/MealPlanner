@@ -6,6 +6,7 @@ import type {
   HouseholdMember,
   HouseholdRole,
   UpdateMemberInput,
+  UpdateSelfInput,
 } from '../app/household/household-api';
 
 export function fakeHousehold(id: string, name: string): Household {
@@ -69,12 +70,34 @@ export class FakeHouseholdApi implements HouseholdApi {
     patch: UpdateMemberInput,
   ): Promise<HouseholdMember> {
     const target = this.requireMember(householdId, memberId);
+    // Mirrors the API's 403: a claimed member's profile is theirs, so role only.
+    if (
+      target.userId !== null &&
+      (patch.displayName !== undefined || patch.personName !== undefined)
+    ) {
+      throw new Error('Role only: that member has an account.');
+    }
+    return this.apply(target, patch);
+  }
+
+  async updateSelf(householdId: string, patch: UpdateSelfInput): Promise<HouseholdMember> {
+    const target = this.members.find(
+      (member) => member.householdId === householdId && member.isSelf,
+    );
+    if (!target) {
+      throw new Error(`Not a member of household ${householdId}`);
+    }
+    return this.apply(target, patch);
+  }
+
+  private apply(target: HouseholdMember, patch: UpdateMemberInput): HouseholdMember {
     const updated: HouseholdMember = {
       ...target,
       role: patch.role ?? target.role,
+      displayName: patch.displayName?.trim() || target.displayName,
       personName: patch.personName === undefined ? target.personName : patch.personName,
     };
-    this.members = this.members.map((member) => (member.id === memberId ? updated : member));
+    this.members = this.members.map((member) => (member.id === target.id ? updated : member));
     return updated;
   }
 

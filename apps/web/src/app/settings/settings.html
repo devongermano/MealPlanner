@@ -45,43 +45,72 @@
     @for (member of members(); track member.id) {
       <li>
         <div class="who">
-          <span class="name">{{ member.displayName }}</span>
+          @if (memberKind(member) === 'claimed') {
+            <span class="name">{{ member.displayName }}</span>
+          } @else {
+            <label class="visually-hidden" [attr.for]="'name-' + member.id">
+              Name for {{ member.displayName }}
+            </label>
+            <input
+              class="display-name"
+              type="text"
+              [id]="'name-' + member.id"
+              [value]="member.displayName"
+              [disabled]="pending()"
+              [attr.aria-invalid]="invalidDisplayName() === member.id"
+              (change)="changeDisplayName(member, $event)"
+            />
+          }
+
           @if (member.isSelf) {
             <span class="tag">you</span>
+          } @else if (member.userId === null) {
+            <span class="tag">no account yet</span>
           }
           <span class="email muted">{{ member.email ?? 'No email yet' }}</span>
         </div>
 
         <div class="controls">
-          <label class="visually-hidden" [attr.for]="'person-' + member.id">
-            Plan identity for {{ member.displayName }}
-          </label>
-          <input
-            class="person-name"
-            type="text"
-            [id]="'person-' + member.id"
-            [value]="member.personName ?? ''"
-            [disabled]="pending()"
-            [attr.aria-invalid]="invalidPersonName() === member.id"
-            placeholder="does not eat"
-            autocapitalize="off"
-            spellcheck="false"
-            (change)="changePersonName(member, $event)"
-          />
+          @if (memberKind(member) === 'claimed') {
+            <span class="person-name-static" [class.unlinked]="!member.personName">
+              {{ member.personName ?? 'does not eat' }}
+            </span>
+          } @else {
+            <label class="visually-hidden" [attr.for]="'person-' + member.id">
+              Plan identity for {{ member.displayName }}
+            </label>
+            <input
+              class="person-name"
+              type="text"
+              [id]="'person-' + member.id"
+              [value]="member.personName ?? ''"
+              [disabled]="pending()"
+              [attr.aria-invalid]="invalidPersonName() === member.id"
+              placeholder="does not eat"
+              autocapitalize="off"
+              spellcheck="false"
+              (change)="changePersonName(member, $event)"
+            />
+          }
 
-          <label class="visually-hidden" [attr.for]="'role-' + member.id">
-            Role for {{ member.displayName }}
-          </label>
-          <select
-            class="role-select"
-            [id]="'role-' + member.id"
-            [disabled]="pending()"
-            (change)="changeRole(member, $event)"
-          >
-            @for (role of roles; track role) {
-              <option [value]="role" [selected]="role === member.role">{{ role }}</option>
-            }
-          </select>
+          @if (member.isSelf) {
+            <!-- No role control on your own row: the self route has no role field, by design. -->
+            <span class="tag role-tag">{{ member.role }}</span>
+          } @else {
+            <label class="visually-hidden" [attr.for]="'role-' + member.id">
+              Role for {{ member.displayName }}
+            </label>
+            <select
+              class="role-select"
+              [id]="'role-' + member.id"
+              [disabled]="pending()"
+              (change)="changeRole(member, $event)"
+            >
+              @for (role of roles; track role) {
+                <option [value]="role" [selected]="role === member.role">{{ role }}</option>
+              }
+            </select>
+          }
 
           <button
             class="btn btn-ghost remove"
@@ -93,6 +122,9 @@
           </button>
         </div>
 
+        @if (invalidDisplayName() === member.id) {
+          <p class="row-error">Everyone on the plan needs a name.</p>
+        }
         @if (invalidPersonName() === member.id) {
           <p class="row-error">{{ personNameRule }}</p>
         }
