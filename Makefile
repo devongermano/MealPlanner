@@ -1,7 +1,34 @@
 VENV ?= .venv
 PY   := $(VENV)/bin/python
 
-.PHONY: test test-fast test-serial install baseline
+# Everyday knobs — override like: make plan SEED=3 N=10 LIBRARY=examples
+LIBRARY   ?= examples
+SEED      ?= 0
+N         ?= 12
+ARTIFACTS ?= artifacts
+
+.PHONY: plan doctor shop menu test test-fast test-serial install baseline
+
+# ---- everyday commands ----------------------------------------------------- #
+# Full week plan: writes plan.md + the three deliverables into $(ARTIFACTS)/
+plan:
+	$(PY) -m mealplan.cli week --library $(LIBRARY) --seed $(SEED) --n $(N) \
+		--artifacts $(ARTIFACTS) --out plan.md
+	@echo "→ plan.md + $(ARTIFACTS)/{shopping_list,cook_plan,eat_*}.md"
+
+# What can the library hit, and why/why not
+doctor:
+	$(PY) -m mealplan.cli doctor --library $(LIBRARY)
+
+# Just the shopping list for this week's solve
+shop:
+	$(PY) -m mealplan.cli shop --library $(LIBRARY) --seed $(SEED) --n $(N)
+
+# Just pick the menu (no portioning)
+menu:
+	$(PY) -m mealplan.cli menu --library $(LIBRARY) --seed $(SEED) --n $(N)
+
+# ---- development ------------------------------------------------------------ #
 
 install:
 	$(VENV)/bin/pip install -e "services/solver[dev]"
