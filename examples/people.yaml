@@ -84,6 +84,21 @@ settings:
                                 # (fusilli beside a breakfast burrito) — the exact
                                 # thing the dish layer exists to kill. The engine
                                 # DEFAULT stays permissive until M1.6 (M113_SPEC §9).
+  # M1.12: household station inventory — what the timeline scheduler
+  # (cook_plan_style: timeline) may run in parallel. These are the
+  # PROVISIONAL defaults spelled out; omit the block (or any field) to get
+  # exactly these values. `prep` = simultaneous prep workspaces, not people
+  # — the cook is always one pair of hands.
+  stations:
+    burners: 4
+    oven_slots: 2
+    grill: false
+    prep: 1
+  # cook_plan_style: recipe (default) renders per-dish blocks; timeline
+  # renders one interleaved stream per session with timers ("thoughtless
+  # to meal prep in the fastest way possible"). Times on the timeline are
+  # estimates until you calibrate by cooking.
+  # cook_plan_style: timeline
 
 # ---------------------------------------------------------------------------
 # BUDGET POLICY. Nothing here is hardcoded into the solver — change it and re-run,

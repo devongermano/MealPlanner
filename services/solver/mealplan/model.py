@@ -60,10 +60,10 @@ PERSON_MODES = ("precision", "relaxed")
 SERVING_MODELS = ("portioned", "family_style")
 
 # M1.10 (PRD §4.0 amendment): cook-plan style is a preference. "recipe"
-# renders classic per-dish blocks from the compiled session; "timeline" is
-# the interleaved optimized stream — its scheduler is M1.12, so until it
-# lands a timeline setting renders recipe blocks WITH an explicit note
-# (never silently). Both are views of the same compiled session.
+# renders classic per-dish blocks from the compiled session; "timeline"
+# (M1.12) is the interleaved optimized stream — the greedy scheduler
+# (schedule.py) runs ONLY for timeline households. Both are views of the
+# same compiled session.
 COOK_PLAN_STYLES = ("recipe", "timeline")
 
 # M1.13 (dish layer, M113_SPEC §9): orphan-side policy during the steward's
@@ -77,6 +77,14 @@ DISH_LAYER_MODES = ("permissive", "strict")
 # M1.13 (M113_SPEC §2): dishes.yaml reconstruction provenance — the honesty
 # field that tells the reviewer how hard to look (data steward's schema).
 DISH_RECONSTRUCTIONS = ("from_source", "inferred", "invented")
+
+# M1.12: the household station inventory the timeline scheduler respects.
+# PROVISIONAL defaults (P9) — a typical apartment kitchen; override any
+# subset in settings.stations. `prep` is simultaneous prep workspaces
+# (cutting boards that can host a task at once), NOT people — the cook is
+# a separate unary resource (one pair of hands, always).
+STATIONS_DEFAULTS = {"burners": 4, "oven_slots": 2, "grill": False,
+                     "prep": 1}
 
 
 class _RawView:
@@ -363,9 +371,12 @@ class Pantry(_RawView):
 #   max_batches_per_component  3      variety/volume guard
 #   use_freezer                True   M0.5: freezer bridging on by default
 #   cook_plan_style            recipe M1.10: per-dish blocks; "timeline" is
-#                                     the M1.12 interleaved stream (until it
-#                                     lands, timeline renders recipe blocks
-#                                     with an explicit note)
+#                                     the M1.12 interleaved stream (greedy
+#                                     scheduler — runs ONLY for timeline
+#                                     households)
+#   stations                   see STATIONS_DEFAULTS (M1.12, provisional):
+#                                     household station inventory; any
+#                                     subset may be overridden
 # No default — REQUIRED:
 #   cook_days                  validated required (io_yaml, M0.17): the
 #                              prototype's silent [0, 3] fallback is gone
@@ -384,6 +395,7 @@ SETTINGS_DEFAULTS = {
     "dish_layer": "permissive",    # M1.13: orphan-side policy (P9 — the
                                    # documented ratchet flips this to
                                    # "strict" after steward coverage)
+    "stations": STATIONS_DEFAULTS,
 }
 
 
@@ -400,6 +412,7 @@ class Settings(_RawView):
     use_freezer: Optional[bool] = None    # M0.5: freezer bridging, default true
     cook_plan_style: Optional[str] = None  # M1.10: recipe | timeline
     dish_layer: Optional[str] = None      # M1.13: permissive | strict
+    stations: Optional[dict] = None       # M1.12: station inventory
     budget: Any = None
     raw: dict = field(default_factory=dict, repr=False)
 
@@ -409,7 +422,11 @@ class Settings(_RawView):
         raw["budget"] = budget
         for k, v in SETTINGS_DEFAULTS.items():
             if raw.get(k) is None:
-                raw[k] = list(v) if isinstance(v, list) else v
+                raw[k] = list(v) if isinstance(v, list) else (
+                    dict(v) if isinstance(v, dict) else v)
+        # M1.12: a partial stations mapping overrides field-by-field — the
+        # unstated fields keep the PROVISIONAL defaults (one place, here).
+        raw["stations"] = {**STATIONS_DEFAULTS, **(raw["stations"] or {})}
         # canonical form everywhere downstream: sorted, deduped. cook_days
         # gets the same treatment as shop_days — session attribution's
         # "earliest session wins" (PRD §8.2) must mean earliest DAY, never
@@ -428,6 +445,7 @@ class Settings(_RawView):
                    use_freezer=raw["use_freezer"],
                    cook_plan_style=raw["cook_plan_style"],
                    dish_layer=raw["dish_layer"],
+                   stations=raw["stations"],
                    budget=budget, raw=raw)
 
 
