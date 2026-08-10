@@ -313,38 +313,57 @@ def build_portioning(sp, weeks, people, meals, comps):
     return out
 
 
-def _portion_pack_lines(s, matrix, comps, h):
-    """The 'Portion & pack' block for one session (portioning matrix)."""
+def _pp_component_lines(cid, m, comps):
+    """One component's rows of the portioning matrix (containers to pack
+    plus family-style storage) — shared by the after-stream 'Portion &
+    pack' section and the idle-hands injection (M1.12)."""
+    L = []
+    name = comps[cid]["name"]
+    rows = m["portioned"].get(cid)
+    if rows:
+        L.append(f"- **{name}** — pack {len(rows)} container"
+                 f"{'s' if len(rows) != 1 else ''}:")
+        for r in rows:
+            thaw = (" — **PACK AT THAW** (freezer-bridged day: portion "
+                    "when it thaws, not on cook day)"
+                    if r["pack_at_thaw"] else "")
+            L.append(f"  - [ ] {r['person']} · eat day {r['day'] + 1} · "
+                     f"{r['slot']} — {r['grams']:g}g{thaw}")
+    e = m["shared"].get(cid)
+    if e:
+        L.append(f"- **{name}** — family style: store "
+                 f"**{e['total_g']:g}g** in a shared container — the "
+                 "eat sheets say who takes how much:")
+        for r in e["takers"]:
+            slot = f" · {r['slot']}" if r["slot"] else ""
+            thaw = " — from freezer on that day" if r["pack_at_thaw"] \
+                else ""
+            L.append(f"  - {r['person']} · eat day {r['day'] + 1}"
+                     f"{slot} — takes {r['grams']:g}g{thaw}")
+    return L
+
+
+def _portion_pack_lines(s, matrix, comps, h, skip=frozenset()):
+    """The 'Portion & pack' block for one session (portioning matrix).
+    Components in ``skip`` were already packed during an idle-hands
+    window inside the timeline stream and are omitted here (M1.12)."""
     m = (matrix or {}).get(s["index"])
     if not m or not (m["portioned"] or m["shared"]):
+        return []
+    cids = [cid for cid in sorted(set(m["portioned"]) | set(m["shared"]))
+            if cid not in skip]
+    if not cids and not m["leftover_notes"]:
         return []
     L = [f"{h}# Portion & pack — session {s['index']}\n"]
     L.append("Portioned slots pack into per-person, per-meal containers "
              "(rows match the eat sheets); family-style batches stay in "
              "shared containers.\n")
-    for cid in sorted(set(m["portioned"]) | set(m["shared"])):
-        name = comps[cid]["name"]
-        rows = m["portioned"].get(cid)
-        if rows:
-            L.append(f"- **{name}** — pack {len(rows)} container"
-                     f"{'s' if len(rows) != 1 else ''}:")
-            for r in rows:
-                thaw = (" — **PACK AT THAW** (freezer-bridged day: portion "
-                        "when it thaws, not on cook day)"
-                        if r["pack_at_thaw"] else "")
-                L.append(f"  - [ ] {r['person']} · eat day {r['day'] + 1} · "
-                         f"{r['slot']} — {r['grams']:g}g{thaw}")
-        e = m["shared"].get(cid)
-        if e:
-            L.append(f"- **{name}** — family style: store "
-                     f"**{e['total_g']:g}g** in a shared container — the "
-                     "eat sheets say who takes how much:")
-            for r in e["takers"]:
-                slot = f" · {r['slot']}" if r["slot"] else ""
-                thaw = " — from freezer on that day" if r["pack_at_thaw"] \
-                    else ""
-                L.append(f"  - {r['person']} · eat day {r['day'] + 1}"
-                         f"{slot} — takes {r['grams']:g}g{thaw}")
+    if skip:
+        packed = ", ".join(comps[cid]["name"] for cid in sorted(skip))
+        L.append(f"_Already packed during the idle-hands window in the "
+                 f"timeline above: {packed}._\n")
+    for cid in cids:
+        L.extend(_pp_component_lines(cid, m, comps))
     for n in m["leftover_notes"]:
         L.append(f"- note: {n['grams']:g}g of '{n['component']}' for eat "
                  f"day {n['day'] + 1} comes from existing leftovers — pack "
@@ -407,13 +426,18 @@ def _timeline_entry_line(e, comps, used_ops):
             f"· active ~{dur:g} min{ref}_")
 
 
-def _idle_injection_lines(win, pp_lines):
+def _idle_injection_lines(win, m, comps, cids):
     """Portioning-matrix work injected into an idle-hands window — the
-    kitchen is working, the cook is not (M1.12)."""
+    kitchen is working, the cook is not (M1.12). Only ``cids`` (components
+    whose last cook step has finished by the window's start) are injected:
+    never tell the cook to pack food that is still cooking. Everything
+    else packs after the stream."""
     a, b = win
     L = [f"- **{schedule_mod.format_min(a)}–{schedule_mod.format_min(b)}** "
-         "Idle hands — everything is cooking itself; portion & pack now:"]
-    L.extend(pp_lines)
+         "Idle hands — the kitchen is cooking itself; portion & pack "
+         "what's already done:"]
+    for cid in cids:
+        L.extend(_pp_component_lines(cid, m, comps))
     return L
 
 
@@ -422,9 +446,10 @@ def _timeline_session_lines(s, comps, settings, methods, matrix, used_ops,
     """One session as the interleaved timeline stream (M1.12): greedy
     schedule (schedule.compile_session — timeline households only), mise
     en place, timestamped stream with timers and 'meanwhile' framing,
-    portion & pack injected into the widest idle-hands window, recipe
-    blocks for fragment-less components, and the honest makespan-vs-naive
-    line."""
+    ready-to-pack portioning work injected into the best idle-hands
+    window (readiness-filtered: only components already done cooking),
+    recipe blocks for fragment-less components, and the honest
+    makespan-vs-naive line."""
     sched = schedule_mod.compile_session(s["batches"], comps, methods,
                                          settings)
     L = []
@@ -448,20 +473,39 @@ def _timeline_session_lines(s, comps, settings, methods, matrix, used_ops,
                      f"{s['demand_g'][cid]:g}g): {ings}")
         L.append("")
     L.append(f"{h}# Timeline — 0:00 is when you start\n")
-    pp = _portion_pack_lines(s, matrix, comps, h)
-    win = None
-    if pp and sched["idle_windows"]:
-        # widest window wins; earliest breaks ties (deterministic)
-        win = max(sched["idle_windows"],
-                  key=lambda w: (w[1] - w[0], -w[0]))
+    m = (matrix or {}).get(s["index"])
+    pp_cids = (sorted(set(m["portioned"]) | set(m["shared"]))
+               if m else [])
+    # a component is packable in a window only once its LAST cook step
+    # has finished by the window's start — never tell the cook to pack
+    # food that is still cooking (readiness filter)
+    ready_at = {}
+    for e in sched["entries"]:
+        if e["component"] != schedule_mod.SHARED:
+            ready_at[e["component"]] = max(
+                ready_at.get(e["component"], 0), e["t_end"])
+
+    def _packable(w):
+        return [cid for cid in pp_cids
+                if cid in ready_at and ready_at[cid] <= w[0]]
+
+    win, win_cids = None, []
+    if pp_cids and sched["idle_windows"]:
+        # most packable components wins; widest, then earliest, break
+        # ties (deterministic)
+        best = max(sched["idle_windows"],
+                   key=lambda w: (len(_packable(w)), w[1] - w[0], -w[0]))
+        cids = _packable(best)
+        if cids:
+            win, win_cids = best, cids
     injected = False
     for e in sched["entries"]:
         if win and not injected and e["t_start"] >= win[0]:
-            L.extend(_idle_injection_lines(win, pp))
+            L.extend(_idle_injection_lines(win, m, comps, win_cids))
             injected = True
         L.append(_timeline_entry_line(e, comps, used_ops))
     if win and not injected:
-        L.extend(_idle_injection_lines(win, pp))
+        L.extend(_idle_injection_lines(win, m, comps, win_cids))
         injected = True
     L.append("")
     for cid in sched["unscheduled"]:
@@ -476,8 +520,13 @@ def _timeline_session_lines(s, comps, settings, methods, matrix, used_ops,
         for step in (c.get("method") or []):
             L.append(f"1. {step}")
         L.append("")
-    if pp and not injected:
-        L.extend(pp)
+    # everything NOT packed during the idle-hands window (components
+    # still cooking at every window's start, or no window at all) packs
+    # here, after the stream
+    rest = _portion_pack_lines(s, matrix, comps, h,
+                               skip=frozenset(win_cids))
+    if rest:
+        L.extend(rest)
     for w in sched["warnings"]:
         L.append(f"- NOTE: {w['message']}")
     return L

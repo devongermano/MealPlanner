@@ -374,9 +374,11 @@ def test_timeline_render_deterministic():
     assert render_cook_plan(*args, **kw) == render_cook_plan(*args, **kw)
 
 
-def test_timeline_render_portioning_injected_into_idle_window():
-    """With meal structure, the portion & pack block lands INSIDE the
-    stream at the widest idle-hands window, framed as such."""
+def test_timeline_render_no_injection_while_still_cooking():
+    """Readiness filter: picadillo's last step (the simmer) runs through
+    every idle-hands window, so its containers must NOT be injected into
+    the stream — the cook can't pack food that is still cooking. The
+    portion & pack block lands AFTER the stream instead."""
     sp = _sp({"picadillo": 2, "sugo": 1})
     sp["sessions"][0]["feeds"] = [
         dict(component="picadillo", day=0, grams=450)]
@@ -389,14 +391,57 @@ def test_timeline_render_portioning_injected_into_idle_window():
     matrix = build_portioning(sp, weeks, {"ada": {}}, meals, COMPS)
     out = render_cook_plan(COMPS, SET, sp, meta=META, methods=METHODS,
                            techniques=TECHNIQUES, matrix=matrix)
-    assert ("Idle hands — everything is cooking itself; portion & pack "
-            "now:" in out)
+    assert "Idle hands —" not in out
+    # the matrix still renders, after the stream
+    assert "Portion & pack — session" in out
     assert "- [ ] ada · eat day 1 · lunch — 450g" in out
-    # the injection sits before the last passive line ends (inside the
-    # stream, not appended after it)
+    assert out.index("Portion & pack — session") > out.rindex(
+        "⏱ set a timer")
+
+
+def test_timeline_render_portioning_injected_only_when_ready():
+    """A component whose cook steps are all done before the idle-hands
+    window IS injected there; a component still cooking through the
+    window packs after the stream — the injection is readiness-filtered,
+    not the whole matrix."""
+    methods = {
+        "picadillo": METHODS["picadillo"],
+        "steak": [
+            dict(phase="cook", text="Sear the steak", station="stove",
+                 mode="active", duration_min=6, operation="brown"),
+        ],
+    }
+    sp = _sp({"picadillo": 2, "steak": 1})
+    sp["sessions"][0]["feeds"] = [
+        dict(component="picadillo", day=0, grams=450),
+        dict(component="steak", day=0, grams=200)]
+    weeks = {"ada": [{"picadillo": 450, "steak": 200}] + [{}] * 6}
+    meals = {"ada": [dict(meals=[dict(slot="lunch",
+                                      serving_model="portioned",
+                                      items={"picadillo": 450,
+                                             "steak": 200})],
+                          notes=[])] + [dict(meals=[], notes=[])] * 6}
+    from mealplan.artifacts import build_portioning
+    matrix = build_portioning(sp, weeks, {"ada": {}}, meals, COMPS)
+    out = render_cook_plan(COMPS, SET, sp, meta=META, methods=methods,
+                           techniques=TECHNIQUES, matrix=matrix)
+    # steak (active-only, done before the simmer window) is injected
+    assert ("Idle hands — the kitchen is cooking itself; portion & pack "
+            "what's already done:" in out)
     inject_at = out.index("Idle hands —")
-    last_timer = out.rindex("⏱ set a timer")
-    assert inject_at < last_timer
+    after_stream_at = out.index("Portion & pack — session")
+    injected_block = out[inject_at:after_stream_at]
+    assert "**steak** — pack 1 container" in injected_block
+    # picadillo is still simmering at the window's start — NOT injected
+    assert "**picadillo**" not in injected_block
+    # the injection sits inside the Timeline section, timestamped at the
+    # idle window (after the stream's entries begin)
+    assert inject_at > out.index("Timeline — 0:00")
+    # picadillo packs after the stream; steak is not repeated there
+    after_block = out[after_stream_at:]
+    assert "**picadillo** — pack 1 container" in after_block
+    assert "**steak** — pack" not in after_block
+    assert "Already packed during the idle-hands window" in after_block
 
 
 def test_timeline_render_unscheduled_component_keeps_recipe_block():
