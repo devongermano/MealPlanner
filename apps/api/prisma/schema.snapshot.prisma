@@ -1,0 +1,151 @@
+// GENERATED — never hand-edit, and never regenerate to "fix" a drift error.
+// A copy of schema.prisma as of the newest migration, so migrations can be
+// diffed offline. If `prisma:migration:check` fails, the answer is a new
+// migration, not a new snapshot — advancing this file without the matching SQL
+// tells CI a change shipped that no database has ever applied.
+// Advanced by: pnpm --filter @mealplan/api prisma:migration:new <name>
+
+// Prisma owns the PUBLIC schema. Supabase owns the AUTH schema (GoTrue).
+// There is exactly one schema owner per schema — see apps/api/README.md
+// ("Two migration systems, one owner each"). Never put app tables in
+// supabase/migrations, and never let Supabase manage public.*.
+//
+// Regenerate the client:  pnpm --filter @mealplan/api prisma:generate
+// Author a migration:     pnpm --filter @mealplan/api prisma:migration:new
+//                         (offline `migrate diff`; no database required)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Capability ladder, NOT a set: planner > cook > eater (PRD §4.2).
+/// A planner holds every capability a cook holds, and a cook every capability
+/// an eater holds — which is how "one person can hold all roles (n=1)" is
+/// satisfied with a single column. See src/households/roles.ts for the one
+/// place the ranking is defined.
+enum HouseholdRole {
+  planner
+  cook
+  eater
+
+  @@map("household_role")
+}
+
+/// The isolation boundary. Every row of household-scoped data in this product
+/// hangs off a household_id, and every read path filters by membership
+/// (PRD §7: per-household isolation from the first hosted deployment).
+model Household {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @db.VarChar(120)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  members HouseholdMember[]
+
+  @@map("households")
+}
+
+/// A PERSON in a household. Not necessarily an account.
+///
+/// Owner ruling (2026-08-10): a household must be fully plannable before every
+/// member has an account. PRD §4.2 iterates over people everywhere, and the
+/// meal-prep model assumes you can plan for someone who may never log in — a
+/// child, a housemate who does not want an app. So a membership row is the
+/// PERSON, and the auth identity is an attribute that may arrive later.
+///
+/// Two states, and the difference drives authorization (see
+/// households.service.ts):
+///
+///   PLACEHOLDER — `userId IS NULL`. A real member with a role, a display name,
+///     and usually a personName. Cannot authenticate: nothing can make
+///     `current token subject = NULL`, and SQL's `user_id = <uuid>` never
+///     matches NULL. The planner owns this row entirely.
+///   CLAIMED — `userId` set. An account. The account owns its own profile;
+///     a planner may change its ROLE and remove it, nothing more.
+///
+/// THE CLAIM SEAM (invitation flow, blocked on PRD OQ-P1 — not built):
+///   Claiming is an UPDATE, never a delete-and-recreate:
+///     UPDATE household_members SET user_id = $1, invite_email = NULL
+///      WHERE id = $2 AND user_id IS NULL
+///   The row `id` therefore survives claiming, which is what lets plans,
+///   portions, and veto history reference a member before its account exists.
+///   The `(household_id, user_id)` unique index is what makes the UPDATE safe:
+///   Postgres treats NULLs as DISTINCT, so any number of placeholders coexist,
+///   while the same account can never end up in one household twice. Do not
+///   change that index to NULLS NOT DISTINCT — it would allow at most one
+///   placeholder per household.
+///
+/// `userId` references auth.users(id) — the foreign key is added by the
+/// migration only when the auth schema is present (Supabase); on a bare
+/// Postgres the column is still a uuid and the app still works. Prisma does
+/// not model auth.users: it is GoTrue's table, not ours.
+///
+/// `personName` is the join to the ENGINE's person concept. The engine keys
+/// every per-person map (`weeks`, `broke`, `cost.shares`, …) by a plain string
+/// taken from the library's `people:` mapping — it has no notion of accounts.
+/// Nullable because a member may plan or cook without eating (no targets, no
+/// sheets). Unique per household when set.
+///
+/// `displayName` is what humans read. Required on every member, because a
+/// member list showing UUIDs is not a member list. Distinct from `personName`
+/// on purpose: "Alex Germano" is a person, `alex` is a key in a YAML file.
+model HouseholdMember {
+  id          String        @id @default(uuid()) @db.Uuid
+  householdId String        @map("household_id") @db.Uuid
+  /// auth.users(id) once claimed; NULL while this member is a placeholder.
+  userId      String?       @map("user_id") @db.Uuid
+  role        HouseholdRole
+  displayName String        @map("display_name") @db.VarChar(120)
+  personName  String?       @map("person_name") @db.VarChar(64)
+  /// Invite INTENT only, for placeholders. Where an invitation would be sent
+  /// once that flow exists. Never queried against auth.users — an endpoint that
+  /// answers "does this address have an account?" is an enumeration oracle, and
+  /// this column must never become one. Cleared when the member is claimed.
+  inviteEmail String?       @map("invite_email") @db.VarChar(320)
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  @@unique([householdId, userId], map: "household_members_household_user_key")
+  @@unique([householdId, personName], map: "household_members_household_person_key")
+  @@index([userId], map: "household_members_user_id_idx")
+  @@map("household_members")
+}
+
+/// PRD §10: "All mutations flow through validated, transactional API writes
+/// that record an audit trail (who, when, what changed)" — replacing v1's
+/// "git is the audit log", which never committed anything.
+///
+/// Append-only by construction: the API never updates or deletes rows here,
+/// and the RLS safety net grants no write policy at all. Every entry is
+/// written in the SAME transaction as the mutation it records, so an
+/// unaudited membership change cannot exist.
+///
+/// Neither `householdId` nor `actorUserId` is a foreign key, and that is the
+/// point: an audit trail that cascade-deletes with the thing it audits is not
+/// an audit trail. Deleting a household or an account removes the rows those
+/// records own — it must not remove the record that they were deleted.
+model HouseholdAuditEntry {
+  id          String   @id @default(uuid()) @db.Uuid
+  /// households(id) at the time of writing. No FK — see above.
+  householdId String   @map("household_id") @db.Uuid
+  /// auth.users(id) of whoever performed the action. Deliberately NOT a
+  /// foreign key: the trail must survive the actor deleting their account.
+  actorUserId String   @map("actor_user_id") @db.Uuid
+  /// Machine-readable verb, e.g. "household.created", "member.role_changed".
+  action      String   @db.VarChar(64)
+  /// The household_members.id or households.id the action applied to.
+  targetId    String?  @map("target_id") @db.Uuid
+  /// {before, after} of whatever changed. No credentials, no tokens.
+  detail      Json?    @db.JsonB
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([householdId, createdAt], map: "household_audit_log_household_created_idx")
+  @@map("household_audit_log")
+}

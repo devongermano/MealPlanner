@@ -1,0 +1,16 @@
+{
+  "name": "@mealplan/contracts-api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "GENERATED TS types for the NestJS API's HTTP surface (NestJS decorators -> OpenAPI -> openapi-typescript). Never hand-edited; regenerate with `pnpm run gen`, drift-gated by `pnpm run check` in CI.",
+  "types": "src/index.ts",
+  "scripts": {
+    "gen": "sh scripts/gen.sh",
+    "check": "sh scripts/check.sh",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "openapi-typescript": "7.13.0",
+    "typescript": "5.9.3"
+  }
+}

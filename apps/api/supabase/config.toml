@@ -1,0 +1,102 @@
+# Supabase local development stack for mealplan.
+#
+# WHY THIS LIVES UNDER apps/api/ — the API is the only thing in this repo that
+# talks to Postgres or Auth (ARCHITECTURE.md, "one brain"), so its dependencies
+# live with it. Run every supabase command from apps/api:
+#
+#   cd apps/api && supabase start      # or: pnpm --filter @mealplan/api supabase:start
+#
+# WHAT THIS STACK IS FOR — Postgres and Auth (GoTrue), per the ARCHITECTURE.md
+# usage matrix. Everything else Supabase offers is switched off below, not
+# because it is bad but because a part that is off cannot quietly acquire a
+# dependency on it. Realtime, Storage and Edge Functions all have explicit ❌
+# rows in that matrix.
+#
+# WHO OWNS THE SCHEMA — Prisma owns `public`, Supabase owns `auth`. There is no
+# supabase/migrations directory here on purpose: app migrations live in
+# apps/api/prisma/migrations and are applied with `prisma migrate deploy`. Two
+# migration tools pointed at one schema is a merge conflict with a database
+# attached.
+
+project_id = "mealplan"
+
+[api]
+enabled = true
+port = 54321
+# PostgREST's Data API. The web app does not use it — it talks to the Nest API.
+# The schema stays listed because GoTrue's own endpoints are served through the
+# same gateway; the RLS policies in the migration are what make it harmless if
+# something does reach it.
+schemas = ["public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 17
+
+[db.migrations]
+# Prisma applies the app schema. Leaving this on would invite someone to drop a
+# .sql file in supabase/migrations and create a second source of truth.
+enabled = false
+
+[db.seed]
+enabled = false
+
+[realtime]
+# ARCHITECTURE.md: "Veto window at beta scale is a polling problem, not
+# websockets."
+enabled = false
+
+[storage]
+# No user uploads yet. Owner-recorded technique videos (PRD §10) are the first
+# plausible customer; turn this on then, deliberately.
+enabled = false
+
+[studio]
+enabled = true
+port = 54323
+api_url = "http://127.0.0.1"
+
+[inbucket]
+# Catches the confirmation and magic-link emails GoTrue sends locally, so the
+# signup flow can be exercised end to end without a real mailbox.
+enabled = true
+port = 54324
+
+[auth]
+enabled = true
+# The Angular dev server. Also the allow-list for post-auth redirects.
+site_url = "http://127.0.0.1:4200"
+additional_redirect_urls = ["http://localhost:4200"]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+refresh_token_reuse_interval = 10
+enable_signup = true
+
+# Anonymous sign-ins stay off, matching the API's AUTH_ALLOW_ANONYMOUS default:
+# a household is durable state and an ephemeral identity should not create one.
+enable_anonymous_sign_ins = false
+enable_manual_linking = false
+minimum_password_length = 8
+password_requirements = "lower_upper_letters_digits"
+
+# ASYMMETRIC SIGNING KEYS (recommended, opt-in locally):
+#   cd apps/api && supabase gen signing-key --algorithm ES256 > supabase/signing_keys.json
+#   then uncomment the line below and restart the stack.
+# The API then verifies via SUPABASE_JWKS_URL and holds no signing material at
+# all — see .env.example. Without it the stack signs HS256 with the JWT secret
+# `supabase start` prints, which is the zero-setup path.
+# signing_keys_path = "./signing_keys.json"
+
+[auth.email]
+enable_signup = true
+# Off locally so tests and manual flows do not need to visit the inbucket UI.
+# The hosted project must have this ON.
+enable_confirmations = false
+double_confirm_changes = true
+
+[auth.sms]
+enable_signup = false
+enable_confirmations = false

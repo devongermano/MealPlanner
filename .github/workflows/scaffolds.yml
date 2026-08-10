@@ -5,6 +5,7 @@ on:
     paths:
       - "apps/**"
       - "packages/contracts/**"
+      - "packages/contracts-api/**"
       - "turbo.json"
       - "pnpm-workspace.yaml"
       - "package.json"
@@ -23,4 +24,33 @@ jobs:
           node-version: "22"
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # apps/api's tests run a real Postgres via PGlite (WebAssembly), so no
+      # service container is needed here — see apps/api/README.md.
       - run: pnpm turbo run build test lint typecheck
+
+  api-contracts:
+    name: API contract drift + schema/migration drift
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # Regenerates the OpenAPI document from the real AppModule and diffs it
+      # against the checked-in copy. Fails when a controller or DTO changed
+      # without regenerating — the web app must never compile against types the
+      # API no longer serves.
+      - name: Contract drift (fails when stale)
+        run: pnpm --filter @mealplan/contracts-api run check
+
+      - name: Typecheck generated TS
+        run: pnpm --filter @mealplan/contracts-api run typecheck
+
+      # Fails when prisma/schema.prisma has changes no migration covers, which
+      # is otherwise invisible until a deploy hits a database that lacks them.
+      - name: Schema/migration drift (fails when a migration is missing)
+        run: pnpm --filter @mealplan/api run prisma:migration:check
