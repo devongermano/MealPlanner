@@ -1,0 +1,14 @@
+{
+  "authMode": "preview",
+  "supabaseUrl": "http://127.0.0.1:54321",
+  "supabaseAnonKey": "",
+  "apiBaseUrl": "http://localhost:3000",
+  "_readme": [
+    "Runtime configuration, read by the browser at startup. Not compiled into the bundle:",
+    "a deploy overwrites this file rather than rebuilding the app.",
+    "",
+    "authMode 'preview' runs in-memory accounts so the app can be walked without a backend.",
+    "It is refused unless the page is served from localhost. Switch to 'supabase' and paste",
+    "the URL + anon key printed by `supabase start` to sign in for real."
+  ]
+}
