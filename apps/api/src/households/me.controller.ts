@@ -1,5 +1,10 @@
 import { Controller, Get } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import type { AuthenticatedUser } from '../auth/authenticated-user';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { ApiAuthenticatedErrors } from '../common/swagger';
@@ -19,7 +24,9 @@ export class MeController {
   constructor(private readonly households: HouseholdsService) {}
 
   @Get()
-  @ApiOperation({ summary: 'The verified caller and their household memberships' })
+  @ApiOperation({
+    summary: 'The verified caller and their household memberships',
+  })
   @ApiResponse({ status: 200, type: MeResponse })
   @ApiAuthenticatedErrors()
   async me(@CurrentUser() user: AuthenticatedUser): Promise<MeResponse> {

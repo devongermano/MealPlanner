@@ -38,7 +38,10 @@ export class PrismaService extends PrismaClient implements OnModuleDestroy {
       await this.$queryRaw`SELECT 1`;
       return true;
     } catch (error) {
-      this.logger.error('Database ping failed', error instanceof Error ? error.stack : String(error));
+      this.logger.error(
+        'Database ping failed',
+        error instanceof Error ? error.stack : String(error),
+      );
       return false;
     }
   }

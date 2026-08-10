@@ -17,7 +17,8 @@ type Equal<A, B> = [A] extends [B] ? ([B] extends [A] ? true : never) : never;
  * being the same set. Adding a role to one without the other is then a build
  * error, not a runtime surprise on an authorization path.
  */
-const assertRolesMatchDatabase: Equal<HouseholdRoleName, PrismaHouseholdRole> = true;
+const assertRolesMatchDatabase: Equal<HouseholdRoleName, PrismaHouseholdRole> =
+  true;
 void assertRolesMatchDatabase;
 
 /**
@@ -57,4 +58,5 @@ export const MIN_ROLE_KEY = 'mealplan:minRole';
  * `eater`, the bottom of the ladder. There is no way to reach a
  * household-scoped route without being in that household.
  */
-export const MinRole = (role: HouseholdRoleName) => SetMetadata(MIN_ROLE_KEY, role);
+export const MinRole = (role: HouseholdRoleName) =>
+  SetMetadata(MIN_ROLE_KEY, role);

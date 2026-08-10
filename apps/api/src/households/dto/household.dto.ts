@@ -1,6 +1,14 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsIn, IsOptional, IsString, IsUUID, Length, Matches, ValidateIf } from 'class-validator';
+import {
+  IsIn,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Length,
+  Matches,
+  ValidateIf,
+} from 'class-validator';
 import { HOUSEHOLD_ROLES, type HouseholdRoleName } from '../roles';
 
 /**
@@ -15,7 +23,7 @@ import { HOUSEHOLD_ROLES, type HouseholdRoleName } from '../roles';
  */
 export const PERSON_NAME_PATTERN = /^[a-z0-9](?:[a-z0-9_-]{0,62}[a-z0-9])?$/;
 const PERSON_NAME_MESSAGE =
-  'must be a lowercase slug matching the library\'s people: key (a-z, 0-9, _ or -, 1-64 chars, starting and ending alphanumeric)';
+  "must be a lowercase slug matching the library's people: key (a-z, 0-9, _ or -, 1-64 chars, starting and ending alphanumeric)";
 
 const trim = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim() : value;
@@ -25,7 +33,12 @@ const trim = ({ value }: { value: unknown }) =>
 // --------------------------------------------------------------------------
 
 export class CreateHouseholdRequest {
-  @ApiProperty({ description: 'Display name.', minLength: 1, maxLength: 120, example: 'The Germanos' })
+  @ApiProperty({
+    description: 'Display name.',
+    minLength: 1,
+    maxLength: 120,
+    example: 'The Germanos',
+  })
   @Transform(trim)
   @IsString()
   @Length(1, 120)
@@ -39,7 +52,9 @@ export class CreateHouseholdRequest {
   @IsOptional()
   @Transform(trim)
   @IsString()
-  @Matches(PERSON_NAME_PATTERN, { message: `personName ${PERSON_NAME_MESSAGE}` })
+  @Matches(PERSON_NAME_PATTERN, {
+    message: `personName ${PERSON_NAME_MESSAGE}`,
+  })
   personName?: string;
 }
 
@@ -61,21 +76,30 @@ export class AddHouseholdMemberRequest {
   userId!: string;
 
   @ApiProperty({ enum: HOUSEHOLD_ROLES })
-  @IsIn(HOUSEHOLD_ROLES, { message: `role must be one of: ${HOUSEHOLD_ROLES.join(', ')}` })
+  @IsIn(HOUSEHOLD_ROLES, {
+    message: `role must be one of: ${HOUSEHOLD_ROLES.join(', ')}`,
+  })
   role!: HouseholdRoleName;
 
-  @ApiPropertyOptional({ description: 'The library person this account eats as.', example: 'alice' })
+  @ApiPropertyOptional({
+    description: 'The library person this account eats as.',
+    example: 'alice',
+  })
   @IsOptional()
   @Transform(trim)
   @IsString()
-  @Matches(PERSON_NAME_PATTERN, { message: `personName ${PERSON_NAME_MESSAGE}` })
+  @Matches(PERSON_NAME_PATTERN, {
+    message: `personName ${PERSON_NAME_MESSAGE}`,
+  })
   personName?: string;
 }
 
 export class UpdateHouseholdMemberRequest {
   @ApiPropertyOptional({ enum: HOUSEHOLD_ROLES })
   @IsOptional()
-  @IsIn(HOUSEHOLD_ROLES, { message: `role must be one of: ${HOUSEHOLD_ROLES.join(', ')}` })
+  @IsIn(HOUSEHOLD_ROLES, {
+    message: `role must be one of: ${HOUSEHOLD_ROLES.join(', ')}`,
+  })
   role?: HouseholdRoleName;
 
   @ApiPropertyOptional({
@@ -90,7 +114,9 @@ export class UpdateHouseholdMemberRequest {
   // check rather than be rejected by it.
   @ValidateIf((_object, value) => value !== null)
   @IsString()
-  @Matches(PERSON_NAME_PATTERN, { message: `personName ${PERSON_NAME_MESSAGE}` })
+  @Matches(PERSON_NAME_PATTERN, {
+    message: `personName ${PERSON_NAME_MESSAGE}`,
+  })
   personName?: string | null;
 }
 
@@ -108,7 +134,10 @@ export class HouseholdMemberView {
   @ApiProperty({ enum: HOUSEHOLD_ROLES })
   role!: HouseholdRoleName;
 
-  @ApiProperty({ nullable: true, description: 'Library person key, or null if this account does not eat.' })
+  @ApiProperty({
+    nullable: true,
+    description: 'Library person key, or null if this account does not eat.',
+  })
   personName!: string | null;
 
   @ApiProperty({ format: 'date-time' })
@@ -123,13 +152,21 @@ export class HouseholdSummary {
   @ApiProperty()
   name!: string;
 
-  @ApiProperty({ enum: HOUSEHOLD_ROLES, description: "The CALLER's role here." })
+  @ApiProperty({
+    enum: HOUSEHOLD_ROLES,
+    description: "The CALLER's role here.",
+  })
   role!: HouseholdRoleName;
 
-  @ApiProperty({ nullable: true, description: "The CALLER's library person key here." })
+  @ApiProperty({
+    nullable: true,
+    description: "The CALLER's library person key here.",
+  })
   personName!: string | null;
 
-  @ApiProperty({ description: 'Members in this household, including the caller.' })
+  @ApiProperty({
+    description: 'Members in this household, including the caller.',
+  })
   memberCount!: number;
 
   @ApiProperty({ format: 'date-time' })
@@ -154,7 +191,10 @@ export class HouseholdDetail {
 }
 
 export class MeResponse {
-  @ApiProperty({ format: 'uuid', description: 'auth.users id of the verified caller.' })
+  @ApiProperty({
+    format: 'uuid',
+    description: 'auth.users id of the verified caller.',
+  })
   userId!: string;
 
   @ApiProperty({ nullable: true })
@@ -163,6 +203,9 @@ export class MeResponse {
   @ApiProperty()
   isAnonymous!: boolean;
 
-  @ApiProperty({ type: [HouseholdSummary], description: 'Every household the caller belongs to.' })
+  @ApiProperty({
+    type: [HouseholdSummary],
+    description: 'Every household the caller belongs to.',
+  })
   households!: HouseholdSummary[];
 }

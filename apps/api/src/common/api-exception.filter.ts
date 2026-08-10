@@ -70,12 +70,18 @@ export class ApiExceptionFilter implements ExceptionFilter {
     details?: ApiErrorDetail[];
   } {
     if (exception instanceof ApiException) {
-      return { code: exception.code, message: exception.message, details: exception.details };
+      return {
+        code: exception.code,
+        message: exception.message,
+        details: exception.details,
+      };
     }
 
     if (exception instanceof HttpException) {
       const status = exception.getStatus();
-      const code = CODE_BY_STATUS[status] ?? (status >= 500 ? 'internal' : 'validation_failed');
+      const code =
+        CODE_BY_STATUS[status] ??
+        (status >= 500 ? 'internal' : 'validation_failed');
       // A 5xx HttpException still must not echo its message.
       if (code === 'internal') {
         return { code, message: 'Internal server error.' };
@@ -92,7 +98,10 @@ export class ApiExceptionFilter implements ExceptionFilter {
       if (exception.code === 'P2025') {
         return { code: 'not_found', message: 'Not found.' };
       }
-      this.logger.error(`Unmapped Prisma error ${exception.code}`, exception.stack);
+      this.logger.error(
+        `Unmapped Prisma error ${exception.code}`,
+        exception.stack,
+      );
       return { code: 'internal', message: 'Internal server error.' };
     }
 

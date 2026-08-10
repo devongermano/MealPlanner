@@ -10,12 +10,28 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { CurrentUser } from '../auth/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/authenticated-user';
-import { ApiAuthenticatedErrors, ApiHouseholdScopedErrors, uuidParam } from '../common/swagger';
-import { CurrentMembership, type CurrentMembershipInfo } from './current-membership.decorator';
-import { HOUSEHOLD_ID_PARAM, HouseholdMembershipGuard } from './household-membership.guard';
+import {
+  ApiAuthenticatedErrors,
+  ApiHouseholdScopedErrors,
+  uuidParam,
+} from '../common/swagger';
+import {
+  CurrentMembership,
+  type CurrentMembershipInfo,
+} from './current-membership.decorator';
+import {
+  HOUSEHOLD_ID_PARAM,
+  HouseholdMembershipGuard,
+} from './household-membership.guard';
 import { HouseholdsService } from './households.service';
 import { MinRole } from './roles';
 import {
@@ -58,7 +74,8 @@ export class HouseholdsController {
   @Post()
   @ApiOperation({
     summary: 'Create a household',
-    description: 'The caller becomes its first planner. Not a parameter: a household with no planner could never be administered.',
+    description:
+      'The caller becomes its first planner. Not a parameter: a household with no planner could never be administered.',
   })
   @ApiResponse({ status: 201, type: HouseholdDetail })
   @ApiAuthenticatedErrors()
@@ -72,11 +89,14 @@ export class HouseholdsController {
   @Get()
   @ApiOperation({
     summary: 'List the households I belong to',
-    description: 'Scoped by membership. There is no route that lists households the caller is not in.',
+    description:
+      'Scoped by membership. There is no route that lists households the caller is not in.',
   })
   @ApiResponse({ status: 200, type: [HouseholdSummary] })
   @ApiAuthenticatedErrors()
-  listMine(@CurrentUser() user: AuthenticatedUser): Promise<HouseholdSummary[]> {
+  listMine(
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<HouseholdSummary[]> {
     return this.households.listMine(user.userId);
   }
 
@@ -86,7 +106,9 @@ export class HouseholdsController {
   @ApiParam({ name: HOUSEHOLD_ID_PARAM, format: 'uuid' })
   @ApiResponse({ status: 200, type: HouseholdDetail })
   @ApiHouseholdScopedErrors()
-  get(@Param(HOUSEHOLD_ID_PARAM) householdId: string): Promise<HouseholdDetail> {
+  get(
+    @Param(HOUSEHOLD_ID_PARAM) householdId: string,
+  ): Promise<HouseholdDetail> {
     return this.households.getDetail(householdId);
   }
 
@@ -111,7 +133,8 @@ export class HouseholdsController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: 'Delete a household',
-    description: 'Memberships cascade. The audit trail does not — the record that it was deleted outlives it.',
+    description:
+      'Memberships cascade. The audit trail does not — the record that it was deleted outlives it.',
   })
   @ApiParam({ name: HOUSEHOLD_ID_PARAM, format: 'uuid' })
   @ApiResponse({ status: 204, description: 'Deleted.' })
@@ -129,7 +152,9 @@ export class HouseholdsController {
   @ApiParam({ name: HOUSEHOLD_ID_PARAM, format: 'uuid' })
   @ApiResponse({ status: 200, type: [HouseholdMemberView] })
   @ApiHouseholdScopedErrors()
-  listMembers(@Param(HOUSEHOLD_ID_PARAM) householdId: string): Promise<HouseholdMemberView[]> {
+  listMembers(
+    @Param(HOUSEHOLD_ID_PARAM) householdId: string,
+  ): Promise<HouseholdMemberView[]> {
     return this.households.listMembers(householdId);
   }
 
@@ -139,7 +164,10 @@ export class HouseholdsController {
   @ApiOperation({ summary: 'Add an account to a household' })
   @ApiParam({ name: HOUSEHOLD_ID_PARAM, format: 'uuid' })
   @ApiResponse({ status: 201, type: HouseholdMemberView })
-  @ApiResponse({ status: 409, description: 'Already a member, or that person is already linked.' })
+  @ApiResponse({
+    status: 409,
+    description: 'Already a member, or that person is already linked.',
+  })
   @ApiHouseholdScopedErrors()
   addMember(
     @CurrentUser() user: AuthenticatedUser,
@@ -181,7 +209,10 @@ export class HouseholdsController {
   @ApiParam({ name: HOUSEHOLD_ID_PARAM, format: 'uuid' })
   @ApiParam({ name: 'memberId', format: 'uuid' })
   @ApiResponse({ status: 200, type: HouseholdMemberView })
-  @ApiResponse({ status: 409, description: 'Would leave the household with no planner.' })
+  @ApiResponse({
+    status: 409,
+    description: 'Would leave the household with no planner.',
+  })
   @ApiHouseholdScopedErrors()
   updateMember(
     @CurrentUser() user: AuthenticatedUser,
@@ -200,7 +231,10 @@ export class HouseholdsController {
   @ApiParam({ name: HOUSEHOLD_ID_PARAM, format: 'uuid' })
   @ApiParam({ name: 'memberId', format: 'uuid' })
   @ApiResponse({ status: 204, description: 'Removed.' })
-  @ApiResponse({ status: 409, description: 'Would leave the household with no planner.' })
+  @ApiResponse({
+    status: 409,
+    description: 'Would leave the household with no planner.',
+  })
   @ApiHouseholdScopedErrors()
   removeMember(
     @CurrentUser() user: AuthenticatedUser,

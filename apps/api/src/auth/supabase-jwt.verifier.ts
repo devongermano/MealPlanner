@@ -9,7 +9,8 @@ import { API_CONFIG, type ApiConfig, type AuthConfig } from '../config';
 import { ApiException } from '../common/api-error';
 import type { AuthenticatedUser } from './authenticated-user';
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** GoTrue puts the PostgREST role in the token. Only one value is a real user. */
 const USER_ROLE_CLAIM = 'authenticated';
@@ -108,9 +109,13 @@ export class SupabaseJwtVerifier {
 
     return {
       userId: sub,
-      email: typeof payload.email === 'string' && payload.email ? payload.email : null,
+      email:
+        typeof payload.email === 'string' && payload.email
+          ? payload.email
+          : null,
       isAnonymous,
-      sessionId: typeof payload.session_id === 'string' ? payload.session_id : null,
+      sessionId:
+        typeof payload.session_id === 'string' ? payload.session_id : null,
     };
   }
 }

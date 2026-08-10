@@ -36,7 +36,10 @@ const STATUS_BY_CODE: Record<ApiErrorCode, HttpStatus> = {
 };
 
 export class ApiErrorDetail {
-  @ApiProperty({ description: 'Dotted path of the offending field.', example: 'name' })
+  @ApiProperty({
+    description: 'Dotted path of the offending field.',
+    example: 'name',
+  })
   field!: string;
 
   @ApiProperty({ description: 'What is wrong with it.' })
@@ -44,16 +47,22 @@ export class ApiErrorDetail {
 }
 
 export class ApiErrorBody {
-  @ApiProperty({ enum: API_ERROR_CODES, description: 'Machine-readable code. Switch on this.' })
+  @ApiProperty({
+    enum: API_ERROR_CODES,
+    description: 'Machine-readable code. Switch on this.',
+  })
   code!: ApiErrorCode;
 
-  @ApiProperty({ description: 'Human-readable summary. Not a stable contract.' })
+  @ApiProperty({
+    description: 'Human-readable summary. Not a stable contract.',
+  })
   message!: string;
 
   @ApiProperty({
     type: [ApiErrorDetail],
     required: false,
-    description: 'Per-field detail. Present on validation_failed; every failing field is reported, not just the first.',
+    description:
+      'Per-field detail. Present on validation_failed; every failing field is reported, not just the first.',
   })
   details?: ApiErrorDetail[];
 }
@@ -89,7 +98,9 @@ export class ApiException extends HttpException {
     return new ApiException('unauthenticated', message);
   }
 
-  static forbidden(message = 'You do not have permission to do that.'): ApiException {
+  static forbidden(
+    message = 'You do not have permission to do that.',
+  ): ApiException {
     return new ApiException('forbidden', message);
   }
 
@@ -106,7 +117,10 @@ export class ApiException extends HttpException {
     return new ApiException('conflict', message);
   }
 
-  static validationFailed(details: ApiErrorDetail[], message = 'Request validation failed.'): ApiException {
+  static validationFailed(
+    details: ApiErrorDetail[],
+    message = 'Request validation failed.',
+  ): ApiException {
     return new ApiException('validation_failed', message, details);
   }
 }

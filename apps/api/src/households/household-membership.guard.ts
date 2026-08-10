@@ -5,7 +5,8 @@ import type { AuthenticatedRequest } from '../auth/authenticated-user';
 import { PrismaService } from '../prisma/prisma.service';
 import { MIN_ROLE_KEY, type HouseholdRoleName, roleSatisfies } from './roles';
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Route parameter every household-scoped route must name its household with. */
 export const HOUSEHOLD_ID_PARAM = 'householdId';

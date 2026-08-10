@@ -43,13 +43,20 @@ async function main(): Promise<void> {
   // `abortOnError: false` is not optional here: Nest's default is to call
   // process.abort() on a bootstrap failure and report it through the logger we
   // just disabled — which exits 1 with no output at all.
-  const app = await NestFactory.create(AppModule, { logger: false, abortOnError: false });
+  const app = await NestFactory.create(AppModule, {
+    logger: false,
+    abortOnError: false,
+  });
   await app.init();
 
   const document = buildOpenApiDocument(app);
   // Trailing newline + 2-space indent: byte-identical to what the drift gate
   // regenerates, and diffable line-by-line in review.
-  writeFileSync(resolve(outputArg), `${JSON.stringify(document, null, 2)}\n`, 'utf8');
+  writeFileSync(
+    resolve(outputArg),
+    `${JSON.stringify(document, null, 2)}\n`,
+    'utf8',
+  );
 
   await app.close();
 }

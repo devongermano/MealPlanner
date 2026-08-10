@@ -27,7 +27,8 @@ export function buildOpenApiDocument(app: INestApplication): OpenAPIObject {
         type: 'http',
         scheme: 'bearer',
         bearerFormat: 'JWT',
-        description: 'Supabase Auth access token (GoTrue). Sent as "Authorization: Bearer <token>".',
+        description:
+          'Supabase Auth access token (GoTrue). Sent as "Authorization: Bearer <token>".',
       },
       'bearer',
     )

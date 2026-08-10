@@ -1,7 +1,7 @@
 {
   "name": "@mealplan/api",
   "version": "0.1.0",
-  "description": "NestJS REST API skeleton — the one brain (M2). Consumes generated types from @mealplan/contracts.",
+  "description": "NestJS REST API — the one brain (M2). Auth, households and roles; consumes @mealplan/contracts, produces @mealplan/contracts-api.",
   "private": true,
   "scripts": {
     "postinstall": "prisma generate",
@@ -13,19 +13,19 @@
     "lint": "eslint \"{src,test,scripts}/**/*.ts\"",
     "lint:fix": "eslint \"{src,test,scripts}/**/*.ts\" --fix",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "jest --config ./test/jest.json",
-    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config ./test/jest.json",
+    "test:e2e": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config ./test/jest.json --testPathPatterns \"e2e-spec\"",
     "openapi:dump": "ts-node -P tsconfig.json scripts/dump-openapi.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate:deploy": "prisma migrate deploy",
-    "prisma:migration:new": "sh scripts/new-migration.sh",
+    "prisma:migration:new": "ts-node -P tsconfig.json scripts/new-migration.ts new",
+    "prisma:migration:check": "ts-node -P tsconfig.json scripts/new-migration.ts check",
     "supabase:start": "supabase start",
     "supabase:stop": "supabase stop"
   },
   "dependencies": {
     "@mealplan/contracts": "workspace:*",
     "@nestjs/common": "11.1.28",
-    "@nestjs/config": "4.0.4",
     "@nestjs/core": "11.1.28",
     "@nestjs/platform-express": "11.1.28",
     "@nestjs/swagger": "11.4.6",
@@ -38,6 +38,7 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.4",
+    "@electric-sql/pglite-socket": "0.2.7",
     "@eslint/eslintrc": "3.3.6",
     "@eslint/js": "9.39.5",
     "@nestjs/cli": "11.0.24",

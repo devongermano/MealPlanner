@@ -1,0 +1,8 @@
+# Supabase CLI working files
+.branches
+.temp
+
+# JWT SIGNING KEYS — private key material. Generate per developer with
+#   supabase gen signing-key --algorithm ES256 > supabase/signing_keys.json
+# and never commit the result.
+signing_keys.json

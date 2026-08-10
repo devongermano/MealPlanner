@@ -3,7 +3,6 @@ import { Prisma, type HouseholdMember } from '@prisma/client';
 import { ApiException } from '../common/api-error';
 import type { AuthenticatedUser } from '../auth/authenticated-user';
 import { PrismaService } from '../prisma/prisma.service';
-import type { HouseholdRoleName } from './roles';
 import {
   AddHouseholdMemberRequest,
   CreateHouseholdRequest,
@@ -101,9 +100,14 @@ export class HouseholdsService {
   // ------------------------------------------------------------------------
 
   /** Creates a household with the caller as its first planner. */
-  async create(user: AuthenticatedUser, body: CreateHouseholdRequest): Promise<HouseholdDetail> {
+  async create(
+    user: AuthenticatedUser,
+    body: CreateHouseholdRequest,
+  ): Promise<HouseholdDetail> {
     return this.prisma.$transaction(async (tx) => {
-      const household = await tx.household.create({ data: { name: body.name } });
+      const household = await tx.household.create({
+        data: { name: body.name },
+      });
       const member = await tx.householdMember.create({
         data: {
           householdId: household.id,
@@ -114,10 +118,17 @@ export class HouseholdsService {
           personName: body.personName ?? null,
         },
       });
-      await this.audit(tx, household.id, user.userId, 'household.created', household.id, {
-        name: household.name,
-        founderMemberId: member.id,
-      });
+      await this.audit(
+        tx,
+        household.id,
+        user.userId,
+        'household.created',
+        household.id,
+        {
+          name: household.name,
+          founderMemberId: member.id,
+        },
+      );
 
       return {
         id: household.id,
@@ -135,28 +146,49 @@ export class HouseholdsService {
     body: UpdateHouseholdRequest,
   ): Promise<HouseholdDetail> {
     await this.prisma.$transaction(async (tx) => {
-      const before = await tx.household.findUnique({ where: { id: householdId } });
+      const before = await tx.household.findUnique({
+        where: { id: householdId },
+      });
       if (!before) throw ApiException.notFound();
 
-      await tx.household.update({ where: { id: householdId }, data: { name: body.name } });
-      await this.audit(tx, householdId, user.userId, 'household.renamed', householdId, {
-        before: before.name,
-        after: body.name,
+      await tx.household.update({
+        where: { id: householdId },
+        data: { name: body.name },
       });
+      await this.audit(
+        tx,
+        householdId,
+        user.userId,
+        'household.renamed',
+        householdId,
+        {
+          before: before.name,
+          after: body.name,
+        },
+      );
     });
     return this.getDetail(householdId);
   }
 
   async remove(user: AuthenticatedUser, householdId: string): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
-      const household = await tx.household.findUnique({ where: { id: householdId } });
+      const household = await tx.household.findUnique({
+        where: { id: householdId },
+      });
       if (!household) throw ApiException.notFound();
 
       // Written before the delete and never cascaded away — the audit table has
       // no foreign key to households precisely so this record survives.
-      await this.audit(tx, householdId, user.userId, 'household.deleted', householdId, {
-        name: household.name,
-      });
+      await this.audit(
+        tx,
+        householdId,
+        user.userId,
+        'household.deleted',
+        householdId,
+        {
+          name: household.name,
+        },
+      );
       // Memberships cascade; nothing else hangs off a household yet.
       await tx.household.delete({ where: { id: householdId } });
     });
@@ -174,9 +206,16 @@ export class HouseholdsService {
         where: { householdId_userId: { householdId, userId: body.userId } },
       });
       if (existing) {
-        throw ApiException.conflict('That account is already a member of this household.');
+        throw ApiException.conflict(
+          'That account is already a member of this household.',
+        );
       }
-      await this.assertPersonNameFree(tx, householdId, body.personName ?? null, null);
+      await this.assertPersonNameFree(
+        tx,
+        householdId,
+        body.personName ?? null,
+        null,
+      );
 
       const member = await tx.householdMember.create({
         data: {
@@ -186,11 +225,18 @@ export class HouseholdsService {
           personName: body.personName ?? null,
         },
       });
-      await this.audit(tx, householdId, user.userId, 'member.added', member.id, {
-        userId: member.userId,
-        role: member.role,
-        personName: member.personName,
-      });
+      await this.audit(
+        tx,
+        householdId,
+        user.userId,
+        'member.added',
+        member.id,
+        {
+          userId: member.userId,
+          role: member.role,
+          personName: member.personName,
+        },
+      );
       return toMemberView(member);
     });
   }
@@ -210,14 +256,27 @@ export class HouseholdsService {
 
     return this.prisma.$transaction(async (tx) => {
       await this.lockHousehold(tx, householdId);
-      const member = await this.findMemberInHousehold(tx, householdId, memberId);
+      const member = await this.findMemberInHousehold(
+        tx,
+        householdId,
+        memberId,
+      );
 
       if (body.personName !== undefined) {
-        await this.assertPersonNameFree(tx, householdId, body.personName, memberId);
+        await this.assertPersonNameFree(
+          tx,
+          householdId,
+          body.personName,
+          memberId,
+        );
       }
       // Demoting the last planner would leave nobody able to administer the
       // household — including nobody able to promote a replacement.
-      if (body.role !== undefined && member.role === 'planner' && body.role !== 'planner') {
+      if (
+        body.role !== undefined &&
+        member.role === 'planner' &&
+        body.role !== 'planner'
+      ) {
         await this.assertAnotherPlannerRemains(tx, householdId, memberId);
       }
 
@@ -225,13 +284,22 @@ export class HouseholdsService {
         where: { id: memberId },
         data: {
           ...(body.role !== undefined ? { role: body.role } : {}),
-          ...(body.personName !== undefined ? { personName: body.personName } : {}),
+          ...(body.personName !== undefined
+            ? { personName: body.personName }
+            : {}),
         },
       });
-      await this.audit(tx, householdId, user.userId, 'member.updated', memberId, {
-        before: { role: member.role, personName: member.personName },
-        after: { role: updated.role, personName: updated.personName },
-      });
+      await this.audit(
+        tx,
+        householdId,
+        user.userId,
+        'member.updated',
+        memberId,
+        {
+          before: { role: member.role, personName: member.personName },
+          after: { role: updated.role, personName: updated.personName },
+        },
+      );
       return toMemberView(updated);
     });
   }
@@ -246,7 +314,11 @@ export class HouseholdsService {
   }
 
   /** Any member removing their own membership. */
-  async leave(user: AuthenticatedUser, householdId: string, memberId: string): Promise<void> {
+  async leave(
+    user: AuthenticatedUser,
+    householdId: string,
+    memberId: string,
+  ): Promise<void> {
     await this.deleteMembership(user, householdId, memberId, 'member.left');
   }
 
@@ -258,7 +330,11 @@ export class HouseholdsService {
   ): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
       await this.lockHousehold(tx, householdId);
-      const member = await this.findMemberInHousehold(tx, householdId, memberId);
+      const member = await this.findMemberInHousehold(
+        tx,
+        householdId,
+        memberId,
+      );
 
       if (member.role === 'planner') {
         await this.assertAnotherPlannerRemains(tx, householdId, memberId);
@@ -308,7 +384,9 @@ export class HouseholdsService {
     householdId: string,
     memberId: string,
   ): Promise<HouseholdMember> {
-    const member = await tx.householdMember.findFirst({ where: { id: memberId, householdId } });
+    const member = await tx.householdMember.findFirst({
+      where: { id: memberId, householdId },
+    });
     if (!member) throw ApiException.notFound();
     return member;
   }
@@ -373,7 +451,7 @@ function toMemberView(member: HouseholdMember): HouseholdMemberView {
   return {
     id: member.id,
     userId: member.userId,
-    role: member.role as HouseholdRoleName,
+    role: member.role,
     personName: member.personName,
     createdAt: member.createdAt.toISOString(),
   };

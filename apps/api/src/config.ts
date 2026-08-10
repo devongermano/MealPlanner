@@ -73,7 +73,9 @@ function num(raw: string | undefined, fallback: number, label: string): number {
   if (raw === undefined || raw === '') return fallback;
   const parsed = Number(raw);
   if (!Number.isFinite(parsed)) {
-    throw new ConfigError(`${label} must be a number, got ${JSON.stringify(raw)}`);
+    throw new ConfigError(
+      `${label} must be a number, got ${JSON.stringify(raw)}`,
+    );
   }
   return parsed;
 }
@@ -83,7 +85,9 @@ function trimmed(raw: string | undefined): string | null {
   return value ? value : null;
 }
 
-export function loadAuthConfig(env: NodeJS.ProcessEnv = process.env): AuthConfig {
+export function loadAuthConfig(
+  env: NodeJS.ProcessEnv = process.env,
+): AuthConfig {
   const jwksUrl = trimmed(env.SUPABASE_JWKS_URL);
   const jwtSecret = trimmed(env.SUPABASE_JWT_SECRET);
 
@@ -104,7 +108,9 @@ export function loadAuthConfig(env: NodeJS.ProcessEnv = process.env): AuthConfig
     try {
       new URL(jwksUrl);
     } catch {
-      throw new ConfigError(`SUPABASE_JWKS_URL is not a URL: ${JSON.stringify(jwksUrl)}`);
+      throw new ConfigError(
+        `SUPABASE_JWKS_URL is not a URL: ${JSON.stringify(jwksUrl)}`,
+      );
     }
   }
   // GoTrue rejects secrets under 32 chars; refusing them here turns a runtime
@@ -126,14 +132,20 @@ export function loadAuthConfig(env: NodeJS.ProcessEnv = process.env): AuthConfig
     issuer,
     audience: trimmed(env.SUPABASE_JWT_AUDIENCE) ?? 'authenticated',
     allowAnonymous: bool(env.AUTH_ALLOW_ANONYMOUS, false),
-    clockToleranceSec: num(env.AUTH_CLOCK_TOLERANCE_SEC, 5, 'AUTH_CLOCK_TOLERANCE_SEC'),
+    clockToleranceSec: num(
+      env.AUTH_CLOCK_TOLERANCE_SEC,
+      5,
+      'AUTH_CLOCK_TOLERANCE_SEC',
+    ),
   };
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): ApiConfig {
   const databaseUrl = trimmed(env.DATABASE_URL);
   if (!databaseUrl) {
-    throw new ConfigError('DATABASE_URL is required. See apps/api/.env.example');
+    throw new ConfigError(
+      'DATABASE_URL is required. See apps/api/.env.example',
+    );
   }
 
   return {

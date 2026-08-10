@@ -24,7 +24,9 @@ export const CurrentMembership = createParamDecorator(
     if (!request.membership) {
       // Only reachable if a route asks for a membership without the guard that
       // resolves one. Fail closed.
-      throw ApiException.forbidden('Household membership was not resolved for this route.');
+      throw ApiException.forbidden(
+        'Household membership was not resolved for this route.',
+      );
     }
     return request.membership as CurrentMembershipInfo;
   },

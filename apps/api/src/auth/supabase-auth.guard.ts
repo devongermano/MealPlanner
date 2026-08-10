@@ -46,7 +46,9 @@ export class SupabaseAuthGuard implements CanActivate {
  * Rejecting a 3+ part header matters — `Bearer a b` must not be read as the
  * token `a`, or a proxy that appends to the header changes who you are.
  */
-export function extractBearerToken(header: string | string[] | undefined): string | null {
+export function extractBearerToken(
+  header: string | string[] | undefined,
+): string | null {
   if (typeof header !== 'string') return null;
   const parts = header.trim().split(/\s+/);
   if (parts.length !== 2) return null;

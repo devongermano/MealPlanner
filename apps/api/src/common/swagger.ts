@@ -9,9 +9,21 @@ import { ApiErrorResponse, ApiException } from './api-error';
  */
 export function ApiAuthenticatedErrors(): MethodDecorator & ClassDecorator {
   return applyDecorators(
-    ApiResponse({ status: 400, description: 'Validation failed.', type: ApiErrorResponse }),
-    ApiResponse({ status: 401, description: 'Missing or invalid access token.', type: ApiErrorResponse }),
-    ApiResponse({ status: 500, description: 'Internal error.', type: ApiErrorResponse }),
+    ApiResponse({
+      status: 400,
+      description: 'Validation failed.',
+      type: ApiErrorResponse,
+    }),
+    ApiResponse({
+      status: 401,
+      description: 'Missing or invalid access token.',
+      type: ApiErrorResponse,
+    }),
+    ApiResponse({
+      status: 500,
+      description: 'Internal error.',
+      type: ApiErrorResponse,
+    }),
   );
 }
 
@@ -24,7 +36,8 @@ export function ApiHouseholdScopedErrors(): MethodDecorator & ClassDecorator {
     ApiAuthenticatedErrors(),
     ApiResponse({
       status: 403,
-      description: 'You are a member, but your role is below what this route requires.',
+      description:
+        'You are a member, but your role is below what this route requires.',
       type: ApiErrorResponse,
     }),
     ApiResponse({

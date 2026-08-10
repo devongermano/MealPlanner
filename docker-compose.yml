@@ -25,6 +25,17 @@ services:
       PORT: "3000"
       HOST: "0.0.0.0"
       SOLVER_URL: "http://solver:8000"
+      # Postgres and Auth come from the Supabase stack, which is deliberately
+      # NOT composed here — it is its own `supabase start`, run from apps/api
+      # (see apps/api/supabase/config.toml). host.docker.internal is how a
+      # container reaches it on the host; on Linux add
+      #   extra_hosts: ["host.docker.internal:host-gateway"]
+      DATABASE_URL: "${DATABASE_URL:-postgresql://postgres:postgres@host.docker.internal:54322/postgres}"
+      SUPABASE_JWT_ISSUER: "${SUPABASE_JWT_ISSUER:-http://host.docker.internal:54321/auth/v1}"
+      # Set exactly ONE of these — the API refuses to boot with both or neither.
+      # The secret is the one value `supabase start` prints that you must copy.
+      SUPABASE_JWT_SECRET: "${SUPABASE_JWT_SECRET:-}"
+      SUPABASE_JWKS_URL: "${SUPABASE_JWKS_URL:-}"
     ports:
       - "3000:3000"
     depends_on:

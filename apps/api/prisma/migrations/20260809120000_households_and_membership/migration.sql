@@ -123,19 +123,30 @@ END $$;
 -- function reads exactly the same GUCs rather than calling auth.uid(), so the
 -- migration applies unchanged to a bare Postgres — which is what lets the RLS
 -- tests run for real against PGlite instead of being asserted by eyeball.
+--
+-- Malformed input resolves to "no subject" rather than raising. Both casts
+-- here can fail on attacker-influenced data — `''::jsonb` on an empty claims
+-- GUC, and `'admin'::uuid` on a subject that is not a UUID — and a policy that
+-- raises instead of returning false turns a denied read into a 500 and makes
+-- the function a probe for what the caller controls. Returning NULL denies,
+-- because NULL never equals a stored user_id.
 CREATE OR REPLACE FUNCTION public.current_user_id()
 RETURNS uuid
-LANGUAGE sql
+LANGUAGE plpgsql
 STABLE
 SET search_path = ''
 AS $$
-  SELECT NULLIF(
-    COALESCE(
-      current_setting('request.jwt.claim.sub', true),
-      current_setting('request.jwt.claims', true)::jsonb ->> 'sub'
-    ),
-    ''
-  )::uuid
+DECLARE
+  claimed text;
+BEGIN
+  claimed := COALESCE(
+    NULLIF(current_setting('request.jwt.claim.sub', true), ''),
+    NULLIF(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub'
+  );
+  RETURN NULLIF(claimed, '')::uuid;
+EXCEPTION WHEN others THEN
+  RETURN NULL;
+END;
 $$;
 
 COMMENT ON FUNCTION public.current_user_id() IS

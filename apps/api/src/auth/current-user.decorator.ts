@@ -1,6 +1,9 @@
 import { ExecutionContext, createParamDecorator } from '@nestjs/common';
 import { ApiException } from '../common/api-error';
-import type { AuthenticatedRequest, AuthenticatedUser } from './authenticated-user';
+import type {
+  AuthenticatedRequest,
+  AuthenticatedUser,
+} from './authenticated-user';
 
 /**
  * Injects the verified caller.

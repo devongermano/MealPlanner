@@ -19,7 +19,10 @@ export class AppController {
   /** Liveness probe. Same shape as the solver service's /healthz (contracts Healthz). */
   @Public()
   @Get('healthz')
-  @ApiOperation({ summary: 'Liveness. The process is up; says nothing about its dependencies.' })
+  @ApiOperation({
+    summary:
+      'Liveness. The process is up; says nothing about its dependencies.',
+  })
   healthz(): Healthz {
     return { ok: true, api_version: 'mealplan/v2' };
   }
@@ -34,10 +37,18 @@ export class AppController {
    */
   @Public()
   @Get('readyz')
-  @ApiOperation({ summary: 'Readiness: database reachable, auth verifier configured.' })
+  @ApiOperation({
+    summary: 'Readiness: database reachable, auth verifier configured.',
+  })
   @ApiResponse({ status: 200, type: ReadyzResponse })
-  @ApiResponse({ status: 503, type: ReadyzResponse, description: 'Database unreachable.' })
-  async readyz(@Res({ passthrough: true }) response: Response): Promise<ReadyzResponse> {
+  @ApiResponse({
+    status: 503,
+    type: ReadyzResponse,
+    description: 'Database unreachable.',
+  })
+  async readyz(
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<ReadyzResponse> {
     const database = await this.prisma.ping();
     if (!database) response.status(HttpStatus.SERVICE_UNAVAILABLE);
     return { ok: database, database, authMode: this.verifier.mode };
@@ -51,7 +62,10 @@ export class AppController {
   @Public()
   @Get('contracts-probe')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Inert fixture proving apps/api compiles against @mealplan/contracts.' })
+  @ApiOperation({
+    summary:
+      'Inert fixture proving apps/api compiles against @mealplan/contracts.',
+  })
   contractsProbe(): WeekPlanResult {
     return sampleWeekPlanResult;
   }

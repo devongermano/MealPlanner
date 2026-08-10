@@ -5,7 +5,9 @@ import { ApiErrorDetail, ApiException } from './api-error';
 function flatten(errors: ValidationError[], parentPath = ''): ApiErrorDetail[] {
   const out: ApiErrorDetail[] = [];
   for (const error of errors) {
-    const path = parentPath ? `${parentPath}.${error.property}` : error.property;
+    const path = parentPath
+      ? `${parentPath}.${error.property}`
+      : error.property;
     for (const message of Object.values(error.constraints ?? {})) {
       out.push({ field: path, message });
     }
