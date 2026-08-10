@@ -297,10 +297,15 @@ usda_fdc:2646170@sr2018-04+fnd2025-12-18
 ```
 
 The part after the `@` names the exact database releases, so any macro figure can be
-traced to a reviewable line in a specific USDA publication. **Not yet applied to the
-corpus:** today's `ingredients.yaml` has the numbers but not the provenance strings —
-the grammar and the tooling exist, the back-fill hasn't been done. You can already check
-the corpus against USDA today with:
+traced to a reviewable line in a specific USDA publication. **Partly applied:** the
+schema has no provenance *field* yet, so the ids live in comments and in
+`data/fdc/LINT_DISPOSITIONS.md`. As of the 2026-08-09 lint pass, three ingredients
+carry a provenance comment because their values were corrected against USDA
+(`dried_chiles`, `chorizo_pork`, `ricotta`), and sixteen more were verified against a
+named entry whose id is recorded in that file — enough to back-fill a real field when
+the schema grows one. The rest are
+label estimates, and the dispositions file says which and why. Check the corpus against
+USDA yourself with:
 
 ```
 python tools/fdc/lint_ingredients.py examples/ingredients.yaml
@@ -501,8 +506,10 @@ Not a wishlist — these are places where the data is thinner than it looks:
 - **No raw onion-and-cilantro finish** for tacos, and no *reserved* consommé for birria
   (the braise keeps its liquid inside the component, so there's nothing separate to dip
   a tortilla in).
-- **Ingredient macros have no provenance strings yet**, and prices have no estimate /
-  receipt labels, though both conventions and their tooling exist.
+- **Provenance has no schema field yet.** Ids live in comments and in
+  `data/fdc/LINT_DISPOSITIONS.md`; 19 of 73 ingredients are tied to a named USDA entry,
+  the rest are label estimates. Prices have no estimate / receipt labels at all, though
+  the convention exists.
 - **Yields are mostly estimates.** Every recipe's `yield_g` should be weighed on a real
   cook day. Every nutrition figure in the system divides by it, so these are the highest-
   leverage measurements available.
