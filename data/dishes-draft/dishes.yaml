@@ -1,0 +1,423 @@
+schema_version: 0
+# dishes.yaml — THE ASSEMBLY LAYER (draft, Track F / M1.13)
+#
+# WHY THIS FILE EXISTS
+# -------------------
+# Owner correction, 2026-08-09: "These aren't meals — they're random ingredients
+# served together… how is that following an actual recipe I gave you?"
+#
+# When the real recipes were ingested, they were split into COMPONENTS — the things
+# you cook in a batch (picadillo, gordita shells, salsa). That split is correct for
+# batch cooking: you cook one pot of picadillo, not one gordita at a time. But the
+# split threw away the other half of every recipe: HOW THE PARTS GO BACK TOGETHER.
+# A gordita is not "some masa and some beef in the same week." It is a shell, split
+# and stuffed with picadillo, topped with salsa, queso and crema, in roughly these
+# proportions.
+#
+# This file is that missing half. One entry per DISH: a named plate, with which
+# components it is made of and how much of each goes in one serving.
+#
+# EVERY NUMBER IN THIS FILE IS PROVISIONAL AND AWAITS OWNER REVIEW.
+# They are a cook's reconstruction, not measurements. Work through
+# DISH_REVIEW.md and correct them; nothing downstream is right until you do.
+#
+#
+# SCHEMA
+# ------
+#   id:          snake_case key. Stable — plans and history reference it.
+#   name:        what you'd call it out loud.
+#   source:      the ORIGINAL RECIPE this assembly comes from, or an honest
+#                statement that there isn't one.
+#   reconstruction:  how much of this assembly is real (see below). NOT optional —
+#                    it is the honesty field that tells the reviewer how hard to look.
+#   components:  {component_id: {base_g, min_g, max_g}} — per ONE SERVING, in grams
+#                of the FINISHED component (cooked weight, as it comes out of the
+#                batch container).
+#                  base_g — the canonical serving. The dish's shape.
+#                  min_g / max_g — the ratio band. How far the solver may move this
+#                    component for a bigger or smaller eater and still have the plate
+#                    read as this dish. Devon's gordita = more picadillo, no queso;
+#                    Jimbo's = the same dish, more of everything.
+#   accents:     [component_id] — the subset of `components` that is optional
+#                per-person finishing (PRD P4). Their min_g is 0: one batch stays
+#                universal until the plate, and the eater who can't have dairy just
+#                gets 0 g of queso. Accents still carry bands in `components` —
+#                one place for every quantity, so nothing is measured twice.
+#   compatible_sides: [component_id] — things that may be served ALONGSIDE this dish
+#                but are not part of it (beans next to gorditas). No bands here: the
+#                side's own serve_g in components.yaml governs it.
+#   meal_affinity: [breakfast|lunch|dinner|any] — which meal slots this dish belongs
+#                in. Meal-time affinity lives on DISHES, not components (PRD §4.0).
+#   notes:       anything the reviewer needs to know, including what's missing.
+#
+#
+# THE `reconstruction` FIELD — read this before trusting a number
+# --------------------------------------------------------------
+#   from_source  A named recipe defines this assembly. The parts, and roughly the
+#                proportions, come from that recipe. Highest confidence.
+#   inferred     The components come from a `source: house` recipe — there is no
+#                recipe document to read, so the FORMAT was inferred from what the
+#                component obviously is (carnitas → tacos; a braise → tacos or a
+#                bowl). Confident about the format, guessing at the grams.
+#   invented     Nothing in the corpus implies this plate. It was built to give a
+#                component a home or to fill an obvious hole. Treat as a proposal.
+#                Rejecting these costs nothing.
+#
+#
+# RULES THE LINT ENFORCES (data/dishes-draft/lint.py)
+# --------------------------------------------------
+#   - every component_id exists in examples/components.yaml
+#   - every dish has >= 1 non-accent component (no dish is only garnish)
+#   - 0 <= min_g <= base_g <= max_g, whole grams
+#   - accents: min_g == 0 (P4 — an accent must be omittable), role must be `accent`
+#   - max_g <= that component's serve_g.max, and non-accent min_g >= serve_g.min.
+#     serve_g bounds are per-dish palatability ABSOLUTES (PRD Appendix B item 2 —
+#     the lard-beans incident). A dish may not authorize a portion the component
+#     itself calls inedible.
+#   - components with unit_g (tortillas, wings, meatballs, shells): base/min/max sit
+#     on the unit grid. You cannot serve 1.4 tortillas.
+#   - every `main` component appears in >= 1 dish; every accent attaches somewhere
+#   - meal_affinity values valid; `any` never mixed with specific slots
+#
+#
+# KNOWN GAPS, FOR THE OWNER (details in DISH_REVIEW.md)
+# ----------------------------------------------------
+#   - No corn tortilla component. Carnitas, birria and al pastor tacos all want one;
+#     the corpus has flour only (corn_tortilla exists as an INGREDIENT, unused).
+#   - No raw-onion/cilantro garnish component — the standard taco finish.
+#   - No RESERVED consommé for birria. The braise keeps its liquid inside the component
+#     (the method portions the beef moistened with broth), so there is nothing to
+#     griddle a tortilla in or drink alongside. Quesabirria needs that plus a melter.
+#   - Exactly one vegetable in the whole corpus (smashed_cucumber, Korean). The
+#     Italian and Mexican dishes have no salad or green side to offer.
+#   - No melting cheese labelled for Mexican food (quesabirria). The corpus's only
+#     melters are mozzarella_shred (italian) and cheddar_shred (crossover).
+#
+#
+# INTEGRATION NOTES, FOR WHOEVER BUILDS M1.13 (not owner-facing)
+# -------------------------------------------------------------
+# This file is data. Nothing consumes it yet. Four things this corpus makes visible
+# that the design panel should settle BEFORE the dealer becomes a dish-dealer:
+#
+# 1. serve_g is per-DAY in the engine, per-SERVING here. M19_SPEC §3.3 records the
+#    mismatch already ("serve_g is authored per SERVING but the day pool applies it to
+#    day totals"). Dish bands are unambiguously per serving. Eat carnitas_tacos twice in
+#    one day and flour_tortilla lands at 284 g — exactly its component max. The next
+#    dish eaten twice will collide. Decide which layer owns the absolute.
+#
+# 2. Exactly one dish has two `main`-role components: turkey_meatballs_al_sugo
+#    (meatballs + sugo). The M1.9 dealer treats mains as ATOMIC and enforces a distinct
+#    main per slot. Under dish-dealing, the variety rule should key on DISH id, not on
+#    main component id — PRD Amendment 2's "no repeated main across slots" becomes "no
+#    repeated dish", which is what a human means by variety anyway.
+#
+# 3. `anchor: lean` is a component property and does not survive assembly.
+#    turkey_meatballs is a lean anchor; turkey_meatballs_al_sugo is 57 g of fat a
+#    serving, because the sugo is built on hot Italian sausage. If `min_lean_anchors`
+#    starts operating on dishes, derive leanness from the dish's own baseline macros —
+#    do not inherit the flag from the main.
+#
+# 4. Batching is genuinely unaffected, and the corpus proves the consolidation is
+#    load-bearing: charred_salsa_roja is a component of 9 of the 16 dishes,
+#    flour_tortilla of 5, cilantro_lime_rice of 4. Components stay the batch unit;
+#    dishes only decide what lands together on the plate.
+
+dishes:
+
+# ================================ MEXICAN / TEX-MEX ================================
+
+- id: gorditas_de_picadillo
+  name: Gorditas de picadillo
+  source: "barefoodtim - gorditas de picadillo (Vitamina T)"
+  reconstruction: from_source
+  components:
+    gordita_shell:         {base_g: 170, min_g: 85, max_g: 340}
+    picadillo:             {base_g: 160, min_g: 80, max_g: 340}
+    charred_salsa_roja:    {base_g: 30,  min_g: 0,  max_g: 100}
+    queso_fresco_crumbled: {base_g: 25,  min_g: 0,  max_g: 80}
+    mexican_crema:         {base_g: 20,  min_g: 0,  max_g: 60}
+  accents: [charred_salsa_roja, queso_fresco_crumbled, mexican_crema]
+  compatible_sides: [refried_pintos, cilantro_lime_rice]
+  meal_affinity: [lunch, dinner]
+  notes: >
+    Two shells is one serving (a batch of shells is five). Each shell is split along
+    the edge while warm and stuffed with picadillo, then finished with salsa, crumbled
+    queso and crema. Baseline filling is ~80 g per shell. The shells are lard-rich by
+    the recipe (70 g lard in a 425 g batch), which is why this plate reads fatty on
+    paper — that is the dish, not an error.
+
+- id: carnitas_tacos
+  name: Carnitas tacos
+  source: "house recipe (orange-lard carnitas) — taco format inferred, no source document"
+  reconstruction: inferred
+  components:
+    flour_tortilla:        {base_g: 142, min_g: 71, max_g: 284}
+    carnitas:              {base_g: 140, min_g: 80, max_g: 280}
+    charred_salsa_roja:    {base_g: 30,  min_g: 0,  max_g: 100}
+    guacamole:             {base_g: 40,  min_g: 0,  max_g: 120}
+    queso_fresco_crumbled: {base_g: 20,  min_g: 0,  max_g: 60}
+  accents: [charred_salsa_roja, guacamole, queso_fresco_crumbled]
+  compatible_sides: [refried_pintos, cilantro_lime_rice]
+  meal_affinity: [lunch, dinner]
+  notes: >
+    Two tacos, ~70 g meat each. Wants corn tortillas and a raw onion-cilantro finish;
+    the corpus has neither, so this is flour-tortilla carnitas until the owner says
+    otherwise.
+
+- id: carnitas_bowl
+  name: Carnitas rice bowl
+  source: "house recipe (orange-lard carnitas) — bowl format inferred, no source document"
+  reconstruction: inferred
+  components:
+    cilantro_lime_rice:  {base_g: 200, min_g: 100, max_g: 400}
+    carnitas:            {base_g: 140, min_g: 80,  max_g: 280}
+    refried_pintos:      {base_g: 100, min_g: 80,  max_g: 250}
+    charred_salsa_roja:  {base_g: 30,  min_g: 0,   max_g: 100}
+    guacamole:           {base_g: 40,  min_g: 0,   max_g: 120}
+    mexican_crema:       {base_g: 20,  min_g: 0,   max_g: 60}
+  accents: [charred_salsa_roja, guacamole, mexican_crema]
+  compatible_sides: []
+  meal_affinity: [lunch, dinner]
+  notes: >
+    The no-tortilla version of the same meat: rice and beans in the bowl, everything
+    else on top. Exists mostly so carnitas has a wheat-free home and a carb-dense one
+    (rice moves further than tortillas when someone needs 588 g of carbs).
+
+- id: birria_tacos
+  name: Birria tacos
+  source: "house recipe (chile-braised chuck) — taco format inferred, no source document"
+  reconstruction: inferred
+  components:
+    flour_tortilla:        {base_g: 142, min_g: 71, max_g: 284}
+    birria_chuck:          {base_g: 150, min_g: 80, max_g: 300}
+    charred_salsa_roja:    {base_g: 30,  min_g: 0,  max_g: 100}
+    queso_fresco_crumbled: {base_g: 25,  min_g: 0,  max_g: 80}
+  accents: [charred_salsa_roja, queso_fresco_crumbled]
+  compatible_sides: [cilantro_lime_rice, refried_pintos]
+  meal_affinity: [lunch, dinner]
+  notes: >
+    Reconstructed as plain birria tacos, NOT quesabirria. Two reasons, both from the
+    recipe itself: the corpus has no melting cheese labelled for Mexican food, and the
+    method folds the skimmed consommé back into the meat and portions the beef
+    moistened with broth — so the braising liquid is already inside this component's
+    1500 g yield. There is no separate consommé to griddle the tortillas in or drink
+    alongside; that ritual needs its own component (reserved broth) plus a melting
+    cheese before quesabirria is a dish this library can make.
+
+- id: birria_bowl
+  name: Birria rice bowl
+  source: "house recipe (chile-braised chuck) — bowl format inferred, no source document"
+  reconstruction: inferred
+  components:
+    cilantro_lime_rice:    {base_g: 200, min_g: 100, max_g: 400}
+    birria_chuck:          {base_g: 160, min_g: 80,  max_g: 320}
+    refried_pintos:        {base_g: 100, min_g: 80,  max_g: 250}
+    charred_salsa_roja:    {base_g: 30,  min_g: 0,   max_g: 100}
+    mexican_crema:         {base_g: 20,  min_g: 0,   max_g: 60}
+    queso_fresco_crumbled: {base_g: 20,  min_g: 0,   max_g: 60}
+  accents: [charred_salsa_roja, mexican_crema, queso_fresco_crumbled]
+  compatible_sides: []
+  meal_affinity: [lunch, dinner]
+  notes: >
+    The braise over rice, with its own liquid soaking in. Wheat-free.
+
+- id: shrimp_al_pastor_tacos
+  name: Shrimp al pastor tacos
+  source: "house recipe (achiote-pineapple shrimp) — taco format inferred, no source document"
+  reconstruction: inferred
+  components:
+    flour_tortilla:     {base_g: 142, min_g: 71, max_g: 284}
+    shrimp_al_pastor:   {base_g: 150, min_g: 80, max_g: 300}
+    guacamole:          {base_g: 40,  min_g: 0,  max_g: 120}
+    charred_salsa_roja: {base_g: 30,  min_g: 0,  max_g: 100}
+  accents: [guacamole, charred_salsa_roja]
+  compatible_sides: [cilantro_lime_rice, refried_pintos]
+  meal_affinity: [lunch, dinner]
+  notes: >
+    Al pastor is a taco by construction — the pineapple in the shrimp is the al pastor
+    signature and it goes in the tortilla. The leanest plate in the corpus at baseline;
+    this is the dish that carries a protein target without dragging fat along.
+
+- id: shrimp_al_pastor_bowl
+  name: Shrimp al pastor rice bowl
+  source: "house recipe (achiote-pineapple shrimp) — bowl format inferred, no source document"
+  reconstruction: inferred
+  components:
+    cilantro_lime_rice: {base_g: 220, min_g: 100, max_g: 420}
+    shrimp_al_pastor:   {base_g: 160, min_g: 80,  max_g: 320}
+    guacamole:          {base_g: 40,  min_g: 0,   max_g: 120}
+    charred_salsa_roja: {base_g: 30,  min_g: 0,   max_g: 100}
+    mexican_crema:      {base_g: 15,  min_g: 0,   max_g: 50}
+  accents: [guacamole, charred_salsa_roja, mexican_crema]
+  compatible_sides: [refried_pintos]
+  meal_affinity: [lunch, dinner]
+  notes: >
+    Shrimp keeps only 3 days and does not freeze — this dish and its taco sibling both
+    have to land early in the week, whichever one the menu picks.
+
+- id: salsa_verde_chicken_tacos
+  name: Salsa verde chicken tacos
+  source: "house recipe (salsa verde shredded chicken) — taco format inferred, no source document"
+  reconstruction: inferred
+  components:
+    flour_tortilla:        {base_g: 142, min_g: 71, max_g: 284}
+    salsa_verde_chicken:   {base_g: 150, min_g: 80, max_g: 300}
+    guacamole:             {base_g: 40,  min_g: 0,  max_g: 120}
+    mexican_crema:         {base_g: 20,  min_g: 0,  max_g: 60}
+    queso_fresco_crumbled: {base_g: 20,  min_g: 0,  max_g: 60}
+  accents: [guacamole, mexican_crema, queso_fresco_crumbled]
+  compatible_sides: [refried_pintos, cilantro_lime_rice]
+  meal_affinity: [lunch, dinner]
+  notes: >
+    The lean chicken keeps 5 days and freezes, so this is the dish that reaches the
+    end of the week — it was added to the corpus for exactly that reason.
+
+- id: salsa_verde_chicken_bowl
+  name: Salsa verde chicken bowl
+  source: "house recipe (salsa verde shredded chicken) — bowl format inferred, no source document"
+  reconstruction: inferred
+  components:
+    cilantro_lime_rice:  {base_g: 200, min_g: 100, max_g: 400}
+    salsa_verde_chicken: {base_g: 160, min_g: 80,  max_g: 320}
+    refried_pintos:      {base_g: 100, min_g: 80,  max_g: 250}
+    guacamole:           {base_g: 40,  min_g: 0,   max_g: 120}
+    mexican_crema:       {base_g: 20,  min_g: 0,   max_g: 60}
+    cheddar_shred:       {base_g: 25,  min_g: 0,   max_g: 70}
+  accents: [guacamole, mexican_crema, cheddar_shred]
+  compatible_sides: []
+  meal_affinity: [lunch, dinner]
+  notes: >
+    Cheddar rather than queso fresco here — the Tex-Mex read. Swap it if you'd rather
+    keep cheddar for breakfast only.
+
+- id: breakfast_burrito
+  name: Breakfast burrito
+  source: "barefoodtim - breakfast burritos"
+  reconstruction: from_source
+  components:
+    flour_tortilla:      {base_g: 71,  min_g: 71,  max_g: 142}
+    egg_potato_scramble: {base_g: 220, min_g: 100, max_g: 380}
+    cheddar_shred:       {base_g: 30,  min_g: 0,   max_g: 80}
+    charred_salsa_roja:  {base_g: 30,  min_g: 0,   max_g: 100}
+  accents: [cheddar_shred, charred_salsa_roja]
+  compatible_sides: [refried_pintos]
+  meal_affinity: [breakfast, lunch]
+  notes: >
+    The canonical P4 example, and the reason accents are their own components: one
+    batch of scramble, one stack of tortillas, and Devon's burrito gets 0 g of cheddar
+    while Jimbo's gets 30 g. Same pots, different plates, no separate recipe.
+    One 10-inch tortilla per burrito — the band allows a second for a double wrap.
+    Beans can go inside rather than alongside; that is the same grams either way.
+
+# ================================= KOREAN / CN-AM =================================
+
+- id: bulgogi_rice_bowl
+  name: Bulgogi rice bowl
+  source: "house recipe (soy-free bulgogi flank) — bowl format inferred, no source document"
+  reconstruction: inferred
+  components:
+    jasmine_rice:        {base_g: 220, min_g: 100, max_g: 420}
+    bulgogi_flank:       {base_g: 130, min_g: 60,  max_g: 280}
+    smashed_cucumber:    {base_g: 80,  min_g: 50,  max_g: 200}
+    scallion_ginger_oil: {base_g: 15,  min_g: 0,   max_g: 45}
+  accents: [scallion_ginger_oil]
+  compatible_sides: []
+  meal_affinity: [lunch, dinner]
+  notes: >
+    Rice, sliced bulgogi over the top, cucumber alongside in the same bowl as the
+    banchan, scallion-ginger oil spooned over. The cucumber is IN the dish rather than
+    a side — a bulgogi bowl without something cool and sharp is just meat on rice.
+    Bulgogi's batch is the smallest in the corpus (600 g, about 4-5 servings).
+
+- id: orange_chicken_rice
+  name: Orange chicken over rice
+  source: "barefoodtim (orange chicken, soy swapped for coconut aminos) — plate format inferred"
+  reconstruction: inferred
+  components:
+    jasmine_rice:        {base_g: 220, min_g: 100, max_g: 420}
+    orange_chicken:      {base_g: 180, min_g: 80,  max_g: 360}
+    scallion_ginger_oil: {base_g: 10,  min_g: 0,   max_g: 40}
+  accents: [scallion_ginger_oil]
+  compatible_sides: [smashed_cucumber]
+  meal_affinity: [lunch, dinner]
+  notes: >
+    The source is a recipe for the chicken alone; over rice is how it is eaten, so the
+    format is safe even though the grams are a guess. The cucumber is offered as a side
+    rather than built in, so the plate can be just chicken and rice on a lazy day.
+
+# =============================== ITALIAN / AMERICAN ===============================
+
+- id: sausage_fusilli_al_forno
+  name: Spicy sausage fusilli al forno
+  source: "barefoodtim 010 - spicy sausage fusilli al forno"
+  reconstruction: from_source
+  components:
+    fusilli_cooked:   {base_g: 150, min_g: 100, max_g: 300}
+    sausage_sugo:     {base_g: 225, min_g: 80,  max_g: 375}
+    mozzarella_shred: {base_g: 45,  min_g: 0,   max_g: 90}
+  accents: [mozzarella_shred]
+  compatible_sides: []
+  meal_affinity: [lunch, dinner]
+  notes: >
+    The baseline ratio is the SOURCE RECIPE'S OWN: its sugo batch is 1500 g and its
+    pasta batch is 1000 g cooked, so 1.5 g of sauce per 1 g of pasta — 225 g sugo to
+    150 g fusilli. This is a saucy, sausage-forward bake, not pasta with sauce on it.
+    Mozzarella is the "al forno" — it goes on top and gets baked. It is an accent so
+    that a dairy-free eater gets the same pasta without it.
+    No side: the corpus has no salad or green vegetable that belongs next to this.
+
+- id: turkey_meatballs_al_sugo
+  name: Turkey meatballs in sugo, with fusilli
+  source: "no source recipe — house turkey meatballs + barefoodtim 010 sugo, paired here"
+  reconstruction: invented
+  components:
+    turkey_meatballs: {base_g: 160, min_g: 80,  max_g: 320}
+    sausage_sugo:     {base_g: 180, min_g: 80,  max_g: 360}
+    fusilli_cooked:   {base_g: 150, min_g: 100, max_g: 300}
+    mozzarella_shred: {base_g: 30,  min_g: 0,   max_g: 90}
+  accents: [mozzarella_shred]
+  compatible_sides: []
+  meal_affinity: [lunch, dinner]
+  notes: >
+    INVENTED. No recipe pairs these — the meatballs are a house recipe and the sugo
+    belongs to the fusilli al forno. They are paired here because the sugo is the
+    corpus's only red sauce and turkey meatballs are otherwise homeless.
+    Two consequences to decide: (1) the sugo is built on hot Italian sausage, so this
+    "lean" plate carries the sausage's fat — it is not the lean anchor its meatballs
+    look like; (2) four 40 g meatballs is the baseline serving.
+    If you'd rather have a plain tomato sauce for meatballs, that is a new component.
+
+- id: wings_plate
+  name: Mango jalapeno wings with rosemary potatoes
+  source: "no source recipe for the plate — barefoodtim 013 wings + barefoodtim 008 potatoes"
+  reconstruction: invented
+  components:
+    mango_jalapeno_wings: {base_g: 270, min_g: 90,  max_g: 450}
+    rosemary_potatoes:    {base_g: 200, min_g: 100, max_g: 400}
+  accents: []
+  compatible_sides: [smashed_cucumber]
+  meal_affinity: [lunch, dinner]
+  notes: >
+    INVENTED. Both halves are real recipes; nothing says they go on the same plate.
+    Wings are weighed GROSS (bone in) — 270 g is six wings, of which about 178 g is
+    edible. The macros account for that; the plate does not look like 270 g of meat.
+    The cucumber is offered as the cooling side because it is the only thing in the
+    corpus that plays that role, despite being Korean.
+
+- id: breakfast_scramble_plate
+  name: Scramble plate with rosemary potatoes
+  source: "no source recipe — barefoodtim breakfast-burrito scramble + barefoodtim 008 potatoes"
+  reconstruction: invented
+  components:
+    egg_potato_scramble: {base_g: 220, min_g: 100, max_g: 400}
+    rosemary_potatoes:   {base_g: 150, min_g: 100, max_g: 350}
+    cheddar_shred:       {base_g: 30,  min_g: 0,   max_g: 80}
+    charred_salsa_roja:  {base_g: 30,  min_g: 0,   max_g: 100}
+  accents: [cheddar_shred, charred_salsa_roja]
+  compatible_sides: []
+  meal_affinity: [breakfast]
+  notes: >
+    INVENTED, and the weakest dish here — it exists so breakfast isn't only a burrito
+    and so there is a wheat-free breakfast. It is also potato on potato: the scramble
+    already has 400 g of potato in a 950 g batch. Reject it and breakfast is the
+    burrito alone, which is an honest answer.
