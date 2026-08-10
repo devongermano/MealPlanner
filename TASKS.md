@@ -46,8 +46,8 @@ and eaten from M1 output. Targets are arbitrary by design (owner, 2026-08-09:
 "arbitrary goals for arbitrary people" — OQ-D1 dissolved; examples/ is demo data).
 
 - [x] M1.0 Sweep the Phase 5 deferred minors (`services/solver/PHASE5_FIXNOTES.md`, "Deferred minors" section)
-- [ ] M1.1 The three deliverables as human-readable artifacts: shopping list, per-session cook plan with scaled recipes, per-day per-person eat sheets
-- [ ] M1.2 Relaxed mode: household-unit rendering + widened tolerance profile with honest error bars
+- [x] M1.1 The three deliverables as human-readable artifacts: shopping list, per-session cook plan with scaled recipes, per-day per-person eat sheets *(services/solver/mealplan/artifacts.py — rendering only, consumes engine/costing outputs verbatim; CLI `week`/`all --artifacts DIR`; seed+library+date footer on all three)*
+- [x] M1.2 Relaxed mode: household-unit rendering + widened tolerance profile with honest error bars *(person.mode enum, RELAXED_TOLERANCE=0.12 provisional default, component.household_unit validated; counts / half-units / friendly batch fractions on eat sheets only — engine still solves grams; error bars are worst-case aggregation of the rounding deltas actually applied, property-tested)*
 - [ ] M1.3 Locked-plan artifacts: immutable, inputs-hash (incl. seed + pantry), keyed by primary-trip date; open-format export
 - [ ] M1.4 n=1..4 exercised via fixtures; CLI `--json` contract versioned
 - [ ] M1.5 Interactive-latency targets set from M0 baselines (provisional labels)

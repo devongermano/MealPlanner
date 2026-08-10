@@ -23,7 +23,8 @@ from typing import Any, Optional
 
 import yaml
 
-from .model import (Ingredient, Pantry, Person, Settings, derive_component)
+from .model import (PERSON_MODES, Ingredient, Pantry, Person, Settings,
+                    derive_component)
 
 SCHEMA_VERSION = 1
 KNOWN_SCHEMA_VERSIONS = (1,)
@@ -243,6 +244,37 @@ def validate_components_doc(doc: Any, known_ingredients: Optional[set] = None,
             issues.append(ValidationIssue(
                 "bad_unit_g", f"{where}, field 'unit_g'",
                 f"unit_g must be a positive number (got {ug!r})"))
+        # household_unit (optional, M1.2 PRD §4.1): {"name": str, "grams": >0}
+        # — the relaxed-mode rendering unit ("cup", "scoop"). Shape-validated
+        # here; the eat-sheet renderer (artifacts.py) is the consumer.
+        hu = c.get("household_unit")
+        if hu is not None:
+            hwhere = f"{where}, field 'household_unit'"
+            if not isinstance(hu, dict):
+                issues.append(ValidationIssue(
+                    "bad_household_unit", hwhere,
+                    "household_unit must be a mapping with 'name' and "
+                    f"'grams' (got {hu!r})"))
+            else:
+                hname = hu.get("name")
+                if not isinstance(hname, str) or not hname.strip():
+                    issues.append(ValidationIssue(
+                        "bad_household_unit", f"{hwhere}, 'name'",
+                        f"household_unit name must be a non-empty string "
+                        f"(got {hname!r})"))
+                hg = hu.get("grams")
+                if (not isinstance(hg, (int, float)) or isinstance(hg, bool)
+                        or hg <= 0):
+                    issues.append(ValidationIssue(
+                        "bad_household_unit", f"{hwhere}, 'grams'",
+                        f"household_unit grams must be a positive number "
+                        f"(got {hg!r})"))
+                extra = sorted(set(hu) - {"name", "grams"})
+                if extra:
+                    issues.append(ValidationIssue(
+                        "bad_household_unit", hwhere,
+                        f"unexpected household_unit field(s) {extra}; "
+                        "only 'name' and 'grams' are allowed"))
         sg = c.get("serve_g")
         if sg is not None:
             if not isinstance(sg, dict) or "min" not in sg or "max" not in sg:
@@ -318,10 +350,21 @@ def validate_people_doc(doc: Any, fname: str = "people.yaml"
                                               "entry is not a mapping"))
                 continue
             for f_ in PERSON_REQUIRED:
+                # M1.2: tolerance is optional for a relaxed person — their
+                # effective tolerance defaults to model.RELAXED_TOLERANCE.
+                if f_ == "tolerance" and p.get("mode") == "relaxed":
+                    continue
                 if f_ not in p:
                     issues.append(ValidationIssue(
                         "missing_field", f"{where}, field '{f_}'",
                         f"required field '{f_}' is missing"))
+            # M1.2 (PRD §4.1): mode is presentation + tolerance default only
+            pm = p.get("mode")
+            if pm is not None and pm not in PERSON_MODES:
+                issues.append(ValidationIssue(
+                    "bad_enum", f"{where}, field 'mode'",
+                    f"mode must be one of {'|'.join(PERSON_MODES)} "
+                    f"(got {pm!r})"))
             tgt = p.get("targets")
             if isinstance(tgt, dict):
                 for mac in ("protein", "fat", "carb"):

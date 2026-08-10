@@ -126,6 +126,9 @@ components:
   source: house
   yield_g: 1250
   serve_g: {min: 100, max: 600}
+  # M1.2 relaxed-mode rendering unit. 185g/cup cooked rice is PROVISIONAL —
+  # weigh one real cup from this recipe and correct it.
+  household_unit: {name: cup, grams: 185}
   keeps_days: 5
   freezes: true
   active_min: 10
@@ -143,6 +146,8 @@ components:
   source: house
   yield_g: 800
   serve_g: {min: 80, max: 400}
+  # M1.2 relaxed-mode rendering unit. 240g/cup refried beans is PROVISIONAL.
+  household_unit: {name: cup, grams: 240}
   keeps_days: 5
   freezes: true
   active_min: 20
@@ -161,6 +166,9 @@ components:
   yield_g: 568
   unit_g: 71
   serve_g: {min: 71, max: 284}     # max 4 tortillas/day. the solver WILL try for 11.
+  # M1.2: count noun for relaxed rendering ("4 tortillas"); grams matches
+  # unit_g by construction (one tortilla) — PROVISIONAL store-brand weight.
+  household_unit: {name: tortilla, grams: 71}
   keeps_days: 14
   freezes: true
   active_min: 0
@@ -282,6 +290,8 @@ components:
   source: house
   yield_g: 1500
   serve_g: {min: 100, max: 600}
+  # M1.2 relaxed-mode rendering unit. 185g/cup cooked rice is PROVISIONAL.
+  household_unit: {name: cup, grams: 185}
   keeps_days: 5
   freezes: true
   active_min: 5

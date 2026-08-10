@@ -43,6 +43,14 @@ from .units import KCAL, MACROS
 #  costing.cooked_leftovers joins it into availability and session_plan.)
 RESERVED_FIELDS = frozenset({"meals_per_day", "period"})
 
+# M1.2 (PRD §4.1): a relaxed person with NO explicit tolerance gets this
+# effective tolerance. PROVISIONAL — ±12% is the PRD §4.1 default, to be
+# ratified against the M1.6 real week. An explicit tolerance always wins and
+# is still capped at 0.5 by validation (io_yaml).
+RELAXED_TOLERANCE = 0.12
+
+PERSON_MODES = ("precision", "relaxed")
+
 
 class _RawView:
     """Dict-style access shim delegating to the raw mapping the object was
@@ -127,6 +135,7 @@ class Component(_RawView):
     active_min: float
     ingredients: dict               # {ingredient_id: grams}
     unit_g: Optional[float] = None
+    household_unit: Optional[dict] = None   # M1.2: {"name": str, "grams": >0}
     anchor: Optional[str] = None
     freezes: Optional[bool] = None  # LIVE (M0.5): freezer-bridging availability
     source: Optional[str] = None
@@ -143,11 +152,18 @@ class Person(_RawView):
     meals_per_day is RESERVED (see RESERVED_FIELDS): validated int >= 1, but
     the M0 engine ignores it by design — it is the meal structure for the M1
     eat sheets (PRD §8.1), a presentation concern, not a solving one.
+
+    mode (M1.2, PRD §4.1): "precision" (default) or "relaxed". Presentation
+    + tolerance-default ONLY — the engine still solves grams either way. A
+    relaxed person with no explicit tolerance gets RELAXED_TOLERANCE; the
+    default is applied HERE (the one schema-defaults layer) so the engine
+    keeps reading person["tolerance"] by plain indexing.
     """
 
     name: str
     targets: dict                   # daily grams: {"protein","fat","carb"}
     tolerance: float
+    mode: str = "precision"         # M1.2: precision | relaxed (PRD §4.1)
     exclude: list = field(default_factory=list)
     dislikes: list = field(default_factory=list)
     max_daily_mass_g: Optional[float] = None
@@ -156,12 +172,18 @@ class Person(_RawView):
 
     @classmethod
     def from_raw(cls, pname: str, d: dict) -> "Person":
-        return cls(name=pname, targets=d.get("targets"),
-                   tolerance=d.get("tolerance"), exclude=d.get("exclude") or [],
-                   dislikes=d.get("dislikes") or [],
-                   max_daily_mass_g=d.get("max_daily_mass_g"),
-                   meals_per_day=d.get("meals_per_day"),
-                   raw=dict(d))
+        raw = dict(d)
+        mode = raw.get("mode") or "precision"
+        raw["mode"] = mode
+        if raw.get("tolerance") is None and mode == "relaxed":
+            raw["tolerance"] = RELAXED_TOLERANCE
+        return cls(name=pname, targets=raw.get("targets"),
+                   tolerance=raw.get("tolerance"), mode=mode,
+                   exclude=raw.get("exclude") or [],
+                   dislikes=raw.get("dislikes") or [],
+                   max_daily_mass_g=raw.get("max_daily_mass_g"),
+                   meals_per_day=raw.get("meals_per_day"),
+                   raw=raw)
 
 
 @dataclass
@@ -306,6 +328,6 @@ def derive_component(c: dict, ing: dict) -> Component:
         role=c.get("role"), yield_g=c.get("yield_g"), serve_g=c.get("serve_g"),
         keeps_days=c.get("keeps_days"), active_min=c.get("active_min"),
         ingredients=c.get("ingredients"), unit_g=c.get("unit_g"),
-        anchor=c.get("anchor"),
+        household_unit=c.get("household_unit"), anchor=c.get("anchor"),
         freezes=c.get("freezes"), source=c.get("source"),
         per100=raw["per100"], tags=raw["tags"], raw=raw)

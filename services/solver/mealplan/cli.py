@@ -18,7 +18,7 @@ import datetime
 import sys
 from pathlib import Path
 
-from . import instrument, io_yaml
+from . import artifacts, instrument, io_yaml
 from .costing import (age_pantry, attribute, budget_ceiling, cooked_leftovers,
                       menu_cost, purchase, session_plan)
 from .engine import (available_on, build_week, choose_menu, from_freezer,
@@ -256,6 +256,11 @@ def main(argv=None):
     ap.add_argument("--menu", default=None)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--out", default="plan.md")
+    ap.add_argument("--artifacts", default=None, metavar="DIR",
+                    help="week/all only: also write the three human-readable "
+                         "deliverables (M1.1, PRD §4.3 step 4) into DIR — "
+                         "shopping_list.md, cook_plan.md, and one "
+                         "eat_<person>.md per person")
     ap.add_argument("--budget", default=None,
                     help="override: '550' for a shared pot, or 'alice=320,bob=240'")
     ap.add_argument("--mass", default=None, help="override: 'alice=2200'")
@@ -302,7 +307,7 @@ def _run(a, timer):
         except ValueError:
             sys.exit(f"--date must be an ISO date (YYYY-MM-DD), "
                      f"got {a.date!r}")
-    leftovers = []
+    leftovers, stock_warns = [], []
     if pantry is not None and (pantry.stock or pantry.cooked):
         if plan_date is None:
             sys.exit("--date YYYY-MM-DD is required when the pantry has "
@@ -320,6 +325,7 @@ def _run(a, timer):
         for w in stock_warnings + leftover_warnings:
             print(f"[warning:{w['code']}] {w['message']}", file=sys.stderr)
         pantry = pantry_eff
+        stock_warns = stock_warnings
     if a.budget:
         settings["budget"] = parse_budget(a.budget)
     if a.mass:
@@ -394,6 +400,24 @@ def _run(a, timer):
     with timer.span("render"):
         out = render(comps, ing, people, settings, menu, weeks, demand, docmsg,
                      menuinfo, sp, pantry=pantry, diag=diag)
+
+    # M1.1: the three human-readable deliverables (PRD §4.3 step 4).
+    # Rendering only — every input below is an already-solved structure.
+    if a.artifacts and a.cmd in ("week", "all"):
+        with timer.span("artifacts"):
+            batches = sp["batches"]
+            chosen = [i for i in menu if batches.get(i)]
+            rows, _, _ = purchase(comps, ing, chosen, batches, pantry=pantry)
+            total = menu_cost(comps, ing, chosen, batches, pantry=pantry)
+            meta = dict(seed=a.seed, library=str(lib),
+                        date=a.date or "unspecified")
+            files = artifacts.render_artifacts(
+                comps, ing, people, settings, menu, weeks, sp, rows, total,
+                pantry=pantry, stock_warnings=stock_warns, diag=diag,
+                meta=meta)
+            written = artifacts.write_artifacts(a.artifacts, files)
+        print(f"[artifacts written to {a.artifacts}: "
+              + ", ".join(p.name for p in written) + "]", file=sys.stderr)
 
     if a.cmd == "shop":
         print(out.split("## Shopping list")[1])

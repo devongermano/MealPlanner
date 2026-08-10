@@ -12,6 +12,7 @@ time is dominated by CBC solves rather than the logic under test.
 import pytest
 
 SLOW_MODULES = {
+    "test_artifacts_e2e",       # the ONE artifacts test with a real solve
     "test_capabilities",        # full pipelines on fixtures + golden
     "test_determinism",         # subprocess CLI runs
     "test_doctor_diagnostics",  # volume-floor bisection, ablations

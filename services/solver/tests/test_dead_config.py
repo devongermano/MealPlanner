@@ -353,7 +353,11 @@ from _shared import strip_comments_and_docstrings
 
 
 def _engine_side_source():
-    srcs = [inspect.getsource(m) for m in (engine, costing, cli)]
+    # artifacts joined the consuming surfaces in M1.1/M1.2: the eat-sheet
+    # renderer consumes Person.mode and Component.household_unit (rendering
+    # is consumption — the field changes what the user sees).
+    from mealplan import artifacts
+    srcs = [inspect.getsource(m) for m in (engine, costing, cli, artifacts)]
     srcs.append(inspect.getsource(model.derive_component))
     return "".join(strip_comments_and_docstrings(s) for s in srcs)
 
