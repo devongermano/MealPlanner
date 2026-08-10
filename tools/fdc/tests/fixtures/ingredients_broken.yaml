@@ -1,0 +1,10 @@
+schema_version: 1
+ingredients:
+  # p+f+c > 100 g per 100 g: physically impossible
+  overweight_paste: {p: 40.0, f: 40.0, c: 40.0}
+  # negative macro (and therefore also implied-kcal trouble)
+  antimatter_oil:   {p: 0.0, f: -5.0, c: 0.0}
+  # mass overflow so extreme the Atwater density also exceeds 900
+  rocket_fuel:      {p: 10.0, f: 110.0, c: 10.0}
+  # deviates hard from the FDC chicken breast entry in the mini extract
+  chicken_breast:   {p: 40.0, f: 15.0, c: 5.0}

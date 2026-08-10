@@ -1,0 +1,4 @@
+schema_version: 1
+ingredients:
+  chicken_breast: {p: 22.5, f: 2.6, c: 0.0, perishable: true, pack_g: 907, keeps_days: 3}
+  butter:         {p: 0.9,  f: 81.1, c: 0.1, perishable: true, pack_g: 454, keeps_days: 60}
