@@ -36,7 +36,9 @@ from the ingredients (never typed in by hand). Rough reference points: a third o
 Devon's day is about 60 g protein / 32 g fat / 107 g carb (≈950 kcal); a third of
 Jimbo's is about 78 g / 52 g / 196 g (≈1,570 kcal).
 
-There are five general questions at the end, after the dishes.
+There are seven general questions at the end, after the dishes. The last two are
+quick label checks from a separate pass over the ingredient data — they're here so
+everything you owe an answer on lives in one document.
 
 ---
 
@@ -430,7 +432,7 @@ One serving: **32 g protein · 41 g fat · 57 g carb · 730 kcal**
 
 ---
 
-## Five general questions
+## Seven general questions
 
 **Q1. Corn tortillas.** Carnitas, birria and al pastor tacos all want corn, and the
 library only has flour. Corn tortillas exist as an *ingredient* but nobody made them a
@@ -462,3 +464,25 @@ already in the library in pieces.
 
 `[ ] ______________________________________________`
 `[ ] ______________________________________________`
+
+---
+
+*The last two come from checking every ingredient's nutrition against the USDA
+database (the full record is in `data/fdc/LINT_DISPOSITIONS.md`). Both are settled by
+reading a package you already buy — I deliberately didn't guess at either.*
+
+**Q6. Hot Italian sausage — what does the package say for protein?** Our data says
+16 g per 100 g. The USDA figure for *mild* Italian sausage is 13.9 g, and chili flakes
+can't add protein, so one of those is a brand difference and one is a guess. This is
+the one worth walking to the fridge for: that sausage is 908 g of a 1,500 g batch of
+sugo, so being wrong here moves the sauce's protein by about 12%.
+
+`[ ] package says ______ g protein per 100 g`  `[ ] can't find it / don't buy it anymore`
+
+**Q7. Chicken wings — worth a check, low stakes.** Our data says 14.1 g fat per 100 g
+of edible meat and skin. USDA gives two answers for the same food: 12.85 g in the older
+survey, 10.64 g in the newer one. Ours is close to the older figure, so nothing is
+obviously wrong — but wings are the one thing weighed bone-in, so it's the number most
+worth confirming if you happen to have a package in front of you.
+
+`[ ] package says ______ g fat per 100 g`  `[ ] leave it as is`
