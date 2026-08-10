@@ -1,0 +1,1435 @@
+schema_version: 1
+
+# PROVENANCE
+#
+# Every pack size, selling unit, and price in this file was authored from
+# real-world knowledge of how a US supermarket actually stocks and sells food.
+# None of it was derived from, copied from, or reconciled against the meal
+# planner's own ingredient data (examples/ingredients.yaml, services/solver/*).
+# Those files were deliberately not opened while writing this catalog.
+#
+# The independence matters because this catalog is the instrument that tests
+# whether the planner's shopping list can be shopped. If the store's pack sizes
+# were taken from the planner's pack sizes, every list would be trivially
+# shoppable and the test could never fail — it would be measuring the planner
+# against itself. The disagreements between this file and the planner's list
+# are the signal we are looking for, so this file must be free to disagree.
+#
+# Conventions used below:
+#   - Loose produce and butcher-counter meat are `sold_by: weight` with
+#     pack_g: 454 (one pound). Price is the per-pound shelf price. A shopper can
+#     buy any weight; 1 lb is just the quoted increment.
+#   - Fixed packages (bags, trays, cartons, cans) carry their true package
+#     weight in pack_g, and price is for that one package.
+#   - Liquids sold by fluid ounce are converted to grams at their real density
+#     (oil ~0.92 g/mL, vinegar/stock ~1.00, juice ~1.045). This is why almost no
+#     bottle in this store weighs a round number of grams.
+#   - `pack_g` for `sold_by: count` is the realistic total package weight AS
+#     SOLD, i.e. gross: eggs in the shell, avocados with pit and skin, whole
+#     pineapple with crown and rind. Edible yield is called out in notes where
+#     it differs sharply, because that gap is a common source of shortfall.
+#
+# Deliberately NOT stocked: there is no SKU named "spices" and none named
+# "dried_chiles". No supermarket sells a product by those names — they are
+# categories. Real jars and real cello bags of specific chiles are stocked
+# instead. Same for "water": tap water is what recipes mean and it is free and
+# unlimited at the sink, so it is not a purchasable ingredient. Bottled drinking
+# water is stocked (it is a real product a real store sells), but a plan that
+# puts cooking water on a shopping list is making a mistake this store will not
+# absorb.
+
+aisles: [produce, meat, seafood, dairy, dry_goods, canned, frozen, spices_baking, household]
+
+skus:
+
+  # ---------------------------------------------------------------- produce --
+
+  - id: onion_yellow_loose
+    display_name: "Yellow Onion, loose"
+    aliases: [onion, yellow onion, onions, brown onion]
+    aisle: produce
+    sold_by: weight
+    pack_g: 454
+    pack_count: null
+    price: 1.49
+    perishable: true
+    needs_refrigeration: false
+    keeps_days_raw: 30
+    freezable: false
+    notes: "Priced per pound in the bin; buy any weight. A medium onion is ~200 g, so a pound is 2-3 onions. Keep in a dark pantry, NOT the fridge - refrigeration makes them soft and sprouty."
+
+  - id: onion_yellow_bag_3lb
+    display_name: "Yellow Onions, 3 lb mesh bag"
+    aliases: [onion bag, bag of onions, yellow onions]
+    aisle: produce
+    sold_by: weight
+    pack_g: 1361
+    pack_count: null
+    price: 3.99
+    perishable: true
+    needs_refrigeration: false
+    keeps_days_raw: 30
+    freezable: false
+    notes: "Fixed 3 lb bag, roughly 6-8 onions of mixed size. Cheaper per pound than loose but you cannot open it."
+
+  - id: onion_white_loose
+    display_name: "White Onion, loose"
+    aliases: [white onion, cebolla blanca]
+    aisle: produce
+    sold_by: weight
+    pack_g: 454
+    pack_count: null
+    price: 1.69
+    perishable: true
+    needs_refrigeration: false
+    keeps_days_raw: 30
+    freezable: false
+    notes: "Sharper and more common in Mexican cooking than yellow. Easy to grab by mistake when a recipe just says 'onion'."
+
+  - id: potato_russet_bag_5lb
+    display_name: "Russet Potatoes, 5 lb bag"
+    aliases: [potato, potatoes, russet, russet potato, baking potato]
+    aisle: produce
+    sold_by: weight
+    pack_g: 2268
+    pack_count: null
+    price: 5.49
+    perishable: true
+    needs_refrigeration: false
+    keeps_days_raw: 21
+    freezable: false
+    notes: "The default potato purchase. 5 lb bag holds roughly 8-12 potatoes. Store cool and dark; the fridge turns their starch to sugar."
+
+  - id: potato_russet_loose
+    display_name: "Russet Potato, loose"
+    aliases: [potato, potatoes, russet]
+    aisle: produce
+    sold_by: weight
+    pack_g: 454
+    pack_count: null
+    price: 1.29
+    perishable: true
+    needs_refrigeration: false
+    keeps_days_raw: 21
+    freezable: false
+    notes: "Per pound from the bin; a large russet is ~300 g. Costs more per pound than the 5 lb bag."
+
+  - id: roma_tomato_loose
+    display_name: "Roma Tomato, loose"
+    aliases: [roma, roma tomato, plum tomato, tomato, tomatoes]
+    aisle: produce
+    sold_by: weight
+    pack_g: 454
+    pack_count: null
+    price: 1.99
+    perishable: true
+    needs_refrigeration: false
+    keeps_days_raw: 6
+    freezable: false
+    notes: "Per pound; one roma is ~62 g, so a pound is 7-8 tomatoes. There is no packaged roma - romas are always a loose bin item. Counter storage; refrigeration kills the flavor."
+
+  - id: poblano_each
+    display_name: "Poblano Pepper, each"
+    aliases: [poblano, poblano pepper, pasilla, chile poblano]
+    aisle: produce
+    sold_by: count
+    pack_g: 100
+    pack_count: 1
+    price: 0.99
+    perishable: true
+    needs_refrigeration: true
+    keeps_days_raw: 10
+    freezable: true
+    notes: "Rung up per pepper at most stores. A large poblano is ~100-120 g, a small one ~70 g. Some stores price them by the pound instead; either way you take home whole peppers, not a weight you chose."
+
+  - id: jalapeno_loose
+    display_name: "Jalapeno Pepper, loose"
+    aliases: [jalapeno, jalapenos, jalapeño, chile jalapeno]
+    aisle: produce
+    sold_by: weight
+    pack_g: 454
+    pack_count: null
+    price: 2.99
+    perishable: true
+    needs_refrigeration: true
+    keeps_days_raw: 12
+    freezable: true
+    notes: "Per pound from the bin. One jalapeno is ~15 g, so a pound is roughly 30 peppers - far more than a home recipe ever wants."
+
+  - id: serrano_loose
+    display_name: "Serrano Pepper, loose"
+    aliases: [serrano, serranos, chile serrano]
+    aisle: produce
+    sold_by: weight
+    pack_g: 454
+    pack_count: null
+    price: 3.99
+    perishable: true
+    needs_refrigeration: true
+    keeps_days_raw: 12
+    freezable: true
+    notes: "Sits directly beside the jalapenos and looks similar but is hotter and thinner. ~8 g each."
+
+  - id: lime_each
+    display_name: "Lime, each"
+    aliases: [lime, limes, persian lime]
+    aisle: produce
+    sold_by: count
+    pack_g: 67
+    pack_count: 1
+    price: 0.50
+    perishable: true
+    needs_refrigeration: true
+    keeps_days_raw: 21
+    freezable: false
+    notes: "Sold per lime, not by weight. A lime is ~67 g whole and yields ~30 mL of juice. Lasts 3 weeks refrigerated, about 1 week on the counter."
+
+  - id: lime_bag_2lb
+    display_name: "Limes, 2 lb bag"
+    aliases: [bag of limes, limes]
+    aisle: produce
+    sold_by: count
+    pack_g: 880
+    pack_count: 13
+    price: 4.49
+    perishable: true
+    needs_refrigeration: true
+    keeps_days_raw: 18
+    freezable: false
+    notes: "Mesh bag, count varies 12-14 depending on lime size. Bagged limes are usually a little smaller and older than loose."
+
+  - id: avocado_hass_each
+    display_name: "Hass Avocado, each"
+    aliases: [avocado, avocados, hass avocado]
+    aisle: produce
+    sold_by: count
+    pack_g: 200
+    pack_count: 1
+    price: 1.49
+    perishable: true
+    needs_refrigeration: true
+    keeps_days_raw: 4
+    freezable: false
+    notes: "Sold per avocado. 200 g is the whole fruit; pit and skin are ~30%, so edible flesh is only ~140 g. Sold rock-hard or ripe with no price difference - a plan that needs it on day 1 and a plan that needs it on day 5 are different shopping problems."
+
+  - id: avocado_bag_4ct
+    display_name: "Hass Avocados, bag of 4"
+    aliases: [avocado bag, avocados]
+    aisle: produce
+    sold_by: count
+    pack_g: 800
+    pack_count: 4
+    price: 5.49
+    perishable: true
+    needs_refrigeration: true
+    keeps_days_raw: 4
+    freezable: false
+    notes: "Bagged avocados are smaller (~180-200 g each) and typically all ripen within a day or two of each other."
+
+  - id: cilantro_bunch
+    display_name: "Cilantro, bunch"
+    aliases: [cilantro, coriander, fresh cilantro, coriander leaf]
+    aisle: produce
+    sold_by: bunch
+    pack_g: 60
+    pack_count: null
+    price: 0.99
+    perishable: true
+    needs_refrigeration: true
+    keeps_days_raw: 6
+    freezable: false
+    notes: "You buy a rubber-banded bunch, never a weight. Bunch weight is genuinely variable - 45 g to 90 g depending on the day and the store - and roughly half of it is stem you throw away, so usable leaf from a 'nominal 60 g' bunch is ~30 g. Wilts fast; there is no way to buy a small amount."
+
+  - id: parsley_flat_bunch
+    display_name: "Flat-Leaf Parsley, bunch"
+    aliases: [parsley, italian parsley, flat leaf parsley]
+    aisle: produce
+    sold_by: bunch
+    pack_g: 60
+    pack_count: null
+    price: 1.29
+    perishable: true
+    needs_refrigeration: true
+    keeps_days_raw: 9
+    freezable: false
+    notes: "Stocked in the same misted rack as cilantro and visually near-identical. Same bunch variability, 45-90 g."
+
+  - id: scallion_bunch
+    display_name: "Scallions, bunch"
+    aliases: [scallion, scallions, green onion, green onions, spring onion]
+    aisle: produce
+    sold_by: bunch
+    pack_g: 100
+    pack_count: null
+    price: 0.99
+    perishable: true
+    needs_refrigeration: true
+    keeps_days_raw: 8
+    freezable: false
+    notes: "Banded bunch of 7-9 stalks, ~100 g with roots and the tough upper greens still on. Bunch size varies 80-130 g. There is no such thing as buying 40 g of scallion."
+
+  - id: garlic_head_each
+    display_name: "Garlic, single head"
+    aliases: [garlic, garlic head, garlic bulb, fresh garlic]
+    aisle: produce
+    sold_by: count
+    pack_g: 50
+    pack_count: 1
+    price: 0.79
+    perishable: true
+    needs_refrigeration: false
+    keeps_days_raw: 60
+    freezable: false
+    notes: "One head is ~50 g and holds 10-12 cloves; a clove is ~4 g peeled. Sold per head from an open bin. Pantry storage - the fridge makes it sprout."
+
+  - id: garlic_bag_3ct
+    display_name: "Garlic, 3-head net bag"
+    aliases: [garlic bag, garlic]
+    aisle: produce
+    sold_by: count
+    pack_g: 150
+    pack_count: 3
+    price: 1.99
+    perishable: true
+    needs_refrigeration: false
+    keeps_days_raw: 60
+    freezable: false
+    notes: "Three heads in a net sleeve, ~150 g total."
+
+  - id: ginger_root_loose
+    display_name: "Ginger Root, loose"
+    aliases: [ginger, fresh ginger, ginger root, gingerroot]
+    aisle: produce
+    sold_by: weight
+    pack_g: 454
+    pack_count: null
+    price: 4.99
+    perishable: true
+    needs_refrigeration: true
+    keeps_days_raw: 28
+    freezable: true
+    notes: "Per pound, and the one produce item where buying a small amount really works: you snap a knob off the hand at the bin. A typical knob is 70-120 g. Freezes well whole."
+
+  - id: pineapple_whole_each
+    display_name: "Pineapple, whole"
+    aliases: [pineapple, fresh pineapple, whole pineapple]
+    aisle: produce
+    sold_by: count
+    pack_g: 1800
+    pack_count: 1
+    price: 4.49
+    perishable: true
+    needs_refrigeration: false
+    keeps_days_raw: 4
+    freezable: true
+    notes: "Sold per pineapple at a flat price regardless of size. A whole one runs 1.6-2.0 kg with crown, and rind plus core is roughly half the weight, so ~900 g of usable fruit comes out of an 1800 g pineapple. Once cut it must be refrigerated and eaten within 4 days."
+
+  - id: pineapple_chunks_tub
+    display_name: "Fresh-Cut Pineapple Chunks, 32 oz tub"
+    aliases: [pineapple chunks, cut pineapple, pineapple]
+    aisle: produce
+    sold_by: weight
+    pack_g: 907
+    pack_count: null
+    price: 7.99
+    perishable: true
+    needs_refrigeration: true
+    keeps_days_raw: 4
+    freezable: true
+    notes: "The cut-fruit case. Costs far more per gram than a whole pineapple but every gram is edible."
+
+  - id: rosemary_clamshell
+    display_name: "Fresh Rosemary, 0.66 oz clamshell"
+    aliases: [rosemary, fresh rosemary, rosemary sprigs]
+    aisle: produce
+    sold_by: weight
+    pack_g: 19
+    pack_count: null
+    price: 2.99
+    perishable: true
+    needs_refrigeration: true
+    keeps_days_raw: 14
+    freezable: true
+    notes: "The smallest fresh rosemary a supermarket sells - a 0.66 oz plastic clamshell of a few sprigs. You cannot buy less, so any recipe needing under ~19 g wastes the remainder unless it is dried or frozen."
+
+  # ------------------------------------------------------------------- meat --
+
+  - id: chicken_breast_boneless_family
+    display_name: "Boneless Skinless Chicken Breast, family pack"
+    aliases: [chicken breast, chicken breasts, boneless chicken, boneless skinless chicken breast]
+    aisle: meat
+    sold_by: weight
+    pack_g: 1134
+    pack_count: null
+    price: 11.99
+    perishable: true
+    needs_refrigeration: true
+    keeps_days_raw: 2
+    freezable: true
+    notes: "Variable-weight tray at $4.79/lb. The 1134 g (2.5 lb) figure is the typical tray; actual packs in the case run 2.2-3.1 lb and the price sticker differs on every one. You cannot order an exact weight - you pick the tray closest to what you want. Raw poultry is safe 1-2 days in the fridge, not longer."
+
+  - id: chicken_breast_boneless_tray
+    display_name: "Boneless Skinless Chicken Breast, small tray"
+    aliases: [chicken breast, chicken breasts, boneless chicken]
+    aisle: meat
+    sold_by: weight
+    pack_g: 680
+    pack_count: null
+    price: 7.49
+    perishable: true
+    needs_refrigeration: true
+    keeps_days_raw: 2
+    freezable: true
+    notes: "Two to three breasts, ~1.5 lb. Higher per-pound price than the family pack. Also variable weight."
+
+  - id: chicken_breast_bone_in_split
+    display_name: "Split Chicken Breast, bone-in skin-on"
+    aliases: [chicken breast, bone-in chicken breast, split breast]
+    aisle: meat
+    sold_by: weight
+    pack_g: 1361
+    pack_count: null
+    price: 6.79
+    perishable: true
+    needs_refrigeration: true
+    keeps_days_raw: 2
+    freezable: true
+    notes: "Half the price per pound of boneless, but bone and skin are ~35% of the weight, so 1361 g yields ~880 g of meat. Shelved immediately beside the boneless packs."
+
+  - id: chicken_thigh_boneless_family
+    display_name: "Boneless Skinless Chicken Thighs, family pack"
+    aliases: [chicken thigh, chicken thighs, boneless thighs]
+    aisle: meat
+    sold_by: weight
+    pack_g: 1134
+    pack_count: null
+    price: 8.99
+    perishable: true
+    needs_refrigeration: true
+    keeps_days_raw: 2
+    freezable: true
+    notes: "Variable-weight 2.5 lb tray at $3.59/lb. Cheaper than breast and more forgiving to reheat."
+
+  - id: chicken_thigh_bone_in_pack
+    display_name: "Bone-In Skin-On Chicken Thighs"
+    aliases: [chicken thigh, chicken thighs, bone-in thighs]
+    aisle: meat
+    sold_by: weight
+    pack_g: 1588
+    pack_count: null
+    price: 6.29
+    perishable: true
+    needs_refrigeration: true
+    keeps_days_raw: 2
+    freezable: true
+    notes: "~3.5 lb tray at $1.79/lb. Bone and skin are ~25-30% of pack weight."
+
+  - id: beef_chuck_roast
+    display_name: "Beef Chuck Roast, boneless"
+    aliases: [beef chuck, chuck roast, chuck, pot roast, beef]
+    aisle: meat
+    sold_by: weight
+    pack_g: 1361
+    pack_count: null
+    price: 20.49
+    perishable: true
+    needs_refrigeration: true
+    keeps_days_raw: 4
+    freezable: true
+    notes: "Single variable-weight roast at $6.85/lb. Roasts in the case run 2-4 lb and each is a different weight - there is no way to buy three identical 3.0 lb roasts. Trims out ~10% fat and gristle."
+
+  - id: beef_chuck_stew_cubes
+    display_name: "Beef Stew Meat, chuck cubes"
+    aliases: [stew meat, beef chuck, beef cubes, stewing beef]
+    aisle: meat
+    sold_by: weight
+    pack_g: 567
+    pack_count: null
+    price: 9.99
+    perishable: true
+    needs_refrigeration: true
+    keeps_days_raw: 3
+    freezable: true
+    notes: "Pre-cut chuck, ~1.25 lb tray at $7.99/lb. Convenient but pricier per pound than cutting a roast yourself."
+
+  - id: pork_shoulder_bone_in
+    display_name: "Pork Shoulder Butt Roast, bone-in"
+    aliases: [pork shoulder, pork butt, boston butt, pork]
+    aisle: meat
+    sold_by: weight
+    pack_g: 3629
+    pack_count: null
+    price: 14.49
+    perishable: true
+    needs_refrigeration: true
+    keeps_days_raw: 4
+    freezable: true
+    notes: "Sold as one whole primal, 7-9 lb, at $1.79/lb - this is the cheap cut and the store does not break it down. You cannot buy 4 lb of it; you buy the whole 8 lb roast. Blade bone is ~15% of the weight."
+
+  - id: pork_shoulder_boneless_half
+    display_name: "Pork Shoulder, boneless half"
+    aliases: [pork shoulder, boneless pork shoulder, pork butt]
+    aisle: meat
+    sold_by: weight
+    pack_g: 1814
+    pack_count: null
+    price: 10.99
+    perishable: true
+    needs_refrigeration: true
+    keeps_days_raw: 4
+    freezable: true
+    notes: "Cryovac'd boneless half, ~4 lb at $2.75/lb. Variable weight, 3.5-4.5 lb in practice. The closest thing to a small pork shoulder purchase."
+
+  # ---------------------------------------------------------------- seafood --
+
+  - id: shrimp_raw_counter_thawed
+    display_name: "Raw Shrimp, EZ-peel, thawed at the seafood counter"
+    aliases: [shrimp, raw shrimp, fresh shrimp, prawns]
+    aisle: seafood
+    sold_by: weight
+    pack_g: 454
+    pack_count: null
+    price: 13.99
+    perishable: true
+    needs_refrigeration: true
+    keeps_days_raw: 1
+    freezable: false
+    notes: "Per pound from the counter case, 26/30 count. The sign says 'fresh' but it is previously frozen and thawed by the store, which is why it must be cooked within a day and must NOT be refrozen. Anyone buying multiple pounds for use across a week is buying the wrong product - the frozen bags are the same shrimp, cheaper, and keep for months."
+
+  # ----------------------------------------------------------------- frozen --
+
+  - id: shrimp_raw_frozen_31_40_1lb
+    display_name: "Raw Shrimp 31/40 ct, peeled deveined, frozen 1 lb bag"
+    aliases: [frozen shrimp, shrimp, raw shrimp, peeled shrimp]
+    aisle: frozen
+    sold_by: weight
+    pack_g: 454
+    pack_count: null
+    price: 9.99
+    perishable: true
+    needs_refrigeration: true
+    keeps_days_raw: 270
+    freezable: true
+    notes: "31/40 means 31-40 shrimp per pound - small-to-medium. Must go straight to the freezer. Once thawed, use within a day and do not refreeze, so thaw only what a meal needs."
+
+  - id: shrimp_raw_frozen_21_25_2lb
+    display_name: "Raw Shrimp 21/25 ct, shell-on, frozen 2 lb bag"
+    aliases: [frozen shrimp, shrimp, jumbo shrimp, large shrimp]
+    aisle: frozen
+    sold_by: weight
+    pack_g: 907
+    pack_count: null
+    price: 19.99
+    perishable: true
+    needs_refrigeration: true
+    keeps_days_raw: 270
+    freezable: true
+    notes: "Larger shrimp, 21-25 per pound. Shell-on loses ~15% to peeling. Count size changes cook time and appearance; a recipe that just says 'shrimp' does not tell you which bag to grab."
+
+  - id: shrimp_cooked_frozen_tail_on
+    display_name: "Cooked Shrimp, tail-on, frozen 12 oz bag"
+    aliases: [cooked shrimp, shrimp, frozen shrimp]
+    aisle: frozen
+    sold_by: weight
+    pack_g: 340
+    pack_count: null
+    price: 8.99
+    perishable: true
+    needs_refrigeration: true
+    keeps_days_raw: 270
+    freezable: true
+    notes: "Already cooked - pink, curled, for shrimp cocktail. Sits in the same freezer door as the raw bags and is a very easy mistake. Cooking it again makes it rubbery."
+
+  - id: chicken_breast_frozen_3lb
+    display_name: "Boneless Skinless Chicken Breast, frozen 3 lb bag"
+    aliases: [frozen chicken, chicken breast, frozen chicken breast]
+    aisle: frozen
+    sold_by: weight
+    pack_g: 1361
+    pack_count: null
+    price: 13.99
+    perishable: true
+    needs_refrigeration: true
+    keeps_days_raw: 270
+    freezable: true
+    notes: "Individually frozen breasts in a resealable bag - a fixed 3 lb, unlike the variable-weight fresh trays. Needs overnight fridge thawing, which is a real scheduling constraint."
+
+  # ------------------------------------------------------------------ dairy --
+
+  - id: eggs_large_dozen
+    display_name: "Large Grade A Eggs, dozen"
+    aliases: [eggs, egg, large eggs, dozen eggs]
+    aisle: dairy
+    sold_by: count
+    pack_g: 680
+    pack_count: 12
+    price: 4.29
+    perishable: true
+    needs_refrigeration: true
+    keeps_days_raw: 35
+    freezable: false
+    notes: "Eggs are sold by the dozen and graded by size, never by weight. A carton of Large is 24 oz / 680 g net by USDA definition - one egg is ~57 g in the shell, ~50 g out of it. There is no such thing as buying 600 g of eggs; you buy 12, or 18, or 6."
+
+  - id: eggs_large_18ct
+    display_name: "Large Grade A Eggs, 18 count"
+    aliases: [eggs, large eggs, egg carton]
+    aisle: dairy
+    sold_by: count
+    pack_g: 1021
+    pack_count: 18
+    price: 6.29
+    perishable: true
+    needs_refrigeration: true
+    keeps_days_raw: 35
+    freezable: false
+    notes: "The next size up. Cheaper per egg than two dozen-cartons."
+
+  - id: queso_fresco_10oz
+    display_name: "Queso Fresco, 10 oz round"
+    aliases: [queso fresco, fresh cheese, queso]
+    aisle: dairy
+    sold_by: weight
+    pack_g: 283
+    pack_count: null
+    price: 4.49
+    perishable: true
+    needs_refrigeration: true
+    keeps_days_raw: 14
+    freezable: false
+    notes: "The standard round at the major chains is 10 oz. Some brands do a 12 oz; this store carries the 10 oz. Once opened it goes soft and sour within about a week. Does not freeze - it turns crumbly and weeps."
+
+  - id: cotija_wedge_10oz
+    display_name: "Cotija Cheese, 10 oz wedge"
+    aliases: [cotija, queso cotija, aged mexican cheese]
+    aisle: dairy
+    sold_by: weight
+    pack_g: 283
+    pack_count: null
+    price: 4.99
+    perishable: true
+    needs_refrigeration: true
+    keeps_days_raw: 30
+    freezable: false
+    notes: "Dry, salty, aged - it grates rather than crumbles soft. Sits right next to the queso fresco in identical packaging and is NOT interchangeable with it."
+
+  - id: mozzarella_shred_8oz
+    display_name: "Shredded Low-Moisture Mozzarella, 8 oz bag"
+    aliases: [mozzarella, shredded mozzarella, mozzarella cheese]
+    aisle: dairy
+    sold_by: weight
+    pack_g: 227
+    pack_count: null
+    price: 3.29
+    perishable: true
+    needs_refrigeration: true
+    keeps_days_raw: 21
+    freezable: true
+    notes: "Shredded-cheese wall neighbor. Melts stringy and mild - visually similar bag to the cheddar, different result."
+
+  - id: cheddar_shred_sharp_8oz
+    display_name: "Shredded Sharp Cheddar, 8 oz bag"
+    aliases: [cheddar, shredded cheddar, cheddar cheese, shredded cheese]
+    aisle: dairy
+    sold_by: weight
+    pack_g: 227
+    pack_count: null
+    price: 3.49
+    perishable: true
+    needs_refrigeration: true
+    keeps_days_raw: 30
+    freezable: true
+    notes: "8 oz is the standard small bag. Sealed it keeps a month; opened, about 10 days before it molds."
+
+  - id: cheddar_shred_mild_16oz
+    display_name: "Shredded Mild Cheddar, 16 oz bag"
+    aliases: [cheddar, shredded cheddar, cheddar cheese]
+    aisle: dairy
+    sold_by: weight
+    pack_g: 454
+    pack_count: null
+    price: 5.79
+    perishable: true
+    needs_refrigeration: true
+    keeps_days_raw: 30
+    freezable: true
+    notes: "The 1 lb bag - better value per gram, but a lot of open cheese to get through."
+
+  - id: orange_juice_carton_52oz
+    display_name: "Orange Juice, not from concentrate, 52 fl oz carton"
+    aliases: [orange juice, oj, juice, fresh orange juice]
+    aisle: dairy
+    sold_by: weight
+    pack_g: 1610
+    pack_count: null
+    price: 4.99
+    perishable: true
+    needs_refrigeration: true
+    keeps_days_raw: 14
+    freezable: false
+    notes: "52 fl oz is the carton size that replaced the old half-gallon; 1.54 L of juice weighs ~1610 g at OJ's density of 1.045. Unopened it keeps to the printed date; once opened, about 7 days."
+
+  - id: orange_juice_jug_89oz
+    display_name: "Orange Juice, not from concentrate, 89 fl oz jug"
+    aliases: [orange juice, oj, juice]
+    aisle: dairy
+    sold_by: weight
+    pack_g: 2750
+    pack_count: null
+    price: 7.49
+    perishable: true
+    needs_refrigeration: true
+    keeps_days_raw: 14
+    freezable: false
+    notes: "The large jug, 2.63 L. Only the 52 oz and 89 oz exist on the shelf - juice comes in fluid ounce sizes, not gram sizes."
+
+  # -------------------------------------------------------------- dry_goods --
+
+  - id: white_rice_long_grain_2lb
+    display_name: "Long Grain White Rice, 2 lb bag"
+    aliases: [white rice, rice, long grain rice, long grain white rice]
+    aisle: dry_goods
+    sold_by: weight
+    pack_g: 907
+    pack_count: null
+    price: 2.79
+    perishable: false
+    needs_refrigeration: false
+    keeps_days_raw: 730
+    freezable: false
+    notes: "Dry weight. Rice roughly triples in weight when cooked - 907 g dry becomes ~2.7 kg cooked - so 'how much rice' means very different things before and after the pot."
+
+  - id: white_rice_long_grain_5lb
+    display_name: "Long Grain White Rice, 5 lb bag"
+    aliases: [white rice, rice, long grain rice]
+    aisle: dry_goods
+    sold_by: weight
+    pack_g: 2268
+    pack_count: null
+    price: 5.99
+    perishable: false
+    needs_refrigeration: false
+    keeps_days_raw: 730
+    freezable: false
+    notes: "Better than half the per-pound price of the 2 lb bag."
+
+  - id: jasmine_rice_5lb
+    display_name: "Jasmine Rice, 5 lb bag"
+    aliases: [jasmine rice, rice, thai rice, white rice]
+    aisle: dry_goods
+    sold_by: weight
+    pack_g: 2268
+    pack_count: null
+    price: 9.99
+    perishable: false
+    needs_refrigeration: false
+    keeps_days_raw: 730
+    freezable: false
+    notes: "Aromatic, softer and stickier than long grain. Shelved directly above the plain white rice; 'white rice' on a list does not say which of these to buy."
+
+  - id: flour_tortilla_burrito_8ct
+    display_name: "Flour Tortillas, burrito size, 8 count (20 oz)"
+    aliases: [flour tortilla, flour tortillas, tortilla, tortillas, burrito tortillas]
+    aisle: dry_goods
+    sold_by: count
+    pack_g: 567
+    pack_count: 8
+    price: 3.79
+    perishable: true
+    needs_refrigeration: false
+    keeps_days_raw: 21
+    freezable: true
+    notes: "Eight 10-inch tortillas, ~71 g each, 20 oz net. Bought by count and by diameter - a recipe wanting eight burritos wants this pack, and the weight is incidental. Bread aisle, room temperature; refrigerating extends it to ~5 weeks."
+
+  - id: flour_tortilla_fajita_10ct
+    display_name: "Flour Tortillas, fajita size, 10 count (17.5 oz)"
+    aliases: [flour tortilla, flour tortillas, tortilla, tortillas, small tortillas]
+    aisle: dry_goods
+    sold_by: count
+    pack_g: 496
+    pack_count: 10
+    price: 3.29
+    perishable: true
+    needs_refrigeration: false
+    keeps_days_raw: 21
+    freezable: true
+    notes: "Ten 8-inch tortillas, ~50 g each. Same aisle, same brand, different diameter - not a substitute for burrito size if the filling was portioned for a 10-inch wrapper."
+
+  - id: corn_tortilla_30ct
+    display_name: "Corn Tortillas, 30 count (25 oz)"
+    aliases: [corn tortilla, corn tortillas, tortilla, tortillas]
+    aisle: dry_goods
+    sold_by: count
+    pack_g: 709
+    pack_count: 30
+    price: 2.79
+    perishable: true
+    needs_refrigeration: false
+    keeps_days_raw: 12
+    freezable: true
+    notes: "Thirty 6-inch tortillas, ~24 g each. Corn and flour are not interchangeable in either flavor or handling, and both are simply labeled 'tortillas' on most lists."
+
+  - id: cornstarch_16oz
+    display_name: "Cornstarch, 16 oz box"
+    aliases: [cornstarch, corn starch, corn flour]
+    aisle: dry_goods
+    sold_by: weight
+    pack_g: 454
+    pack_count: null
+    price: 2.49
+    perishable: false
+    needs_refrigeration: false
+    keeps_days_raw: 1460
+    freezable: false
+    notes: "The 1 lb box is the only common size. Recipes use it a tablespoon at a time, so one box lasts years."
+
+  - id: honey_12oz_bear
+    display_name: "Clover Honey, 12 oz bear"
+    aliases: [honey, clover honey, raw honey]
+    aisle: dry_goods
+    sold_by: weight
+    pack_g: 340
+    pack_count: null
+    price: 5.49
+    perishable: false
+    needs_refrigeration: false
+    keeps_days_raw: 3650
+    freezable: false
+    notes: "Honey is one of the few liquids genuinely sold by net weight rather than fluid ounces. Effectively never spoils; crystallizes but rewarms clear."
+
+  - id: rice_vinegar_12oz
+    display_name: "Rice Vinegar, unseasoned, 12 fl oz"
+    aliases: [rice vinegar, rice wine vinegar, unseasoned rice vinegar]
+    aisle: dry_goods
+    sold_by: weight
+    pack_g: 355
+    pack_count: null
+    price: 2.79
+    perishable: false
+    needs_refrigeration: false
+    keeps_days_raw: 1460
+    freezable: false
+    notes: "12 fl oz = 355 mL, and vinegar is close enough to water that mL and grams coincide - which is exactly why volume/weight confusion goes unnoticed here and bites on oil."
+
+  - id: soy_sauce_15oz
+    display_name: "Soy Sauce, 15 fl oz bottle"
+    aliases: [soy sauce, shoyu, tamari]
+    aisle: dry_goods
+    sold_by: weight
+    pack_g: 465
+    pack_count: null
+    price: 3.49
+    perishable: false
+    needs_refrigeration: false
+    keeps_days_raw: 1095
+    freezable: false
+    notes: "Shelved beside the coconut aminos and often treated as its substitute, but it is far saltier and contains wheat - not a swap for anyone avoiding soy or gluten."
+
+  - id: coconut_aminos_8oz
+    display_name: "Coconut Aminos, 8 fl oz bottle"
+    aliases: [coconut aminos, aminos, coconut sauce]
+    aisle: dry_goods
+    sold_by: weight
+    pack_g: 249
+    pack_count: null
+    price: 6.49
+    perishable: false
+    needs_refrigeration: false
+    keeps_days_raw: 730
+    freezable: false
+    notes: "The small bottle. Refrigerate after opening per the label."
+
+  - id: coconut_aminos_500ml
+    display_name: "Coconut Aminos, 16.9 fl oz (500 mL) bottle"
+    aliases: [coconut aminos, aminos, large coconut aminos]
+    aisle: dry_goods
+    sold_by: weight
+    pack_g: 525
+    pack_count: null
+    price: 10.99
+    perishable: false
+    needs_refrigeration: false
+    keeps_days_raw: 730
+    freezable: false
+    notes: "16.9 fl oz is the metric 500 mL bottle wearing US units. At ~1.05 g/mL it weighs ~525 g, not 500 g and not 17 oz of mass - the '17 oz' on a list is a fluid ounce being read as a weight."
+
+  - id: neutral_oil_canola_48oz
+    display_name: "Canola Oil, 48 fl oz bottle"
+    aliases: [canola oil, vegetable oil, neutral oil, cooking oil, oil]
+    aisle: dry_goods
+    sold_by: weight
+    pack_g: 1306
+    pack_count: null
+    price: 5.99
+    perishable: false
+    needs_refrigeration: false
+    keeps_days_raw: 540
+    freezable: false
+    notes: "Oil is sold in fluid ounces and is LIGHTER than water at ~0.92 g/mL, so this 48 fl oz (1.42 L) bottle holds 1306 g. Shelf sizes are 16, 24, 48 and 96 fl oz - there is no bottle that holds a round number of grams."
+
+  - id: olive_oil_ev_500ml
+    display_name: "Extra Virgin Olive Oil, 500 mL bottle"
+    aliases: [olive oil, extra virgin olive oil, evoo]
+    aisle: dry_goods
+    sold_by: weight
+    pack_g: 458
+    pack_count: null
+    price: 10.49
+    perishable: false
+    needs_refrigeration: false
+    keeps_days_raw: 540
+    freezable: false
+    notes: "Olive oil comes in 250 / 500 / 750 mL and 1 L. At 0.915 g/mL a 500 mL bottle is 458 g and a 750 mL is 686 g. Keep dark and cool; it goes rancid within a year of opening."
+
+  - id: lard_manteca_16oz
+    display_name: "Lard (Manteca), 16 oz tub"
+    aliases: [lard, manteca, pork lard, rendered lard]
+    aisle: dry_goods
+    sold_by: weight
+    pack_g: 454
+    pack_count: null
+    price: 3.49
+    perishable: false
+    needs_refrigeration: false
+    keeps_days_raw: 365
+    freezable: true
+    notes: "The 1 lb tub is the small size - shelf-stable sealed, refrigerate once opened. Sold in whole pounds, not odd ounce counts."
+
+  - id: lard_manteca_2_5lb
+    display_name: "Lard (Manteca), 2.5 lb tub"
+    aliases: [lard, manteca, pork lard]
+    aisle: dry_goods
+    sold_by: weight
+    pack_g: 1134
+    pack_count: null
+    price: 7.99
+    perishable: false
+    needs_refrigeration: false
+    keeps_days_raw: 365
+    freezable: true
+    notes: "The big tub, usually in the Hispanic foods aisle rather than with the shortening."
+
+  - id: dried_chile_guajillo_2oz
+    display_name: "Dried Guajillo Chiles, 2 oz bag"
+    aliases: [guajillo, dried guajillo, guajillo chiles, dried chiles, dried chilies]
+    aisle: dry_goods
+    sold_by: weight
+    pack_g: 57
+    pack_count: null
+    price: 2.79
+    perishable: false
+    needs_refrigeration: false
+    keeps_days_raw: 365
+    freezable: false
+    notes: "Mild, bright, the backbone of most red chile sauces. Cello bags run 2-4 oz; a whole guajillo is ~7 g, so 57 g is about 8 chiles."
+
+  - id: dried_chile_ancho_3oz
+    display_name: "Dried Ancho Chiles, 3 oz bag"
+    aliases: [ancho, dried ancho, ancho chiles, dried chiles, dried poblano]
+    aisle: dry_goods
+    sold_by: weight
+    pack_g: 85
+    pack_count: null
+    price: 3.49
+    perishable: false
+    needs_refrigeration: false
+    keeps_days_raw: 365
+    freezable: false
+    notes: "Dried poblano - dark, raisiny, sweeter than guajillo. A whole ancho is ~15 g. Anchos and guajillos are not substitutes for each other; a list that says only 'dried chiles' does not name a purchasable product."
+
+  - id: pinto_beans_dry_2lb
+    display_name: "Dry Pinto Beans, 2 lb bag"
+    aliases: [pinto beans, dry pinto beans, dried beans, beans]
+    aisle: dry_goods
+    sold_by: weight
+    pack_g: 907
+    pack_count: null
+    price: 2.99
+    perishable: false
+    needs_refrigeration: false
+    keeps_days_raw: 730
+    freezable: false
+    notes: "Dry beans roughly double to two-and-a-half times in weight when soaked and cooked, so 907 g dry yields ~2.2 kg cooked - about ten cans' worth of drained beans for the price of two cans. The tradeoff is hours of cook time, which is a scheduling fact, not a shopping one."
+
+  # ----------------------------------------------------------------- canned --
+
+  - id: pinto_beans_can_15_5oz
+    display_name: "Pinto Beans, 15.5 oz can"
+    aliases: [canned pinto beans, pinto beans, canned beans, beans]
+    aisle: canned
+    sold_by: count
+    pack_g: 439
+    pack_count: 1
+    price: 1.29
+    perishable: false
+    needs_refrigeration: false
+    keeps_days_raw: 1095
+    freezable: false
+    notes: "The standard can is 15.5 oz = 439 g NET, which counts the brine. Drained weight printed on the label is ~260 g - so about 40% of what you carry home is liquid you pour down the sink. Any calculation that treats the 439 g as beans will come up roughly a third short."
+
+  - id: black_beans_can_15_5oz
+    display_name: "Black Beans, 15.5 oz can"
+    aliases: [canned black beans, black beans, canned beans, beans]
+    aisle: canned
+    sold_by: count
+    pack_g: 439
+    pack_count: 1
+    price: 1.29
+    perishable: false
+    needs_refrigeration: false
+    keeps_days_raw: 1095
+    freezable: false
+    notes: "Same can, same shelf, same 260 g drained. Stacked immediately beside the pintos."
+
+  - id: tomato_diced_can_14_5oz
+    display_name: "Diced Tomatoes, 14.5 oz can"
+    aliases: [canned tomatoes, diced tomatoes, tomatoes, canned tomato]
+    aisle: canned
+    sold_by: count
+    pack_g: 411
+    pack_count: 1
+    price: 1.39
+    perishable: false
+    needs_refrigeration: false
+    keeps_days_raw: 1095
+    freezable: false
+    notes: "14.5 oz is the standard small can. Drained solids are ~240 g. Cheaper and more consistent than fresh romas for anything cooked down, but not a swap for raw tomato in salsa."
+
+  - id: chicken_stock_carton_32oz
+    display_name: "Chicken Stock, 32 fl oz carton"
+    aliases: [chicken stock, chicken broth, stock, broth]
+    aisle: canned
+    sold_by: count
+    pack_g: 946
+    pack_count: 1
+    price: 3.99
+    perishable: false
+    needs_refrigeration: false
+    keeps_days_raw: 540
+    freezable: true
+    notes: "The aseptic carton is 32 fl oz = 1 quart = 946 mL. That is the only carton size on the shelf besides the 48 fl oz. Shelf-stable sealed; once opened it must be refrigerated and used within 4-5 days, which matters when a plan opens one for a small amount."
+
+  - id: chicken_broth_can_14_5oz
+    display_name: "Chicken Broth, 14.5 oz can"
+    aliases: [chicken broth, chicken stock, broth, stock]
+    aisle: canned
+    sold_by: count
+    pack_g: 411
+    pack_count: 1
+    price: 1.49
+    perishable: false
+    needs_refrigeration: false
+    keeps_days_raw: 1095
+    freezable: true
+    notes: "The small can, for when a recipe wants under two cups. Broth is thinner and saltier than stock; the words are used interchangeably on labels and on lists."
+
+  # ---------------------------------------------------------- spices_baking --
+
+  - id: salt_kosher_3lb
+    display_name: "Kosher Salt, 3 lb box"
+    aliases: [kosher salt, salt, coarse salt]
+    aisle: spices_baking
+    sold_by: weight
+    pack_g: 1361
+    pack_count: null
+    price: 4.99
+    perishable: false
+    needs_refrigeration: false
+    keeps_days_raw: 3650
+    freezable: false
+    notes: "The cook's default salt. Stocked so that a plan COULD buy it - virtually every savory recipe needs salt and virtually no generated shopping list remembers to include it."
+
+  - id: salt_table_26oz
+    display_name: "Iodized Table Salt, 26 oz canister"
+    aliases: [table salt, salt, iodized salt]
+    aisle: spices_baking
+    sold_by: weight
+    pack_g: 737
+    pack_count: null
+    price: 1.29
+    perishable: false
+    needs_refrigeration: false
+    keeps_days_raw: 3650
+    freezable: false
+    notes: "Finer grain, so a teaspoon of this is nearly twice the salt of a teaspoon of kosher. Substituting by volume oversalts badly."
+
+  - id: black_pepper_ground_4oz
+    display_name: "Ground Black Pepper, 4 oz jar"
+    aliases: [black pepper, pepper, ground pepper, ground black pepper]
+    aisle: spices_baking
+    sold_by: weight
+    pack_g: 113
+    pack_count: null
+    price: 4.99
+    perishable: false
+    needs_refrigeration: false
+    keeps_days_raw: 1095
+    freezable: false
+    notes: "4 oz is the large jar; the everyday one is 2 oz. Like salt, assumed by nearly every recipe and listed by almost none."
+
+  - id: cumin_ground_1_5oz
+    display_name: "Ground Cumin, 1.5 oz jar"
+    aliases: [cumin, ground cumin, comino]
+    aisle: spices_baking
+    sold_by: weight
+    pack_g: 43
+    pack_count: null
+    price: 5.29
+    perishable: false
+    needs_refrigeration: false
+    keeps_days_raw: 1095
+    freezable: false
+    notes: "Standard supermarket spice jars hold 1-3 oz (28-85 g). Nothing on this rack approaches 100 g outside of the warehouse-club aisle this store does not have."
+
+  - id: chili_powder_2_5oz
+    display_name: "Chili Powder, 2.5 oz jar"
+    aliases: [chili powder, chile powder]
+    aisle: spices_baking
+    sold_by: weight
+    pack_g: 71
+    pack_count: null
+    price: 3.49
+    perishable: false
+    needs_refrigeration: false
+    keeps_days_raw: 1095
+    freezable: false
+    notes: "A blend - ground chile plus cumin, oregano and garlic - not the same thing as ground dried chile. Another category word that maps to several different real products."
+
+  - id: oregano_mexican_dried_0_5oz
+    display_name: "Dried Mexican Oregano, 0.5 oz jar"
+    aliases: [oregano, dried oregano, mexican oregano]
+    aisle: spices_baking
+    sold_by: weight
+    pack_g: 14
+    pack_count: null
+    price: 2.49
+    perishable: false
+    needs_refrigeration: false
+    keeps_days_raw: 1095
+    freezable: false
+    notes: "Dried leaf is bulky and light, so jars are tiny by weight - 14 g fills a whole jar. Mexican and Mediterranean oregano are different plants with different flavor."
+
+  - id: garlic_powder_3oz
+    display_name: "Garlic Powder, 3 oz jar"
+    aliases: [garlic powder, granulated garlic]
+    aisle: spices_baking
+    sold_by: weight
+    pack_g: 85
+    pack_count: null
+    price: 3.49
+    perishable: false
+    needs_refrigeration: false
+    keeps_days_raw: 1095
+    freezable: false
+    notes: "Sits in the spice rack while fresh garlic sits in produce; a list saying only 'garlic' does not distinguish them, and they are not swappable by weight."
+
+  # -------------------------------------------------------------- household --
+
+  - id: aluminum_foil_75sqft
+    display_name: "Heavy Duty Aluminum Foil, 75 sq ft roll"
+    aliases: [aluminum foil, foil, tin foil]
+    aisle: household
+    sold_by: count
+    pack_g: 900
+    pack_count: 1
+    price: 7.49
+    perishable: false
+    needs_refrigeration: false
+    keeps_days_raw: 3650
+    freezable: false
+    notes: "Braises get covered, sheet pans get lined, leftovers get wrapped. Stocked so a batch-cooking plan CAN buy it; recipes call for it constantly and shopping lists never do."
+
+  - id: parchment_paper_70sqft
+    display_name: "Parchment Paper, 70 sq ft roll"
+    aliases: [parchment, parchment paper, baking paper]
+    aisle: household
+    sold_by: count
+    pack_g: 400
+    pack_count: 1
+    price: 5.99
+    perishable: false
+    needs_refrigeration: false
+    keeps_days_raw: 3650
+    freezable: false
+    notes: "Same reasoning as foil - a consumable that recipes assume into existence."
+
+  - id: food_container_32oz_5pk
+    display_name: "Food Storage Containers, 32 oz, 5 pack"
+    aliases: [food containers, storage containers, meal prep containers, tupperware]
+    aisle: household
+    sold_by: count
+    pack_g: 500
+    pack_count: 5
+    price: 8.99
+    perishable: false
+    needs_refrigeration: false
+    keeps_days_raw: 3650
+    freezable: true
+    notes: "Quart-size deli-style tubs - the size a portion of stew or rice goes into. A plan that cooks in batches produces containers' worth of food and has to have somewhere to put it."
+
+  - id: food_container_16oz_10pk
+    display_name: "Food Storage Containers, 16 oz, 10 pack"
+    aliases: [food containers, storage containers, deli containers, meal prep containers]
+    aisle: household
+    sold_by: count
+    pack_g: 600
+    pack_count: 10
+    price: 9.49
+    perishable: false
+    needs_refrigeration: false
+    keeps_days_raw: 3650
+    freezable: true
+    notes: "Pint size, for single portions and for components stored separately."
+
+  - id: food_container_glass_2cup_4pk
+    display_name: "Glass Food Storage Containers with Lids, 2 cup, 4 pack"
+    aliases: [glass containers, glass storage, pyrex, meal prep containers]
+    aisle: household
+    sold_by: count
+    pack_g: 2400
+    pack_count: 4
+    price: 21.99
+    perishable: false
+    needs_refrigeration: false
+    keeps_days_raw: 3650
+    freezable: true
+    notes: "Oven and microwave safe, unlike the plastic tubs. The reheat step of a batch plan is easier with these and the price is why most people own a mix."
+
+  - id: freezer_bag_gallon_30ct
+    display_name: "Freezer Bags, gallon, 30 count"
+    aliases: [freezer bags, ziploc, gallon bags, storage bags]
+    aisle: household
+    sold_by: count
+    pack_g: 400
+    pack_count: 30
+    price: 7.49
+    perishable: false
+    needs_refrigeration: false
+    keeps_days_raw: 3650
+    freezable: true
+    notes: "How a 8 lb pork shoulder or a 3 lb chicken tray gets split down and frozen on the day it is bought. Freezer bags are thicker than storage bags - the thin ones crack at freezer temperature."
+
+  - id: freezer_bag_quart_38ct
+    display_name: "Freezer Bags, quart, 38 count"
+    aliases: [freezer bags, quart bags, ziploc, storage bags]
+    aisle: household
+    sold_by: count
+    pack_g: 300
+    pack_count: 38
+    price: 5.99
+    perishable: false
+    needs_refrigeration: false
+    keeps_days_raw: 3650
+    freezable: true
+    notes: "Portion-size. Marinating and single-serving freezing."
+
+  - id: water_bottled_16_9oz_24pk
+    display_name: "Purified Drinking Water, 16.9 fl oz, 24 pack"
+    aliases: [bottled water, water, drinking water]
+    aisle: household
+    sold_by: count
+    pack_g: 11880
+    pack_count: 24
+    price: 5.99
+    perishable: false
+    needs_refrigeration: false
+    keeps_days_raw: 3650
+    freezable: false
+    notes: "Stocked because a real store really does sell this, and the simulator should not pretend otherwise. But it is NOT the answer to a recipe that calls for water: cooking water comes from the tap, costs nothing, and is unlimited. If a plan puts water on a shopping list, the correct outcome is that the shopper is confused, not that they buy a case."
+
+# =============================================================================
+# AUTHORING NOTES - mismatches I noticed
+# =============================================================================
+#
+# These are things in the planner's shopping list that do not line up with how a
+# real supermarket sells food. I did NOT bend the catalog to accommodate any of
+# them. Recorded here as predictions; the gate should rediscover them on its own.
+#
+# --- Products that are not products -----------------------------------------
+#
+# 1. "spices - 3 x 100g"
+#    No store sells anything called "spices." It is a category, not a SKU. There
+#    is no shelf to walk to, no jar to pick up, no price. Separately, 100 g is
+#    larger than every jar on a supermarket spice rack: cumin comes in 1.5 oz
+#    (43 g), chili powder in 2.5 oz (71 g), dried oregano in 0.5 oz (14 g).
+#    "3 x 100g of spices" is unshoppable twice over - wrong name, impossible size.
+#
+# 2. "dried_chiles - 2 x 100g"
+#    Same failure. Guajillo, ancho, arbol, pasilla and chipotle are different
+#    ingredients with different heat and flavor, sold in separate 2-4 oz
+#    (57-113 g) cello bags. "Dried chiles" names none of them, and 100 g is not
+#    a bag size.
+#
+# --- Sold by count, requested by weight -------------------------------------
+#
+# 3. "eggs - 2 x 600g"
+#    Eggs are sold by the dozen and graded by size. A carton of Large is 24 oz /
+#    680 g net in the shell by USDA definition. There is no 600 g egg package.
+#    The number also silently mixes shell weight in: 600 g of shelled egg is 12
+#    eggs, but 600 g of carton is only ~10.5.
+#
+# 4. "lime - 3 x 335g"
+#    Limes are rung up individually (~67 g each) or in 2 lb mesh bags. 335 g is
+#    exactly five limes, which suggests the number was computed rather than
+#    observed. No 335 g lime package exists.
+#
+# 5. "avocado - 3 x 200g"
+#    Avocados are sold each. 200 g is a fair weight for a whole Hass, but pit and
+#    skin are ~30%, so "600 g of avocado" buys only ~420 g of edible flesh. If
+#    the recipe wanted 600 g of flesh, the list is short by two avocados.
+#
+# 6. "poblano - 3 x 300g"
+#    Poblanos are sold per pepper (~100 g). 300 g is three peppers, so the total
+#    is right by accident, but there is no 300 g unit to buy and no way to ask
+#    for one.
+#
+# 7. "scallion - 1 x 100g"
+#    Scallions come in banded bunches. ~100 g is a realistic bunch, but bunches
+#    run 80-130 g and include roots and tough tops - so the shopper cannot buy
+#    100 g and the 100 g they do get is not 100 g of usable scallion.
+#
+# 8. "cilantro - 9 x 60g"
+#    Cilantro is sold by the bunch, and bunch weight is genuinely variable
+#    (45-90 g), so "60 g" is a fiction of precision. Worse, roughly half a bunch
+#    is stem: nine bunches at a nominal 60 g is ~540 g gross but only ~270 g of
+#    leaf. And nine bunches of cilantro in one cart, all wilting inside a week,
+#    should raise an eyebrow on its own.
+#
+# 9. "flour_tortilla - 7 x 20 oz"
+#    20 oz (567 g) is a real pack - 8 burrito-size tortillas - so the weight is
+#    right. But nobody shops tortillas by weight; they shop by count and by
+#    diameter, and the list names neither. Seven packs is 56 tortillas, which is
+#    a quantity worth confirming rather than inferring.
+#
+# --- Variable-weight meat requested as exact packs ---------------------------
+#
+# 10. "chicken_breast - 5 x 32 oz" and "chicken_thigh - 1 x 32 oz"
+#     Meat trays are variable weight - every single one in the case has a
+#     different sticker. There is no 32 oz (2 lb) chicken tray to pick up five
+#     times. Real options are a ~2.5 lb family pack, a ~1.5 lb small tray, or a
+#     fixed 3 lb frozen bag. Also: my catalog gives raw chicken keeps_days_raw
+#     of 2, matching USDA guidance of 1-2 days; the list claims 3 days. Buying
+#     10 lb of fresh chicken in one trip is not survivable at either number
+#     without freezing, and nothing on the list freezes it or buys bags to do so.
+#
+# 11. "beef_chuck - 3 x 3.0 lb"
+#     Chuck roasts run 2-4 lb and each is individually weighed. Three identical
+#     3.0 lb roasts is not a purchase that can be made.
+#
+# 12. "pork_shoulder - 2 x 1800g"
+#     Bone-in pork butt is sold as one whole 7-9 lb primal at around $1.79/lb;
+#     the store does not cut it down. The nearest real thing is a boneless half
+#     at ~1814 g, which is a different product at a different price per pound.
+#     If the 1800 g was meant to be bone-in, ~15% of it is blade bone.
+#
+# 13. "shrimp_raw - 6 x 1 lb ... keeps 2d raw"
+#     1 lb bags exist, but the list never states a count size (21/25? 31/40?),
+#     which changes both the cooking and the dish. The bigger problem is the
+#     2-day shelf life: counter "fresh" shrimp is thawed previously-frozen
+#     product that must be cooked within a day and never refrozen. Six pounds of
+#     it bought at once for a week of meals is not a shoppable plan. The frozen
+#     bags are the same shrimp and keep for months, but the list does not ask
+#     for them.
+#
+# --- Fluid ounces read as grams ---------------------------------------------
+#
+# 14. "neutral_oil - 1 x 950g"
+#     Oil is sold in fluid ounces (16 / 24 / 48 / 96) and is lighter than water
+#     at 0.92 g/mL. A 48 fl oz bottle holds 1306 g; a 24 fl oz holds 653 g.
+#     950 g is ~35 fl oz - between two shelf sizes and equal to neither.
+#
+# 15. "olive_oil - 1 x 750g"
+#     Olive oil bottles are 250 / 500 / 750 mL and 1 L. If "750" came from the
+#     750 mL bottle, the mass is 686 g, not 750 g - a straight mL-to-gram
+#     substitution that ignores oil's density. A true 750 g of olive oil is
+#     820 mL, which is not a bottle anyone sells.
+#
+# 16. "chicken_stock - 4 x 33 oz"
+#     Stock cartons are 32 fl oz (1 quart, 946 mL) or 48 fl oz. 33 oz is not a
+#     size. It looks like 946 g being rounded back into ounces at water density
+#     and landing one ounce off the real package it came from.
+#
+# 17. "coconut_aminos - 1 x 17 oz"
+#     The real bottle is 16.9 fl oz - a 500 mL metric bottle in US clothing. At
+#     ~1.05 g/mL that is ~525 g of product. "17 oz" is a fluid-ounce label being
+#     treated as a weight, and the two differ by enough to matter for a recipe
+#     using 60 g.
+#
+# 18. "rice_vinegar - 1 x 355g"
+#     355 is the mL in a 12 fl oz bottle. It is reported as grams and happens to
+#     be nearly correct because vinegar is water-density - which is precisely why
+#     this class of error survives review until it hits an oil or a juice.
+#
+# --- Pack sizes no store carries --------------------------------------------
+#
+# 19. "lard - 2 x 15 oz"
+#     Lard comes in 16 oz tubs/cans and 2.5 lb tubs. 15 oz is not a size.
+#
+# 20. "orange_juice - 1 x 1750g"
+#     Cartons are 52 fl oz (~1610 g) and 89 fl oz jugs (~2750 g). Nothing on the
+#     shelf is 1750 g. Note also the density: OJ is 1.045 g/mL, so even the
+#     fluid-ounce-to-gram conversion is not 1:1.
+#
+# 21. "queso_fresco - 1 x 12 oz"
+#     The major-chain round is 10 oz (283 g); 12 oz exists at some brands but is
+#     not what is on this store's shelf. Needing 340 g means buying two 10 oz
+#     rounds and having 226 g left to use within a week, not one clean package.
+#
+# 22. "roma_tomato - 6 x 500g" and "jalapeno - 3 x 150g" and "garlic - 3 x 150g"
+#     All three are loose bin items priced per pound. There is no 500 g roma
+#     package, no 150 g jalapeno package, and garlic is sold by the head (~50 g)
+#     or in 3-head sleeves. The quantities are buyable; the units are invented.
+#
+# 23. "pineapple - 1 x 900g"
+#     A whole pineapple is 1.6-2.0 kg and the store charges a flat price per
+#     pineapple regardless. Roughly half is rind, core and crown. 900 g is very
+#     close to the EDIBLE yield of one whole pineapple - which suggests the
+#     planner is tracking usable flesh but writing it as if it were a purchase.
+#     Either way there is no 900 g pineapple to put in a cart.
+#
+# 24. "rosemary - 1 x 20g"
+#     Close: the real clamshell is 0.66 oz / 19 g. But it is the smallest unit in
+#     existence, and the plan needs 10 g - so half of the only buyable package is
+#     waste, which the "10g leftover" line does correctly notice.
+#
+# --- The big one: net vs drained ---------------------------------------------
+#
+# 25. "pinto_beans_canned - 14 x 15 oz (need 6146g, 0g leftover)"
+#     Cans are 15.5 oz = 439 g NET, and net includes the brine. Drained weight,
+#     which is what actually goes in the pot, is ~260 g per can. Fourteen cans
+#     therefore deliver ~3640 g of beans against a stated need of 6146 g - a
+#     shortfall of roughly 41%. If the requirement really is 6146 g of cooked
+#     beans, the correct purchase is about 24 cans, or a $2.99 bag of dry pintos
+#     that yields ~2.2 kg cooked. This is the single most consequential mismatch
+#     in the list: it is not a labeling quibble, it means the meals do not have
+#     enough food in them.
+#
+# --- Things the plan needs and never buys ------------------------------------
+#
+# 26. Salt appears nowhere on the list. Neither does black pepper. Every savory
+#     recipe in a week of cooking uses both. They are stocked in this catalog
+#     (kosher 3 lb, table 26 oz, ground pepper 4 oz) specifically so that their
+#     absence is a finding about the plan and not an artifact of the store.
+#
+# 27. No aluminum foil, parchment, storage containers, or freezer bags. This is a
+#     batch-cooking plan: it buys 10 lb of chicken, 9 lb of pork and 6 lb of
+#     shrimp against 2-4 day raw shelf lives, cooks in bulk, and stores the
+#     results - with nothing to store them in and nothing to freeze the surplus
+#     raw protein in on shopping day. All of it is stocked here.
+#
+# 28. Water. Recipes need it; it is not a grocery. Bottled water is stocked as a
+#     real product, but the correct behavior for a planner is to never list
+#     cooking water at all.
+#
+# --- Storage claims worth checking -------------------------------------------
+#
+# 29. The list gives onions and garlic "keeps 30d raw" and groups them under
+#     "Perishable (buy fresh)". Both are pantry items and both are actively
+#     harmed by refrigeration - onions go soft, garlic sprouts. If the planner is
+#     modeling refrigerator capacity, it is putting things in the fridge that do
+#     not belong there and may be reporting a fridge as full when it is not.
+#
+# 30. "Total estimated cost: $415.80." Independent of the arithmetic, several
+#     line items above are priced against packages that do not exist, so the
+#     total is an estimate of a basket that cannot be assembled. The direction of
+#     the error is not uniform: the bean shortfall would push the real total up,
+#     while the whole-pineapple and pork-shoulder lines would push it down.

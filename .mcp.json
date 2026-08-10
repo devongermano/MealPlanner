@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "kitchen": {
+      "command": "/Users/devon/Desktop/MealPlanner/.venv/bin/python",
+      "args": ["-m", "kitchen_sim.mcp_server"],
+      "cwd": "/Users/devon/Desktop/MealPlanner/gates/kitchen-sim"
+    }
+  }
+}

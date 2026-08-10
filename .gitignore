@@ -43,3 +43,7 @@ coverage/
 # plans/ is deliberately NOT ignored (M1.3): locked plan artifacts are
 # git-tracked data — the artifact IS the record. Tests only ever write
 # plans under tmp_path.
+
+# kitchen-sim: per-run pointer and outputs are local state, not the record
+gates/kitchen-sim/.current_run.json
+gates/kitchen-sim/runs/
