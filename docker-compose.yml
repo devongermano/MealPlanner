@@ -1,0 +1,48 @@
+# Local dev skeleton (M2 pre-work). Validates with `docker compose config`;
+# running containers is M2 proper. Topology per ARCHITECTURE.md:
+# web (dev server) -> api (NestJS, the one brain) -> solver (private FastAPI).
+# Supabase local (`supabase start`) is separate and not composed here.
+
+services:
+  solver:
+    # Placeholder until the FastAPI wrapper container lands (M2 proper).
+    # Real service: services/solver — engine-in, result-out, no state.
+    image: python:3.12-slim
+    command:
+      [
+        "python",
+        "-c",
+        "print('solver placeholder — M2 proper runs the FastAPI wrapper from services/solver')",
+      ]
+    expose:
+      - "8000"
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      PORT: "3000"
+      HOST: "0.0.0.0"
+      SOLVER_URL: "http://solver:8000"
+    ports:
+      - "3000:3000"
+    depends_on:
+      - solver
+
+  web:
+    # Dev-server-in-container; production web is a static build (Render).
+    image: node:22.22.3-slim
+    working_dir: /repo/apps/web
+    volumes:
+      - .:/repo
+    command:
+      [
+        "sh",
+        "-c",
+        "corepack enable && corepack prepare pnpm@9.0.0 --activate && pnpm install --frozen-lockfile && pnpm start -- --host 0.0.0.0",
+      ]
+    ports:
+      - "4200:4200"
+    depends_on:
+      - api
