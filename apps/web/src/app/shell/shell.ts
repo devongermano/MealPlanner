@@ -35,6 +35,17 @@ export class Shell {
     return parts.map((part) => part[0]?.toUpperCase() ?? '').join('');
   });
 
+  /**
+   * A bare href="#main" resolves against the base href, so the router would leave
+   * the current page instead of jumping to the content. Move focus directly.
+   */
+  protected skipToContent(event: Event): void {
+    event.preventDefault();
+    const main = document.getElementById('main');
+    main?.focus();
+    main?.scrollIntoView();
+  }
+
   protected switchHousehold(event: Event): void {
     const id = (event.target as HTMLSelectElement).value;
     this.store.setActive(id);

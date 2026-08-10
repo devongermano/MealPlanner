@@ -4,6 +4,18 @@ import type { ConfigProblem } from './runtime-config';
 export const CONFIG_PROBLEM = new InjectionToken<ConfigProblem>('CONFIG_PROBLEM');
 
 /**
+ * bootstrapApplication attaches by matching the component's selector against the
+ * existing DOM, and index.html only contains <app-root>. Without this the notice
+ * fails with NG05104 and the page sits on its loading fallback forever — which is
+ * the exact failure this component exists to prevent.
+ */
+export function createSetupNoticeHost(doc: Document): HTMLElement {
+  const host = doc.createElement('app-setup-notice');
+  doc.body.replaceChildren(host);
+  return host;
+}
+
+/**
  * Bootstrapped in place of the app when configuration is unusable. This is the only
  * thing standing between a missing config.json and a white screen, so it says what
  * broke and what to type — never "something went wrong".

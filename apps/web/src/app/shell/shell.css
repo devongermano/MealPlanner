@@ -89,11 +89,14 @@ nav {
   font-size: var(--text-sm);
 }
 
+/* Bordered so it reads as a control; unbordered it looks like a stray label. */
 .theme-toggle {
   min-height: 1.75rem;
-  padding: 0 var(--space-2);
+  padding: 0 var(--space-3);
   font-size: var(--text-xs);
   text-transform: capitalize;
+  border-color: var(--border);
+  border-radius: var(--radius-full);
 }
 
 .avatar {
