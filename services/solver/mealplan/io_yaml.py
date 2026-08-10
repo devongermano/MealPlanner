@@ -23,8 +23,8 @@ from typing import Any, Optional
 
 import yaml
 
-from .model import (PERSON_MODES, Ingredient, Pantry, Person, Settings,
-                    derive_component)
+from .model import (PERSON_MODES, SERVING_MODELS, Ingredient, Pantry, Person,
+                    Settings, derive_component, resolve_meal_slots)
 
 SCHEMA_VERSION = 1
 KNOWN_SCHEMA_VERSIONS = (1,)
@@ -275,6 +275,30 @@ def validate_components_doc(doc: Any, known_ingredients: Optional[set] = None,
                         "bad_household_unit", hwhere,
                         f"unexpected household_unit field(s) {extra}; "
                         "only 'name' and 'grams' are allowed"))
+        # pairs_with (optional, M1.9): accent affinity — the meal dealer
+        # attaches an accent to the meal whose slot-main appears in its
+        # pairs_with list (falling back to same-cuisine). Shape-validated
+        # here; ids must be non-empty strings; references to components not
+        # in this document are a WARNING (the affinity silently degrades to
+        # the cuisine fallback — say so at load, not never).
+        pw = c.get("pairs_with")
+        if pw is not None:
+            pwhere = f"{where}, field 'pairs_with'"
+            if (not isinstance(pw, list)
+                    or not all(isinstance(x, str) and x.strip() for x in pw)):
+                issues.append(ValidationIssue(
+                    "bad_pairs_with", pwhere,
+                    f"pairs_with must be a list of component ids "
+                    f"(got {pw!r})"))
+            else:
+                all_ids = {x.get("id") for x in comps if isinstance(x, dict)}
+                unknown = sorted(set(pw) - all_ids)
+                if unknown:
+                    issues.append(ValidationIssue(
+                        "pairs_with_unknown_component", pwhere,
+                        f"pairs_with references unknown component(s) "
+                        f"{unknown} — the affinity falls back to "
+                        "same-cuisine for those", severity="warning"))
         sg = c.get("serve_g")
         if sg is not None:
             if not isinstance(sg, dict) or "min" not in sg or "max" not in sg:
@@ -384,14 +408,83 @@ def validate_people_doc(doc: Any, fname: str = "people.yaml"
                 issues.append(ValidationIssue(
                     "bad_tolerance", f"{where}, field 'tolerance'",
                     f"tolerance must be a number in (0, 0.5] (got {tv!r})"))
-            # meals_per_day is RESERVED (model.RESERVED_FIELDS): validated
-            # here, ignored by the M0 engine by design (M1 eat sheets).
+            # meals_per_day is LIVE since M1.9 (PRD §4.0): the post-solve
+            # dealer deals each solved day into n composed meals.
             mpd = p.get("meals_per_day")
             if mpd is not None and (not isinstance(mpd, int)
                                     or isinstance(mpd, bool) or mpd < 1):
                 issues.append(ValidationIssue(
                     "bad_meals_per_day", f"{where}, field 'meals_per_day'",
                     f"meals_per_day must be an integer >= 1 (got {mpd!r})"))
+            # M1.9 (PRD §4.0 amendments): serving_model enum per person;
+            # meal_slots list with per-slot serving_model / interchangeable.
+            sm = p.get("serving_model")
+            if sm is not None and sm not in SERVING_MODELS:
+                issues.append(ValidationIssue(
+                    "bad_enum", f"{where}, field 'serving_model'",
+                    f"serving_model must be one of "
+                    f"{'|'.join(SERVING_MODELS)} (got {sm!r})"))
+            ms = p.get("meal_slots")
+            if ms is not None:
+                mwhere = f"{where}, field 'meal_slots'"
+                if not isinstance(ms, list) or not ms:
+                    issues.append(ValidationIssue(
+                        "bad_meal_slots", mwhere,
+                        f"meal_slots must be a non-empty list of slot "
+                        f"mappings (got {ms!r})"))
+                else:
+                    names = []
+                    for k, s in enumerate(ms):
+                        swhere = f"{mwhere}[{k}]"
+                        if not isinstance(s, dict):
+                            issues.append(ValidationIssue(
+                                "bad_meal_slots", swhere,
+                                f"slot must be a mapping with 'name' "
+                                f"(got {s!r})"))
+                            continue
+                        nm = s.get("name")
+                        if not isinstance(nm, str) or not nm.strip():
+                            issues.append(ValidationIssue(
+                                "bad_meal_slots", f"{swhere}, 'name'",
+                                f"slot name must be a non-empty string "
+                                f"(got {nm!r})"))
+                        else:
+                            names.append(nm)
+                        ssm = s.get("serving_model")
+                        if ssm is not None and ssm not in SERVING_MODELS:
+                            issues.append(ValidationIssue(
+                                "bad_enum", f"{swhere}, 'serving_model'",
+                                f"slot serving_model must be one of "
+                                f"{'|'.join(SERVING_MODELS)} (got {ssm!r})"))
+                        ic = s.get("interchangeable")
+                        if ic is not None and not isinstance(ic, bool):
+                            issues.append(ValidationIssue(
+                                "bad_meal_slots", f"{swhere}, "
+                                "'interchangeable'",
+                                f"interchangeable must be a boolean "
+                                f"(got {ic!r})"))
+                        extra = sorted(set(s) - {"name", "serving_model",
+                                                 "interchangeable"})
+                        if extra:
+                            issues.append(ValidationIssue(
+                                "bad_meal_slots", swhere,
+                                f"unexpected slot field(s) {extra}; only "
+                                "'name', 'serving_model' and "
+                                "'interchangeable' are allowed"))
+                    dupes = sorted({n for n in names if names.count(n) > 1})
+                    if dupes:
+                        issues.append(ValidationIssue(
+                            "bad_meal_slots", mwhere,
+                            f"duplicate slot name(s) {dupes} — slot names "
+                            "must be unique"))
+                    # both set → the counts must agree (all-errors, exit 3)
+                    if (isinstance(mpd, int) and not isinstance(mpd, bool)
+                            and mpd >= 1 and len(ms) != mpd):
+                        issues.append(ValidationIssue(
+                            "meal_slot_count_mismatch", mwhere,
+                            f"meal_slots lists {len(ms)} slot(s) but "
+                            f"meals_per_day is {mpd} — the counts must "
+                            "agree (or set only one of the two)"))
             # removed in M0.5 — nothing ever read them
             for f_ in ("min_components_per_day", "max_components_per_day"):
                 if f_ in p:
@@ -670,7 +763,34 @@ def load_docs(ing_doc, comp_doc, ppl_doc):
     # prototype behavior: budget rides along inside settings
     settings = Settings.from_raw(ppl_doc["settings"],
                                  ppl_doc.get("budget", {"mode": "off"}))
+    _report_warnings(meal_side_mass_issues(comps, people))
     return ing, comps, people, settings
+
+
+def meal_side_mass_issues(comps, people) -> list[ValidationIssue]:
+    """M1.9 load-time warning (M19_SPEC §2.5): a person with a multi-meal
+    structure but ZERO splittable side mass in their eligible library (no
+    starch/veg they can eat, or roles misauthored all-main) will see every
+    meal flagged by the dealer — name the fix at load, before anyone sees a
+    flagged week. Needs DERIVED component tags, hence post-construction
+    (called from load_docs, not from validate_people_doc)."""
+    out = []
+    for pn, p in people.items():
+        slots = resolve_meal_slots(p)
+        if not slots or len(slots) < 2:
+            continue
+        excl = set(p.get("exclude") or [])
+        splittable = [cid for cid, c in comps.items()
+                      if c["role"] in ("starch", "veg")
+                      and not (set(c["tags"]) & excl)]
+        if not splittable:
+            out.append(ValidationIssue(
+                "meal_side_mass_missing", f"people.yaml: person '{pn}'",
+                f"'{pn}' has {len(slots)} meals per day but the library has "
+                "no starch/veg component they can eat — every meal will be "
+                "flagged; add an eligible side dish (or fix misauthored "
+                "roles)", severity="warning"))
+    return out
 
 
 def load_pantry(path: str | os.PathLike,

@@ -19,7 +19,9 @@ people:
   jimbo:
     targets: {protein: 235, fat: 157, carb: 588}
     tolerance: 0.05
-    meals_per_day: 2      # RESERVED: M1 eat-sheet structure; the M0 engine ignores it
+    meals_per_day: 3      # LIVE (M1.9, PRD §4.0): the solved day is dealt into
+                          # 3 composed meals (auto-named meal_1..meal_3; the
+                          # serving model defaults to portioned)
     exclude: [soy, peanut, garbanzo]
     # VOLUME CAP. 588g of carbs from rice is ~4.9 lb of rice; from tortillas it is
     # ~2.5 lb. Setting this forces the menu toward dense carbs instead of asking him
@@ -32,7 +34,14 @@ people:
     # Currently set to a generic maintenance-ish day for a lifter around 190-200lb.
     targets: {protein: 180, fat: 95, carb: 320}
     tolerance: 0.07
-    meals_per_day: 3      # RESERVED: M1 eat-sheet structure; the M0 engine ignores it
+    serving_model: portioned   # M1.9: person-level default; slots inherit it
+    meal_slots:                # M1.9 (PRD §4.0 Amendment 2): named slots with
+                               # per-slot serving-model overrides — breakfast is
+                               # family style ("have this much"), the rest are
+                               # packed per-meal containers
+      - {name: breakfast, serving_model: family_style}
+      - {name: lunch}
+      - {name: dinner}
     exclude: [dairy]
     max_daily_mass_g: null
     dislikes: []

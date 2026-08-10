@@ -26,12 +26,12 @@ load -> choose_menu(n=6, seed=0, iters=600, shortlist=8) -> build_week -> sessio
 
 | stage | median ms | min ms | max ms |
 |---|---|---|---|
-| load | 4.0 | 4.0 | 4.1 |
-| choose_menu | 67.0 | 65.6 | 68.8 |
-| build_week | 6,422.2 | 6,413.2 | 6,437.8 |
+| load | 4.1 | 3.9 | 8.6 |
+| choose_menu | 83.8 | 66.5 | 120.3 |
+| build_week | 7,183.3 | 6,251.6 | 11,887.7 |
 | session_plan | 0.1 | 0.1 | 0.1 |
 | purchase | 0.0 | 0.0 | 0.0 |
-| **pipeline total** | **6,493.3** | 6,485.9 | 6,509.1 |
+| **pipeline total** | **7,254.9** | 6,322.0 | 11,980.3 |
 
 ## Examples corpus — `mealplan week` pipeline
 
@@ -46,20 +46,21 @@ load -> doctor -> choose_menu(n=12, seed=0; CLI defaults) -> build_week -> sessi
 | doctor-feasibility | 4 |
 | doctor-volume | 46 |
 | menu-verify | 4 |
-| plate | 588 |
-| **total** | **698** |
+| plate | 1068 |
+| **total** | **1178** |
 
 ### Wall timings over 5 runs (recorded-only — never asserted in CI, PRD §8.5)
 
 | stage | median ms | min ms | max ms |
 |---|---|---|---|
-| load | 26.8 | 26.2 | 27.0 |
-| doctor | 2,567.4 | 2,541.7 | 2,593.3 |
-| choose_menu | 1,495.0 | 1,490.7 | 1,499.2 |
-| build_week | 11,489.4 | 11,442.1 | 11,606.4 |
+| load | 29.0 | 27.3 | 29.7 |
+| doctor | 2,837.5 | 2,619.6 | 3,667.8 |
+| choose_menu | 1,561.0 | 1,528.8 | 1,697.6 |
+| build_week | 22,444.3 | 21,660.8 | 29,052.1 |
 | session_plan | 0.2 | 0.2 | 0.2 |
-| purchase | 0.0 | 0.0 | 0.0 |
-| **pipeline total** | **15,565.7** | 15,528.9 | 15,710.2 |
+| meal-alloc | 11.6 | 11.3 | 11.8 |
+| purchase | 0.1 | 0.0 | 0.1 |
+| **pipeline total** | **26,884.0** | 25,848.5 | 34,458.8 |
 
 ## Interactive primitives — tests/fixtures/solo_lifter
 
@@ -78,9 +79,9 @@ One plate LP and one replate (day rebalance, §4.4) on the golden menu — the s
 
 | stage | median ms | min ms | max ms |
 |---|---|---|---|
-| plate | 17.5 | 17.3 | 19.0 |
-| replate | 18.9 | 17.6 | 20.2 |
-| **pipeline total** | **36.4** | 34.9 | 39.3 |
+| plate | 19.5 | 18.4 | 20.7 |
+| replate | 20.5 | 19.2 | 20.8 |
+| **pipeline total** | **40.0** | 37.8 | 41.1 |
 
 ## Lock round trip — tests/fixtures/solo_lifter (M1.3)
 
@@ -98,9 +99,9 @@ One plate LP and one replate (day rebalance, §4.4) on the golden menu — the s
 
 | stage | median ms | min ms | max ms |
 |---|---|---|---|
-| lock | 6,822.9 | 6,774.0 | 6,876.9 |
-| verify-plan | 6,790.2 | 6,765.4 | 6,831.9 |
-| **pipeline total** | **13,605.9** | 13,583.1 | 13,667.1 |
+| lock | 7,045.9 | 7,003.5 | 7,107.5 |
+| verify-plan | 7,028.9 | 6,873.0 | 7,098.8 |
+| **pipeline total** | **14,064.1** | 13,876.4 | 14,206.4 |
 
 ## Targets (provisional) — M1.5, PRD §8.5
 
@@ -108,7 +109,7 @@ Interactive-latency targets set FROM the measured medians above with **2x headro
 
 | interaction | measured median | provisional target (2x) |
 |---|---|---|
-| interactive single plate (plate LP, solo golden menu) | 17.5 ms | 35.1 ms |
-| replate — day rebalance (engine.replate, solo golden menu) | 18.9 ms | 37.7 ms |
-| full pipeline (`mealplan week` shape, examples corpus) | 15,565.7 ms | 31,131.4 ms |
-| lock round trip (`mealplan lock` + `mealplan verify-plan`, solo_lifter) | 13,605.9 ms | 27,211.8 ms |
+| interactive single plate (plate LP, solo golden menu) | 19.5 ms | 39.0 ms |
+| replate — day rebalance (engine.replate, solo golden menu) | 20.5 ms | 41.0 ms |
+| full pipeline (`mealplan week` shape, examples corpus) | 26,884.0 ms | 53,768.1 ms |
+| lock round trip (`mealplan lock` + `mealplan verify-plan`, solo_lifter) | 14,064.1 ms | 28,128.3 ms |

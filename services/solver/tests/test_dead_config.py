@@ -152,7 +152,7 @@ def test_min_lean_anchors_default_is_two():
 
 
 # --------------------------------------------------------------------------- #
-#  meals_per_day — kept, validated, explicitly reserved
+#  meals_per_day — LIVE since M1.9 (meals.deal_day); still validated int >= 1
 # --------------------------------------------------------------------------- #
 def _ppl_doc(person_extra=None, settings_extra=None):
     p = {"targets": {"protein": 100, "fat": 60, "carb": 200},
@@ -177,12 +177,12 @@ def test_meals_per_day_valid_and_absent_are_fine():
         assert not [i for i in issues if i.severity == "error"], extra
 
 
-def test_reserved_set_is_exactly_the_documented_two():
-    """meals_per_day (Person, M1 eat sheets) and period (Budget, weekly-only
-    in M0/M1) — each reserved WITH a rationale in model.py. cooked (Pantry)
-    left the set when M1.8 made it live. Growing this set is a deliberate
-    act."""
-    assert model.RESERVED_FIELDS == {"meals_per_day", "period"}
+def test_reserved_set_is_exactly_the_documented_one():
+    """period (Budget, weekly-only in M0/M1) — reserved WITH a rationale in
+    model.py. cooked (Pantry) left the set when M1.8 made it live;
+    meals_per_day (Person) left it when M1.9's meal dealer made it live.
+    Growing this set is a deliberate act."""
+    assert model.RESERVED_FIELDS == {"period"}
 
 
 # --------------------------------------------------------------------------- #
@@ -355,10 +355,14 @@ from _shared import strip_comments_and_docstrings
 def _engine_side_source():
     # artifacts joined the consuming surfaces in M1.1/M1.2: the eat-sheet
     # renderer consumes Person.mode and Component.household_unit (rendering
-    # is consumption — the field changes what the user sees).
-    from mealplan import artifacts
-    srcs = [inspect.getsource(m) for m in (engine, costing, cli, artifacts)]
+    # is consumption — the field changes what the user sees). meals joined
+    # in M1.9: the dealer consumes meals_per_day / serving_model /
+    # meal_slots / pairs_with (via model.resolve_meal_slots, also included).
+    from mealplan import artifacts, meals
+    srcs = [inspect.getsource(m)
+            for m in (engine, costing, cli, artifacts, meals)]
     srcs.append(inspect.getsource(model.derive_component))
+    srcs.append(inspect.getsource(model.resolve_meal_slots))
     return "".join(strip_comments_and_docstrings(s) for s in srcs)
 
 
@@ -385,7 +389,7 @@ def test_no_dead_config_gate():
     engine_src = _engine_side_source()
     validation_src = strip_comments_and_docstrings(
         inspect.getsource(io_yaml))
-    assert model.RESERVED_FIELDS == {"meals_per_day", "period"}
+    assert model.RESERVED_FIELDS == {"period"}
 
     for cls in (model.Ingredient, model.Component, model.Person,
                 model.Settings, model.Budget, model.Pantry):

@@ -87,10 +87,18 @@ def inputs_sha256(snapshot: dict) -> str:
 
 
 def build_plan_doc(snapshot, key, plan_date, menu, weeks, sp, feasible,
-                   misses, relax_tiers, warnings, supersedes=()):
+                   misses, relax_tiers, warnings, supersedes=(), meals=None):
     """Assemble the plan.yaml document. Everything passes through
-    ``jsonable`` so the YAML written is plain scalars/lists/maps."""
-    return jsonable({
+    ``jsonable`` so the YAML written is plain scalars/lists/maps.
+
+    ``meals`` (M1.9, PRD §4.0): the dealt MealDay structure per configured
+    person — meals are PLAN CONTENT, not rendering, so they lock with the
+    plan. The key is present only when somebody configures meals: a
+    meal-less plan document stays byte-identical to pre-M1.9 (the layer is
+    inert). The inputs hash covers meal_slots / serving_model /
+    meals_per_day automatically — the snapshot embeds people.yaml verbatim.
+    """
+    doc = {
         "schema_version": PLAN_SCHEMA_VERSION,
         "schema": "mealplan/v2",
         "engine_version": __version__,
@@ -108,7 +116,10 @@ def build_plan_doc(snapshot, key, plan_date, menu, weeks, sp, feasible,
         "relax_tiers": relax_tiers,
         "warnings": warnings,
         "veto_history": [],         # reserved for M2 (propose → veto → lock)
-    })
+    }
+    if meals:
+        doc["meals"] = meals        # per-person, per-day dealt MealDay
+    return jsonable(doc)
 
 
 def _next_superseded_name(plan_dir: Path) -> str:

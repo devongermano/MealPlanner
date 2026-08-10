@@ -47,7 +47,7 @@ from pathlib import Path
 
 import yaml
 
-from . import artifacts, instrument, io_yaml, lockplan
+from . import artifacts, instrument, io_yaml, lockplan, meals
 from .costing import (age_pantry, attribute, budget_ceiling, cooked_leftovers,
                       menu_cost, purchase, session_plan)
 from .engine import (available_on, build_week, choose_menu, from_freezer,
@@ -432,7 +432,12 @@ def _assemble(comps, people, settings, menu, seed, ing, leftovers, timer):
                                    ing=ing, diag=diag, leftovers=leftovers)
     with timer.span("session_plan"):
         sp = session_plan(comps, ing, settings, weeks, leftovers=leftovers)
-    return weeks, demand, sp, diag
+    # M1.9: deal each configured person-day into composed meals — zero LP
+    # solves (the meal-alloc stage is timing only). Empty dict when nobody
+    # configures meals: the layer is inert, pipeline byte-identical.
+    with timer.span("meal-alloc"):
+        mealdays = meals.deal_week(people, comps, weeks)
+    return weeks, demand, sp, diag, mealdays
 
 
 def _solve_from_snapshot(snap, timer):
@@ -470,10 +475,12 @@ def _solve_from_snapshot(snap, timer):
     menu, menuinfo, feas, broke = _resolve_menu(
         comps, ing, people, settings, ov.get("menu"), ov.get("n"), seed,
         force, timer, bad_args_exit=EXIT_ERROR)
-    weeks, demand, sp, diag = _assemble(comps, people, settings, menu, seed,
-                                        ing, leftovers, timer)
+    weeks, demand, sp, diag, mealdays = _assemble(comps, people, settings,
+                                                  menu, seed, ing, leftovers,
+                                                  timer)
     return dict(menu=menu, menuinfo=menuinfo, feasible=feas, misses=broke,
-                weeks=weeks, demand=demand, sp=sp, diag=diag)
+                weeks=weeks, demand=demand, sp=sp, diag=diag,
+                meals=mealdays)
 
 
 # --------------------------------------------------------------------------- #
@@ -660,8 +667,9 @@ def _run(a, timer):
               f"cuisines {menuinfo['cuisines']}")
         return
 
-    weeks, demand, sp, diag = _assemble(comps, people, settings, menu,
-                                        a.seed, ing, leftovers, timer)
+    weeks, demand, sp, diag, mealdays = _assemble(comps, people, settings,
+                                                  menu, a.seed, ing,
+                                                  leftovers, timer)
     batches = sp["batches"]
     chosen = [i for i in menu if batches.get(i)]
     rows, wp, wt = purchase(comps, ing, chosen, batches, pantry=pantry)
@@ -672,7 +680,7 @@ def _run(a, timer):
                   comps=comps, ing=ing, people=people, menu=menu,
                   menuinfo=menuinfo, feas=feas, broke=broke, weeks=weeks,
                   sp=sp, diag=diag, pantry=pantry, stock_warns=stock_warns,
-                  rows=rows, total=total)
+                  rows=rows, total=total, mealdays=mealdays)
         return
 
     # M1.1: the three human-readable deliverables (PRD §4.3 step 4).
@@ -684,7 +692,7 @@ def _run(a, timer):
             files = artifacts.render_artifacts(
                 comps, ing, people, settings, menu, weeks, sp, rows, total,
                 pantry=pantry, stock_warnings=stock_warns, diag=diag,
-                meta=meta)
+                meta=meta, meals=mealdays)
             written = artifacts.write_artifacts(a.artifacts, files)
         print(f"[artifacts written to {a.artifacts}: "
               + ", ".join(p.name for p in written) + "]", file=sys.stderr)
@@ -701,6 +709,10 @@ def _run(a, timer):
             result.update(
                 weeks=weeks, demand=demand, session_plan=sp,
                 relax_tiers=(diag or {}).get("relax_tiers"))
+            # M1.9: meal structure rides in the result ONLY when somebody
+            # configures meals — the no-meals document is byte-identical
+            if mealdays:
+                result["meals"] = mealdays
             if a.diagnose:
                 result["doctor"] = {"report": docmsg, "data": docdata}
         _emit_json(a.cmd, feas is not False, result=result)
@@ -726,7 +738,7 @@ def _run(a, timer):
 # --------------------------------------------------------------------------- #
 def _cmd_lock(a, timer, *, lib, settings, plan_date, comps, ing, people,
               menu, menuinfo, feas, broke, weeks, sp, diag, pantry,
-              stock_warns, rows, total):
+              stock_warns, rows, total, mealdays=None):
     """Write the immutable locked plan artifact: plans/<key>/plan.yaml plus
     the three M1.1 deliverables rendered alongside."""
     key = lockplan.primary_trip_date(plan_date, settings)
@@ -741,7 +753,7 @@ def _cmd_lock(a, timer, *, lib, settings, plan_date, comps, ing, people,
                                        a.seed, plan_date)
     doc = lockplan.build_plan_doc(
         snapshot, key, plan_date, menu, weeks, sp, feas, broke,
-        (diag or {}).get("relax_tiers"), stock_warns)
+        (diag or {}).get("relax_tiers"), stock_warns, meals=mealdays)
     plan_dir = Path(a.plans) / key.isoformat()
     with timer.span("lock"):
         try:
@@ -755,7 +767,8 @@ def _cmd_lock(a, timer, *, lib, settings, plan_date, comps, ing, people,
         meta = dict(seed=a.seed, library=str(lib), date=plan_date.isoformat())
         files = artifacts.render_artifacts(
             comps, ing, people, settings, menu, weeks, sp, rows, total,
-            pantry=pantry, stock_warnings=stock_warns, diag=diag, meta=meta)
+            pantry=pantry, stock_warnings=stock_warns, diag=diag, meta=meta,
+            meals=mealdays)
         written = artifacts.write_artifacts(plan_dir, files)
     result = {
         "key": key.isoformat(), "plan_path": str(path),
@@ -801,6 +814,11 @@ def _cmd_verify_plan(a, timer):
               "inputs_sha256": doc["inputs_sha256"],
               "hash_ok": None, "menu_ok": None, "portions_ok": None,
               "session_plan_ok": None, "verified": False}
+    # M1.9: a plan that carries meal structure is re-dealt and compared too;
+    # a meal-less plan's report keeps its historical shape byte-for-byte
+    has_meals = doc.get("meals") is not None
+    if has_meals:
+        report["meals_ok"] = None
     report["hash_ok"] = lockplan.check_hash(doc)
     if not report["hash_ok"]:
         raise CliError(
@@ -816,11 +834,14 @@ def _cmd_verify_plan(a, timer):
                              == canonical_json(doc["portions"]))
     report["session_plan_ok"] = (canonical_json(solved["sp"])
                                  == canonical_json(doc["session_plan"]))
-    report["verified"] = (report["menu_ok"] and report["portions_ok"]
-                          and report["session_plan_ok"])
+    checks = ["menu_ok", "portions_ok", "session_plan_ok"]
+    if has_meals:
+        report["meals_ok"] = (canonical_json(solved["meals"])
+                              == canonical_json(doc["meals"]))
+        checks.append("meals_ok")
+    report["verified"] = all(report[k] for k in checks)
     if not report["verified"]:
-        bad = [k for k in ("menu_ok", "portions_ok", "session_plan_ok")
-               if not report[k]]
+        bad = [k for k in checks if not report[k]]
         raise CliError(
             "verify_failed",
             f"{p}: re-solve from the embedded snapshot diverges from the "

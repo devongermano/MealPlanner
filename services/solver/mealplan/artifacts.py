@@ -307,10 +307,17 @@ def _macro_status(total, target, tol):
 
 
 def render_eat_sheet(pname, person, comps, week, settings, menu, ing=None,
-                     relax_tiers=None, meta=None):
+                     relax_tiers=None, meta=None, meal_days=None):
     """One person's per-day assembly sheet. ``week`` is that person's list
     of solved day plates ({cid: grams}); empty/None days are EXPLAINED
-    holes, never silent. ``relax_tiers`` is diag["relax_tiers"][pname]."""
+    holes, never silent. ``relax_tiers`` is diag["relax_tiers"][pname].
+
+    ``meal_days`` (M1.9): this person's dealt MealDay list (meals.deal_week
+    output). When present, each day renders as Meal 1..n SECTIONS — meal
+    heading (slot + serving model), items, per-meal macro subtotal — the
+    clean minimal meal-structured sheet; the full sheet rework (portioning
+    matrix, family_style vs portioned phrasing) is M1.10. When None the
+    sheet is byte-identical to pre-M1.9 (the layer is inert)."""
     mode = person.get("mode") or "precision"
     tol = person["tolerance"]
     t = person["targets"]
@@ -341,14 +348,45 @@ def render_eat_sheet(pname, person, comps, week, settings, menu, ing=None,
                  + (f" — *variety caps relaxed (tier {tier})*" if tier
                     else "") + "\n")
         entries = []
-        for c, g in sorted(pl.items(), key=lambda x: (-x[1], x[0])):
-            qty, implied = render_portion(comps[c], g, mode)
-            entries.append((c, float(g), implied))
-            extra = ""
-            if from_freezer(comps[c], d - 1, settings, ing):
-                extra = "  — from freezer — thaw ahead"
-            L.append(f"- {comps[c]['name']}: {qty}{extra}")
-        L.append("")
+        md = meal_days[d - 1] if meal_days and d - 1 < len(meal_days) \
+            else None
+        if md and md.get("meals"):
+            # M1.9: meal-sectioned day — every gram below comes from the
+            # dealt MealDay, which conserves the solved plate exactly
+            for meal in md["meals"]:
+                L.append(f"### {meal['slot']} — {meal['serving_model'].replace('_', ' ')}\n")
+                if not meal["items"]:
+                    L.append("_nothing dealt to this meal_")
+                for c, g in sorted(meal["items"].items(),
+                                   key=lambda x: (-x[1], x[0])):
+                    qty, implied = render_portion(comps[c], g, mode)
+                    entries.append((c, float(g), implied))
+                    extra = ""
+                    if from_freezer(comps[c], d - 1, settings, ing):
+                        extra = "  — from freezer — thaw ahead"
+                    L.append(f"- {comps[c]['name']}: {qty}{extra}")
+                mm = meal.get("macros") or {}
+                if meal["items"]:
+                    L.append(f"- meal subtotal: {mm.get('kcal', 0):.0f} kcal "
+                             f"— {mm.get('protein', 0):.1f}p / "
+                             f"{mm.get('fat', 0):.1f}f / "
+                             f"{mm.get('carb', 0):.1f}c")
+                # M19_SPEC §6 / P8: meal-level flags are never machine-only —
+                # a human reading the sheet sees what the JSON knows
+                # ("dinner is the heavy meal today: +32g fat — carnitas").
+                for f in meal.get("flags", []):
+                    if f.get("message"):
+                        L.append(f"- *{f['message']}*")
+                L.append("")
+        else:
+            for c, g in sorted(pl.items(), key=lambda x: (-x[1], x[0])):
+                qty, implied = render_portion(comps[c], g, mode)
+                entries.append((c, float(g), implied))
+                extra = ""
+                if from_freezer(comps[c], d - 1, settings, ing):
+                    extra = "  — from freezer — thaw ahead"
+                L.append(f"- {comps[c]['name']}: {qty}{extra}")
+            L.append("")
         # One decimal on the day total (M1.4 queued minor B): identical-
         # looking lines must never disagree. The status is therefore
         # computed from the SAME 1-decimal-rounded value that is displayed
@@ -380,9 +418,11 @@ def render_eat_sheet(pname, person, comps, week, settings, menu, ing=None,
 # --------------------------------------------------------------------------- #
 def render_artifacts(comps, ing, people, settings, menu, weeks, sp,
                      purchase_rows, total_cost, pantry=None,
-                     stock_warnings=None, diag=None, meta=None):
+                     stock_warnings=None, diag=None, meta=None, meals=None):
     """All three deliverables as ``{filename: markdown}``. Pure composition
-    of the renderers above — every input is an already-solved structure."""
+    of the renderers above — every input is an already-solved structure.
+    ``meals`` (M1.9): meals.deal_week output ({person: [MealDay]}) — eat
+    sheets render meal sections for the people present in it."""
     relax = (diag or {}).get("relax_tiers", {})
     files = {
         "shopping_list.md": render_shopping_list(
@@ -393,7 +433,8 @@ def render_artifacts(comps, ing, people, settings, menu, weeks, sp,
     for pname, wk in weeks.items():
         files[f"eat_{pname}.md"] = render_eat_sheet(
             pname, people[pname], comps, wk, settings, menu, ing=ing,
-            relax_tiers=relax.get(pname), meta=meta)
+            relax_tiers=relax.get(pname), meta=meta,
+            meal_days=(meals or {}).get(pname))
     return files
 
 

@@ -33,15 +33,15 @@ from .units import KCAL, MACROS
 # validated on load but ignored by the engine BY DESIGN; the registry test
 # (tests/test_dead_config.py) fails CI on any field that is neither.
 #
-# - meals_per_day (Person): presentation-level meal structure for the M1 eat
-#   sheets (PRD §8.1). The M0 engine plans whole days; splitting a day's
-#   plate into meals is rendering, not solving.
 # - period (Budget): budget period label, validated to the one known value
 #   ('week') — M0/M1 plans are weekly by construction, so nothing consumes
 #   it; reserved for a future non-weekly budget period.
 # (cooked (Pantry) was reserved in M0; it went LIVE in M1.8 —
-#  costing.cooked_leftovers joins it into availability and session_plan.)
-RESERVED_FIELDS = frozenset({"meals_per_day", "period"})
+#  costing.cooked_leftovers joins it into availability and session_plan.
+#  meals_per_day (Person) was reserved in M0; it went LIVE in M1.9 — the
+#  post-solve meal dealer (meals.deal_day, PRD §4.0) deals each solved day
+#  plate into n composed meals.)
+RESERVED_FIELDS = frozenset({"period"})
 
 # M1.2 (PRD §4.1): a relaxed person with NO explicit tolerance gets this
 # effective tolerance. PROVISIONAL — ±12% is the PRD §4.1 default, to be
@@ -50,6 +50,14 @@ RESERVED_FIELDS = frozenset({"meals_per_day", "period"})
 RELAXED_TOLERANCE = 0.12
 
 PERSON_MODES = ("precision", "relaxed")
+
+# M1.9 (PRD §4.0 + amendments): per-person / per-slot serving models.
+# "portioned" is the meal-prep model (per-meal containers packed on cook
+# day) — the product's stated model, so it is the default. PROVISIONAL
+# (P9, M19_SPEC §11.3): family_style is the named v1-heritage mode; the
+# default is an owner call to ratify. Both models share the entire solve —
+# they change rendering only (PRD §4.0: grams are canonical, P7).
+SERVING_MODELS = ("portioned", "family_style")
 
 
 class _RawView:
@@ -138,6 +146,7 @@ class Component(_RawView):
     household_unit: Optional[dict] = None   # M1.2: {"name": str, "grams": >0}
     anchor: Optional[str] = None
     freezes: Optional[bool] = None  # LIVE (M0.5): freezer-bridging availability
+    pairs_with: Optional[list] = None  # M1.9: accent affinity (component ids)
     source: Optional[str] = None
     per100: dict = field(default_factory=dict)   # DERIVED — see derive_component
     tags: list = field(default_factory=list)     # DERIVED — union of ingredient tags
@@ -149,9 +158,17 @@ class Person(_RawView):
     """min_components_per_day / max_components_per_day were REMOVED in schema
     v1 (M0.5): no engine ever consumed them; validation now errors on them.
 
-    meals_per_day is RESERVED (see RESERVED_FIELDS): validated int >= 1, but
-    the M0 engine ignores it by design — it is the meal structure for the M1
-    eat sheets (PRD §8.1), a presentation concern, not a solving one.
+    meals_per_day is LIVE since M1.9 (PRD §4.0): each person's solved day
+    plate is dealt into n composed meals by the post-solve dealer
+    (meals.deal_day). Validated int >= 1; unset means no meal layer for
+    this person (the layer is inert).
+
+    serving_model / meal_slots (M1.9, PRD §4.0 amendments): the serving
+    model is per person with per-slot overrides — slots inherit the
+    person's serving_model unless they set their own. ``interchangeable``
+    (per slot) is a named OPT-IN, never a default (Amendment 2). Slot
+    resolution — the schema-defaults job — is ``resolve_meal_slots``
+    below, the ONE resolution point every consumer calls.
 
     mode (M1.2, PRD §4.1): "precision" (default) or "relaxed". Presentation
     + tolerance-default ONLY — the engine still solves grams either way. A
@@ -167,7 +184,9 @@ class Person(_RawView):
     exclude: list = field(default_factory=list)
     dislikes: list = field(default_factory=list)
     max_daily_mass_g: Optional[float] = None
-    meals_per_day: Optional[int] = None    # RESERVED — M1 eat sheets
+    meals_per_day: Optional[int] = None    # LIVE (M1.9): meal-layer n
+    serving_model: str = "portioned"       # LIVE (M1.9): rendering model
+    meal_slots: Optional[list] = None      # LIVE (M1.9): per-slot config
     raw: dict = field(default_factory=dict, repr=False)
 
     @classmethod
@@ -177,13 +196,51 @@ class Person(_RawView):
         raw["mode"] = mode
         if raw.get("tolerance") is None and mode == "relaxed":
             raw["tolerance"] = RELAXED_TOLERANCE
+        sm = raw.get("serving_model") or "portioned"
+        raw["serving_model"] = sm
         return cls(name=pname, targets=raw.get("targets"),
                    tolerance=raw.get("tolerance"), mode=mode,
                    exclude=raw.get("exclude") or [],
                    dislikes=raw.get("dislikes") or [],
                    max_daily_mass_g=raw.get("max_daily_mass_g"),
                    meals_per_day=raw.get("meals_per_day"),
+                   serving_model=sm,
+                   meal_slots=raw.get("meal_slots"),
                    raw=raw)
+
+
+def resolve_meal_slots(person) -> Optional[list]:
+    """THE one slot-resolution point (M1.9, M19_SPEC §2.3) — schema defaults
+    live in the model layer, so every consumer (dealer, picker nudge, eat
+    sheets, doctor) resolves a person's meal slots through exactly this
+    function. Accepts a ``Person`` or any dict-style person mapping.
+
+    Rules (validated in io_yaml — this function assumes a valid document):
+    - ``meals_per_day`` set, ``meal_slots`` absent → generated slots named
+      ``meal_1..meal_n`` (breakfast/lunch/dinner semantics are NOT guessed —
+      open question, M19_SPEC §11.2).
+    - ``meal_slots`` set (alone or with a matching ``meals_per_day``) →
+      those slots; ``n = len(meal_slots)``.
+    - Neither → ``None``: no meal layer for this person (the layer is
+      inert, byte-identical pipeline).
+
+    Each resolved slot is ``{"name", "serving_model", "interchangeable"}``:
+    slots inherit the person's ``serving_model`` (default "portioned")
+    unless they override it; ``interchangeable`` defaults False (opt-in,
+    never default — PRD §4.0 Amendment 2).
+    """
+    sm = person.get("serving_model") or "portioned"
+    slots = person.get("meal_slots")
+    if slots:
+        return [dict(name=s["name"],
+                     serving_model=s.get("serving_model") or sm,
+                     interchangeable=bool(s.get("interchangeable", False)))
+                for s in slots]
+    n = person.get("meals_per_day")
+    if n:
+        return [dict(name=f"meal_{k + 1}", serving_model=sm,
+                     interchangeable=False) for k in range(n)]
+    return None
 
 
 @dataclass
@@ -329,5 +386,6 @@ def derive_component(c: dict, ing: dict) -> Component:
         keeps_days=c.get("keeps_days"), active_min=c.get("active_min"),
         ingredients=c.get("ingredients"), unit_g=c.get("unit_g"),
         household_unit=c.get("household_unit"), anchor=c.get("anchor"),
-        freezes=c.get("freezes"), source=c.get("source"),
+        freezes=c.get("freezes"), pairs_with=c.get("pairs_with"),
+        source=c.get("source"),
         per100=raw["per100"], tags=raw["tags"], raw=raw)

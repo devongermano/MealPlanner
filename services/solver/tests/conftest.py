@@ -21,6 +21,10 @@ SLOW_MODULES = {
     "test_json_contract_solve",  # --json contract for solve-carrying commands
     "test_lock_plan",           # lock/verify-plan round trips solve twice
     "test_m1_phase1",           # scaling/pantry scenarios run plates + weeks
+    "test_meals_e2e",           # M1.9 meal-layer pipeline: lock/verify with
+                                # meal structure (the dealer itself is
+                                # zero-LP; its unit tests are FAST-tier in
+                                # test_meals.py by construction)
     "test_n_coverage",          # n=1..4 full pipelines across fixtures
     "test_sessions_freshness",  # session_plan scenarios solve weeks
     "test_score_scale",         # frontier points run choose_menu

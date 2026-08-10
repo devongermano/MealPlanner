@@ -51,7 +51,7 @@ sys.path.insert(0, str(SOLVER / "tests"))    # for tests/_shared.py
 import pulp                                        # noqa: E402
 from _shared import GOLDEN_MENU_KW, GOLDEN_SEED    # noqa: E402
 
-from mealplan import cli, costing, engine, io_yaml  # noqa: E402
+from mealplan import cli, costing, engine, io_yaml, meals  # noqa: E402
 
 
 @contextmanager
@@ -78,6 +78,10 @@ def run_examples(timings):
                                           seed=0, ing=ing)
     with span(timings, "session_plan"):
         sp = costing.session_plan(comps, ing, settings, weeks)
+    # M1.9: the meal dealer (PROVISIONAL row — zero LP solves by
+    # construction; timing only, so pure-Python regressions stay visible)
+    with span(timings, "meal-alloc"):
+        meals.deal_week(people, comps, weeks)
     with span(timings, "purchase"):
         # same shape as the CLI week command (cli.py): a menu component the
         # week never serves gets no batch and is not purchased

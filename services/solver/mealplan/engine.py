@@ -38,6 +38,7 @@ import pulp
 from .costing import (budget_ceiling, cook_minutes, cookable_sessions,
                       estimate_batches, freezer_bridges, menu_cost, purchase,
                       raw_freshness, sessions_for, shop_days_for)
+from .model import resolve_meal_slots
 from .units import MACROS, fmt_miss, kcal_of
 
 
@@ -677,6 +678,54 @@ def doctor(comps, people, settings, ing=None):
         lines.append(f"- **{pname}**: worst day is day {ch['worst_day']} — "
                      f"{ch['worst_headroom_g']:.0f}g carb available vs "
                      f"{ch['target_g']}g target: {flag}")
+
+    # ---- M1.9: meal-layer dealability (arithmetic only, ZERO LP solves) ----
+    # Meal-layer infeasibility is explained at the layer it occurs (P6),
+    # before a full build. Section appears only when somebody configures
+    # meals — the layer is inert otherwise (byte-identical doctor output).
+    meal_slots = {pn: resolve_meal_slots(p) for pn, p in people.items()}
+    if any(meal_slots.values()):
+        from .meals import MEAL_WEIGHTS
+        lines.append("\n## Meal layer\n")
+        data["meal_layer"] = {}
+        days = settings["days"]
+        floor_g = MEAL_WEIGHTS["MIN_SUBPORTION_G"]
+        for pname, slots in meal_slots.items():
+            if not slots:
+                continue
+            p = people[pname]
+            n = len(slots)
+            elig = [i for i in ids if eligible(comps[i], p)]
+            per_day_mains, per_day_side = [], []
+            for d in range(days):
+                av = [i for i in elig
+                      if available_on(comps[i], d, settings, ing)]
+                per_day_mains.append(
+                    len({i for i in av if comps[i]["role"] == "main"}))
+                per_day_side.append(round(sum(
+                    effective_serve_bounds(comps[i], p)[1]
+                    for i in av
+                    if comps[i]["role"] in ("starch", "veg")), 1))
+            worst_mains = min(per_day_mains) if per_day_mains else 0
+            worst_side = min(per_day_side) if per_day_side else 0.0
+            need_side = n * floor_g
+            variety_days = sum(1 for m in per_day_mains if m < n)
+            entry = dict(slots=n, worst_day_mains=worst_mains,
+                         worst_day_side_mass_g=worst_side,
+                         side_mass_needed_g=need_side,
+                         expected_variety_unmet_days=variety_days)
+            data["meal_layer"][pname] = entry
+            lines.append(
+                f"- **{pname}** ({n} meals/day): worst-day distinct mains "
+                f"{worst_mains} vs {n} needed"
+                + (" — **mains repeat across slots "
+                   f"on {variety_days} day(s)** (variety_unmet expected)"
+                   if variety_days else " — OK")
+                + f"; worst-day splittable side mass {worst_side:.0f}g vs "
+                  f"{need_side}g needed"
+                + (" — OK" if worst_side >= need_side
+                   else " — **SHORT**: meals will lean on carved "
+                        "sub-portions or ship flagged"))
     return "\n".join(lines), data
 
 
@@ -976,6 +1025,13 @@ def build_week(comps, people, settings, menu, seed=0, ing=None, diag=None,
     and each component is ALSO available on the plan days its leftover's
     residual life covers; session_plan then consumes those grams before any
     fresh batch (economy: leftovers are already paid for)."""
+    # M1.9 §3.5 picker nudge: for a person WITH a meal structure, candidate
+    # plates that deal well (enough distinct mains, enough splittable side
+    # mass) are preferred among the already-solved candidates. Zero-LP —
+    # selection only; the term contributes 0 when meals are unset, so the
+    # no-meals pipeline stays byte-identical. Lazy import: meals.py imports
+    # effective_serve_bounds from this module.
+    from .meals import dealability_penalty
     days = settings["days"]
     cap_batches = settings["max_batches_per_component"]
     porder = {pn: k for k, pn in enumerate(sorted(people))}
@@ -984,6 +1040,8 @@ def build_week(comps, people, settings, menu, seed=0, ing=None, diag=None,
         leftover_days.setdefault(e["component"], set()).update(e["days"])
     weeks, demand = {}, {}
     for pname, p in people.items():
+        slots = resolve_meal_slots(p)
+        slots_n = len(slots) if slots else 0
         wk, used_days, used_g = [], {}, {}
         for d in range(days):
             fresh = [i for i in menu
@@ -1005,11 +1063,17 @@ def build_week(comps, people, settings, menu, seed=0, ing=None, diag=None,
                     (settings["max_days_same_component"] + 1, cap_batches + 1),
                     (days, cap_batches + 2))):
                 avail = pool(cd, cb)
+                mains_avail = len({i for i in avail
+                                   if comps[i]["role"] == "main"}) \
+                    if slots_n else 0
                 bestsc = None
                 for pl in diverse_plates(p, comps, avail, k=10,
                                          seed=(seed * 1009 + porder[pname] * 101
                                                + d * 31) % 9973):
                     sc = sum(used_days.get(c, 0) ** 2 for c in pl)
+                    if slots_n:
+                        sc += dealability_penalty(pl, comps, slots_n,
+                                                  mains_avail)
                     if bestsc is None or sc < bestsc:
                         bestsc, best = sc, pl
                 if best:
