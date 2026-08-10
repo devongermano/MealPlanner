@@ -22,8 +22,14 @@ export interface AuthenticatedRequest extends Request {
   membership?: {
     id: string;
     householdId: string;
-    userId: string;
+    /**
+     * Never null in practice: a membership resolved from a token subject can
+     * only be a claimed one, because SQL's `user_id = <uuid>` never matches the
+     * NULL a placeholder carries. Typed nullable to match the column.
+     */
+    userId: string | null;
     role: string;
+    displayName: string;
     personName: string | null;
   };
 }

@@ -42,6 +42,7 @@ import {
   HouseholdSummary,
   UpdateHouseholdMemberRequest,
   UpdateHouseholdRequest,
+  UpdateOwnMembershipRequest,
 } from './dto/household.dto';
 
 /**
@@ -56,14 +57,21 @@ import {
  * | DELETE /households/:id                      | planner                     |
  * | GET    /households/:id/members              | member (eater+)             |
  * | POST   /households/:id/members              | planner                     |
+ * | PATCH  /households/:id/members/me           | member (eater+), self only  |
  * | DELETE /households/:id/members/me           | member (eater+), self only  |
  * | PATCH  /households/:id/members/:memberId    | planner                     |
  * | DELETE /households/:id/members/:memberId    | planner                     |
  *
  * Every `:id` route is gated by `HouseholdMembershipGuard`, so the floor is
- * always membership and `@MinRole` only ever raises it. Leaving is its own
- * route rather than a special case inside the delete handler, which keeps the
- * role decision entirely in the guard where it can be audited in one place.
+ * always membership and `@MinRole` only ever raises it. Leaving and self-edit
+ * are their own routes rather than special cases inside the planner handlers,
+ * which keeps the role decision entirely in the guard — and keeps `role` out of
+ * the request shape an eater is allowed to submit.
+ *
+ * One rule the guard cannot express, because it depends on the TARGET row and
+ * not on the caller: a planner owns a PLACEHOLDER member outright, but may only
+ * change the role of a member who has an account. That lives in
+ * `assertPlannerMayEdit` in the service.
  */
 @ApiTags('households')
 @ApiBearerAuth()
@@ -161,7 +169,11 @@ export class HouseholdsController {
   @Post(`:${HOUSEHOLD_ID_PARAM}/members`)
   @UseGuards(HouseholdMembershipGuard)
   @MinRole('planner')
-  @ApiOperation({ summary: 'Add an account to a household' })
+  @ApiOperation({
+    summary: 'Add a member to a household',
+    description:
+      'Omit userId to create a PLACEHOLDER — a real member with no account yet, which is the normal path: a household must be plannable before everyone has signed up. Send userId only when the caller already knows the account id.',
+  })
   @ApiParam({ name: HOUSEHOLD_ID_PARAM, format: 'uuid' })
   @ApiResponse({ status: 201, type: HouseholdMemberView })
   @ApiResponse({
@@ -175,6 +187,46 @@ export class HouseholdsController {
     @Body() body: AddHouseholdMemberRequest,
   ): Promise<HouseholdMemberView> {
     return this.households.addMember(user, householdId, body);
+  }
+
+  /**
+   * Editing your own membership.
+   *
+   * The target is `req.membership.id` — the row the guard resolved from the
+   * caller's own token — never a value from the URL or the body, so this route
+   * cannot be pointed at anyone else.
+   *
+   * `UpdateOwnMembershipRequest` has no `role` field, and that omission is the
+   * security control: this route is open to eaters, so a `role` here would be
+   * one-request self-promotion. Combined with `forbidNonWhitelisted`, sending
+   * one is a 400 rather than a silent ignore.
+   */
+  @Patch(`:${HOUSEHOLD_ID_PARAM}/members/me`)
+  @UseGuards(HouseholdMembershipGuard)
+  @ApiOperation({
+    summary: 'Edit my own display name or linked person',
+    description:
+      'Your profile is yours: a planner cannot change it for you, and this route cannot change your role.',
+  })
+  @ApiParam({ name: HOUSEHOLD_ID_PARAM, format: 'uuid' })
+  @ApiResponse({ status: 200, type: HouseholdMemberView })
+  @ApiResponse({
+    status: 409,
+    description: 'That person is already linked to another member.',
+  })
+  @ApiHouseholdScopedErrors()
+  updateOwnMembership(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param(HOUSEHOLD_ID_PARAM) householdId: string,
+    @CurrentMembership() membership: CurrentMembershipInfo,
+    @Body() body: UpdateOwnMembershipRequest,
+  ): Promise<HouseholdMemberView> {
+    return this.households.updateOwnMembership(
+      user,
+      householdId,
+      membership.id,
+      body,
+    );
   }
 
   /**
@@ -205,7 +257,11 @@ export class HouseholdsController {
   @Patch(`:${HOUSEHOLD_ID_PARAM}/members/:memberId`)
   @UseGuards(HouseholdMembershipGuard)
   @MinRole('planner')
-  @ApiOperation({ summary: "Change a member's role or linked person" })
+  @ApiOperation({
+    summary: "Change another member's role, or edit a placeholder",
+    description:
+      'A placeholder member (userId null) is fully editable by a planner. A member who has an account is role-only — their profile is theirs.',
+  })
   @ApiParam({ name: HOUSEHOLD_ID_PARAM, format: 'uuid' })
   @ApiParam({ name: 'memberId', format: 'uuid' })
   @ApiResponse({ status: 200, type: HouseholdMemberView })

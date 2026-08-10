@@ -31,9 +31,13 @@ CREATE TABLE "households" (
 CREATE TABLE "household_members" (
     "id" UUID NOT NULL,
     "household_id" UUID NOT NULL,
-    "user_id" UUID NOT NULL,
+    -- NULL while this member is a placeholder (a real member with no account
+    -- yet). See schema.prisma for the claim seam this nullability exists for.
+    "user_id" UUID,
     "role" "household_role" NOT NULL,
+    "display_name" VARCHAR(120) NOT NULL,
     "person_name" VARCHAR(64),
+    "invite_email" VARCHAR(320),
     "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMPTZ(6) NOT NULL,
 
@@ -57,6 +61,11 @@ CREATE TABLE "household_audit_log" (
 CREATE INDEX "household_members_user_id_idx" ON "household_members"("user_id");
 
 -- CreateIndex
+-- NULLS DISTINCT (the Postgres default) is load-bearing here, not incidental:
+-- it lets a household hold many placeholder members while still preventing one
+-- account from joining the same household twice, which is what makes claiming
+-- a safe UPDATE. Switching this to NULLS NOT DISTINCT would cap a household at
+-- one placeholder.
 CREATE UNIQUE INDEX "household_members_household_user_key" ON "household_members"("household_id", "user_id");
 
 -- CreateIndex

@@ -27,7 +27,7 @@ describe('households (real Postgres)', () => {
 
   beforeAll(async () => {
     database = await startTestDatabase();
-    app = (await createTestApp(database.url)) as INestApplication<App>;
+    app = (await createTestApp(database)) as INestApplication<App>;
     prisma = prismaOf(app);
     ownerToken = await signAccessToken({
       sub: owner,
@@ -51,15 +51,20 @@ describe('households (real Postgres)', () => {
 
   async function createHousehold(name = 'The Germanos', personName?: string) {
     const response = await asOwner('post', '/households')
-      .send({ name, ...(personName ? { personName } : {}) })
+      .send({
+        name,
+        displayName: 'Owner',
+        ...(personName ? { personName } : {}),
+      })
       .expect(201);
     return response.body as {
       id: string;
       name: string;
       members: Array<{
         id: string;
-        userId: string;
+        userId: string | null;
         role: string;
+        displayName: string;
         personName: string | null;
       }>;
     };
@@ -109,7 +114,13 @@ describe('households (real Postgres)', () => {
       await prisma.household.create({
         data: {
           name: 'Someone Else',
-          members: { create: { userId: newUserId(), role: 'planner' } },
+          members: {
+            create: {
+              userId: newUserId(),
+              role: 'planner',
+              displayName: 'Someone Else',
+            },
+          },
         },
       });
 
@@ -190,7 +201,11 @@ describe('households (real Postgres)', () => {
     it('allows the demotion once a second planner exists', async () => {
       const household = await createHousehold();
       await asOwner('post', `/households/${household.id}/members`)
-        .send({ userId: newUserId(), role: 'planner' })
+        .send({
+          userId: newUserId(),
+          role: 'planner',
+          displayName: 'Added Person',
+        })
         .expect(201);
 
       await asOwner(
@@ -212,7 +227,7 @@ describe('households (real Postgres)', () => {
       const eater = newUserId();
       const eaterToken = await signAccessToken({ sub: eater });
       await asOwner('post', `/households/${household.id}/members`)
-        .send({ userId: eater, role: 'eater' })
+        .send({ userId: eater, role: 'eater', displayName: 'Added Person' })
         .expect(201);
 
       await request(app.getHttpServer())
@@ -229,18 +244,108 @@ describe('households (real Postgres)', () => {
   });
 
   describe('membership', () => {
+    /**
+     * Invite intent must stay INTENT. The owner ruling allows an email on a
+     * placeholder so a future invitation flow knows where to send, but it is
+     * never resolved against the account directory — an endpoint that answers
+     * "does this address have an account?" is an enumeration oracle, and
+     * quietly linking a matching account would be that oracle with the answer
+     * returned in the response body.
+     */
+    it('never resolves an invite email into an account, even a real one', async () => {
+      const household = await createHousehold();
+
+      const response = await asOwner(
+        'post',
+        `/households/${household.id}/members`,
+      )
+        .send({
+          displayName: 'Alex',
+          role: 'eater',
+          // The OWNER's own address — an account that certainly exists.
+          inviteEmail: 'owner@example.com',
+        })
+        .expect(201);
+
+      const created = bodyOf<HouseholdMemberView>(response);
+      // Still a placeholder: the address bought no account lookup.
+      expect(created.userId).toBeNull();
+      expect(created.inviteEmail).toBe('owner@example.com');
+
+      // And it did not attach itself to the owner's existing membership.
+      const members = await prisma.householdMember.findMany({
+        where: { householdId: household.id },
+      });
+      expect(members).toHaveLength(2);
+      expect(members.filter((m) => m.userId !== null)).toHaveLength(1);
+    });
+
+    it('refuses invite intent on a member that already has an account', async () => {
+      const household = await createHousehold();
+      const response = await asOwner(
+        'post',
+        `/households/${household.id}/members`,
+      )
+        .send({
+          displayName: 'Alex',
+          role: 'eater',
+          userId: newUserId(),
+          inviteEmail: 'alex@example.com',
+        })
+        .expect(400);
+      expect(errorOf(response).code).toBe('validation_failed');
+    });
+
+    it('creates a placeholder member with no account when userId is omitted', async () => {
+      const household = await createHousehold();
+      const response = await asOwner(
+        'post',
+        `/households/${household.id}/members`,
+      )
+        .send({ displayName: 'Alex', role: 'eater', personName: 'alex' })
+        .expect(201);
+
+      expect(bodyOf<HouseholdMemberView>(response)).toMatchObject({
+        userId: null,
+        displayName: 'Alex',
+        personName: 'alex',
+        role: 'eater',
+        inviteEmail: null,
+      });
+    });
+
+    /**
+     * Many placeholders per household is the point of the NULLS DISTINCT unique
+     * index. If that index were ever changed to NULLS NOT DISTINCT, a household
+     * could hold exactly one person without an account — which is the opposite
+     * of the ruling.
+     */
+    it('allows many placeholder members in one household', async () => {
+      const household = await createHousehold();
+      for (const name of ['Alex', 'Sam', 'Robin']) {
+        await asOwner('post', `/households/${household.id}/members`)
+          .send({ displayName: name, role: 'eater' })
+          .expect(201);
+      }
+      expect(
+        await prisma.householdMember.count({
+          where: { householdId: household.id, userId: null },
+        }),
+      ).toBe(3);
+    });
+
     it('refuses to add the same account twice', async () => {
       const household = await createHousehold();
       const newcomer = newUserId();
 
       await asOwner('post', `/households/${household.id}/members`)
-        .send({ userId: newcomer, role: 'eater' })
+        .send({ userId: newcomer, role: 'eater', displayName: 'Added Person' })
         .expect(201);
       const response = await asOwner(
         'post',
         `/households/${household.id}/members`,
       )
-        .send({ userId: newcomer, role: 'cook' })
+        .send({ userId: newcomer, role: 'cook', displayName: 'Added Person' })
         .expect(409);
 
       expect(errorOf(response).code).toBe('conflict');
@@ -252,7 +357,12 @@ describe('households (real Postgres)', () => {
         'post',
         `/households/${household.id}/members`,
       )
-        .send({ userId: newUserId(), role: 'eater', personName: 'devon' })
+        .send({
+          userId: newUserId(),
+          role: 'eater',
+          displayName: 'Added Person',
+          personName: 'devon',
+        })
         .expect(409);
       expect(errorOf(response).message).toContain('devon');
     });
@@ -264,11 +374,29 @@ describe('households (real Postgres)', () => {
       expect(second.members[0].personName).toBe('devon');
     });
 
-    it('unlinks a person when personName is null', async () => {
+    it('unlinks my own person when personName is null', async () => {
       const household = await createHousehold('The Germanos', 'devon');
+      // Through the SELF route: the owner has an account, so their profile
+      // is theirs — a planner (even themselves) cannot edit it via the
+      // planner route.
       const response = await asOwner(
         'patch',
-        `/households/${household.id}/members/${household.members[0].id}`,
+        `/households/${household.id}/members/me`,
+      )
+        .send({ personName: null })
+        .expect(200);
+      expect(bodyOf<HouseholdMemberView>(response).personName).toBeNull();
+    });
+
+    it('lets a planner unlink a PLACEHOLDER member', async () => {
+      const household = await createHousehold();
+      const added = await asOwner('post', `/households/${household.id}/members`)
+        .send({ displayName: 'Alex', role: 'eater', personName: 'alex' })
+        .expect(201);
+
+      const response = await asOwner(
+        'patch',
+        `/households/${household.id}/members/${bodyOf<HouseholdMemberView>(added).id}`,
       )
         .send({ personName: null })
         .expect(200);
@@ -289,7 +417,7 @@ describe('households (real Postgres)', () => {
       const household = await createHousehold();
       const target = newUserId();
       const added = await asOwner('post', `/households/${household.id}/members`)
-        .send({ userId: target, role: 'eater' })
+        .send({ userId: target, role: 'eater', displayName: 'Added Person' })
         .expect(201);
 
       await asOwner(
@@ -337,7 +465,7 @@ describe('households (real Postgres)', () => {
   describe('validation', () => {
     it('rejects an empty name', async () => {
       const response = await asOwner('post', '/households')
-        .send({ name: '' })
+        .send({ name: '', displayName: 'X' })
         .expect(400);
       expect(errorOf(response).code).toBe('validation_failed');
       expect((errorOf(response).details ?? []).map((d) => d.field)).toEqual([
@@ -347,7 +475,7 @@ describe('households (real Postgres)', () => {
 
     it('rejects a name over 120 characters', async () => {
       await asOwner('post', '/households')
-        .send({ name: 'x'.repeat(121) })
+        .send({ name: 'x'.repeat(121), displayName: 'X' })
         .expect(400);
     });
 
@@ -360,7 +488,7 @@ describe('households (real Postgres)', () => {
       'x'.repeat(65),
     ])('rejects the person name %j', async (personName) => {
       await asOwner('post', '/households')
-        .send({ name: 'H', personName })
+        .send({ name: 'H', displayName: 'X', personName })
         .expect(400);
     });
 
@@ -368,7 +496,7 @@ describe('households (real Postgres)', () => {
       'accepts the person name %j',
       async (personName) => {
         await asOwner('post', '/households')
-          .send({ name: 'H', personName })
+          .send({ name: 'H', displayName: 'X', personName })
           .expect(201);
       },
     );
@@ -376,7 +504,11 @@ describe('households (real Postgres)', () => {
     it('rejects an unknown role', async () => {
       const household = await createHousehold();
       await asOwner('post', `/households/${household.id}/members`)
-        .send({ userId: newUserId(), role: 'admin' })
+        .send({
+          userId: newUserId(),
+          role: 'admin',
+          displayName: 'Added Person',
+        })
         .expect(400);
     });
 
@@ -387,7 +519,7 @@ describe('households (real Postgres)', () => {
      */
     it('rejects properties the DTO does not declare', async () => {
       const response = await asOwner('post', '/households')
-        .send({ name: 'H', role: 'planner', isAdmin: true })
+        .send({ name: 'H', displayName: 'X', role: 'planner', isAdmin: true })
         .expect(400);
       expect(errorOf(response).code).toBe('validation_failed');
     });
@@ -402,12 +534,14 @@ describe('households (real Postgres)', () => {
           userId: 'not-a-uuid',
           role: 'wizard',
           personName: 'Not A Slug',
+          // displayName omitted: a fourth failure, and it must be reported
+          // alongside the others rather than swallowed.
         })
         .expect(400);
 
       const fields = (errorOf(response).details ?? []).map((d) => d.field);
       expect(new Set(fields)).toEqual(
-        new Set(['userId', 'role', 'personName']),
+        new Set(['userId', 'role', 'personName', 'displayName']),
       );
     });
   });

@@ -101,6 +101,48 @@ household is durable state and an ephemeral identity should not create one.
 
 ---
 
+## Members: placeholders and accounts
+
+Owner ruling (2026-08-10): **a household must be fully plannable before every
+member has an account.** PRD §4.2 iterates over people everywhere, and the
+meal-prep model assumes you plan for someone who may never log in. So a
+membership row is the PERSON; the auth identity is an attribute that may arrive
+later.
+
+| | `user_id` | Who owns it |
+|---|---|---|
+| **Placeholder** | `NULL` | The planner, entirely — display name, person, role, invite intent. |
+| **Claimed** | set | The account owns its profile. A planner may change its **role** and remove it, nothing more. |
+
+A placeholder **cannot authenticate**, and that is structural rather than
+enforced: the verifier requires a UUID subject, and SQL's `user_id = <uuid>`
+never matches NULL. No caller can ever resolve onto one.
+
+Three fields, easily confused:
+
+- `displayName` — what humans read. Required on every member.
+- `personName` — the library/plan key (`alex`), the bridge to the engine.
+- `inviteEmail` — where an invitation *would* go. **Intent only**: never checked
+  against the account directory, because answering "does this address have an
+  account?" is an enumeration oracle. Passing a real user's address creates a
+  plain placeholder and links nothing.
+
+### The claim seam (not built — blocked on PRD OQ-P1)
+
+Claiming is an **UPDATE, never a delete-and-recreate**:
+
+```sql
+UPDATE household_members SET user_id = $1, invite_email = NULL
+ WHERE id = $2 AND user_id IS NULL
+```
+
+The row `id` survives, which is what will let plans, portions, and veto history
+reference a member before its account exists. The `(household_id, user_id)`
+unique index makes that UPDATE safe: Postgres treats NULLs as **distinct**, so
+any number of placeholders coexist while one account can never join a household
+twice. **Do not change that index to `NULLS NOT DISTINCT`** — it would cap a
+household at one person without an account.
+
 ## Roles and the authorization matrix
 
 Roles are a **ladder, not a set**: `planner > cook > eater` (PRD §4.2). A
@@ -116,8 +158,9 @@ can hold all roles" works with a single column.
 | `PATCH /households/:id` | planner |
 | `DELETE /households/:id` | planner |
 | `POST /households/:id/members` | planner |
-| `PATCH /households/:id/members/:memberId` | planner |
+| `PATCH /households/:id/members/:memberId` | planner (role only, unless the target is a placeholder) |
 | `DELETE /households/:id/members/:memberId` | planner |
+| `PATCH /households/:id/members/me` | member (eater+), self only |
 | `DELETE /households/:id/members/me` | member (eater+), self only |
 
 Enforced in **one** place — `HouseholdMembershipGuard` — so there is one thing
@@ -131,6 +174,16 @@ distinguishable body is the same oracle with extra steps.
 Authentication is global (`APP_GUARD`), so a controller added later is protected
 by default and exposing one is an explicit `@Public()` — greppable in one
 command.
+
+Self-edit is a separate route rather than a branch inside the planner handler,
+and `UpdateOwnMembershipRequest` has **no `role` field**. That omission is the
+control: the route is open to eaters, so a `role` there would be one-request
+self-promotion. With `forbidNonWhitelisted`, sending one is a 400 rather than a
+silent ignore.
+
+The one rule the guard cannot express is target-dependent: a planner owns a
+placeholder outright but may only change a claimed member's role. It lives in
+`assertPlannerMayEdit` in the service, and answers 403.
 
 ---
 
@@ -173,7 +226,7 @@ something rejects a forgery.
 
 | Suite | Covers |
 |---|---|
-| `test/authz-matrix.e2e-spec.ts` | every household route × every kind of caller, plus cross-household object references and token handling |
+| `test/authz-matrix.e2e-spec.ts` | every household route × every kind of caller, cross-household object references, token handling, placeholder members, and self-edit-is-not-self-promotion |
 | `test/households.e2e-spec.ts` | invariants (last planner, person uniqueness), the audit trail, validation, the error envelope |
 | `test/rls-safety-net.e2e-spec.ts` | the policies, as SQL |
 | `test/app.e2e-spec.ts` | liveness and the contracts probe **with the database down** |
@@ -194,6 +247,13 @@ limit of a green test run here.
 
 `--experimental-vm-modules` is in the `test` script because PGlite loads its
 WebAssembly through a dynamic import, which Jest's sandbox blocks otherwise.
+
+Each suite gets its own Postgres on its own port. The port is claimed by
+**attempting the bind and retrying on `EADDRINUSE`**, never by probing for a
+free port and binding it later — that gap lets a parallel Jest worker take the
+port in between, which showed up as one unrelated test failing in roughly one
+run in three. A per-database marker row is checked at startup so that if a
+cross-connection ever happens again it fails immediately and by name.
 
 ---
 
@@ -220,11 +280,11 @@ except someone probing.
 
 ## Open questions for the owner
 
-1. **Adding members needs the target's `auth.users` id.** There is no lookup by
-   email, because an endpoint that answers "does this address have an account?"
-   is an account-enumeration oracle. The real fix is an invitation flow (send to
-   an email, recipient accepts, membership is created on acceptance) — not
-   built, and it needs the notification channel decision (PRD OQ-P1).
+1. **Invitations are not built** (PRD OQ-P1, the notification channel). Until
+   they are, a household is assembled from placeholder members and `inviteEmail`
+   is inert storage. `POST /members` still accepts a `userId` for the case where
+   the caller already knows one, but the web app has no way to produce one and
+   should use placeholders.
 2. **Roles are a single column, not a set.** The ladder covers PRD §4.2 as
    written. If a household ever needs "cook but explicitly not eater", it
    becomes a join table and a migration.
@@ -237,3 +297,11 @@ except someone probing.
    migration; tightening later is a data cleanup — so it starts strict.
 5. **Audit entries are written but never read.** No endpoint exposes them yet.
    PRD §10 requires the trail; who gets to read it is unspecified.
+6. **A planner cannot fix a claimed member's `personName`.** Under the ruling
+   the account owns it, so if someone links themselves to the wrong library
+   person only they can correct it. That is the intended reading of "self owns
+   their profile", but it is worth confirming — `personName` is arguably
+   planning data rather than profile data.
+7. **`POST /members` with a `userId` adds that account without its consent.**
+   It gains access to the household; it loses nothing. Invitations replace this
+   path.

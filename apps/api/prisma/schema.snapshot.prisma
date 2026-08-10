@@ -1,3 +1,10 @@
+// GENERATED — never hand-edit, and never regenerate to "fix" a drift error.
+// A copy of schema.prisma as of the newest migration, so migrations can be
+// diffed offline. If `prisma:migration:check` fails, the answer is a new
+// migration, not a new snapshot — advancing this file without the matching SQL
+// tells CI a change shipped that no database has ever applied.
+// Advanced by: pnpm --filter @mealplan/api prisma:migration:new <name>
+
 // Prisma owns the PUBLIC schema. Supabase owns the AUTH schema (GoTrue).
 // There is exactly one schema owner per schema — see apps/api/README.md
 // ("Two migration systems, one owner each"). Never put app tables in
@@ -43,7 +50,35 @@ model Household {
   @@map("households")
 }
 
-/// An ACCOUNT's membership in a household.
+/// A PERSON in a household. Not necessarily an account.
+///
+/// Owner ruling (2026-08-10): a household must be fully plannable before every
+/// member has an account. PRD §4.2 iterates over people everywhere, and the
+/// meal-prep model assumes you can plan for someone who may never log in — a
+/// child, a housemate who does not want an app. So a membership row is the
+/// PERSON, and the auth identity is an attribute that may arrive later.
+///
+/// Two states, and the difference drives authorization (see
+/// households.service.ts):
+///
+///   PLACEHOLDER — `userId IS NULL`. A real member with a role, a display name,
+///     and usually a personName. Cannot authenticate: nothing can make
+///     `current token subject = NULL`, and SQL's `user_id = <uuid>` never
+///     matches NULL. The planner owns this row entirely.
+///   CLAIMED — `userId` set. An account. The account owns its own profile;
+///     a planner may change its ROLE and remove it, nothing more.
+///
+/// THE CLAIM SEAM (invitation flow, blocked on PRD OQ-P1 — not built):
+///   Claiming is an UPDATE, never a delete-and-recreate:
+///     UPDATE household_members SET user_id = $1, invite_email = NULL
+///      WHERE id = $2 AND user_id IS NULL
+///   The row `id` therefore survives claiming, which is what lets plans,
+///   portions, and veto history reference a member before its account exists.
+///   The `(household_id, user_id)` unique index is what makes the UPDATE safe:
+///   Postgres treats NULLs as DISTINCT, so any number of placeholders coexist,
+///   while the same account can never end up in one household twice. Do not
+///   change that index to NULLS NOT DISTINCT — it would allow at most one
+///   placeholder per household.
 ///
 /// `userId` references auth.users(id) — the foreign key is added by the
 /// migration only when the auth schema is present (Supabase); on a bare
@@ -53,21 +88,25 @@ model Household {
 /// `personName` is the join to the ENGINE's person concept. The engine keys
 /// every per-person map (`weeks`, `broke`, `cost.shares`, …) by a plain string
 /// taken from the library's `people:` mapping — it has no notion of accounts.
-/// This column is that key, and it is nullable on purpose:
-///   - member with personName    → an account that eats; their sheets resolve
-///   - member with NULL          → an account that plans/cooks but is not a
-///                                 person in the library (no targets, no sheets)
-///   - person with no member row → a person in the library who has no account
-///                                 (a child, a guest). Represented in library
-///                                 data only; nothing here to authorize.
-/// Unique per household when set (Postgres treats NULLs as distinct, so any
-/// number of accountless-person rows coexist).
+/// Nullable because a member may plan or cook without eating (no targets, no
+/// sheets). Unique per household when set.
+///
+/// `displayName` is what humans read. Required on every member, because a
+/// member list showing UUIDs is not a member list. Distinct from `personName`
+/// on purpose: "Alex Germano" is a person, `alex` is a key in a YAML file.
 model HouseholdMember {
   id          String        @id @default(uuid()) @db.Uuid
   householdId String        @map("household_id") @db.Uuid
-  userId      String        @map("user_id") @db.Uuid
+  /// auth.users(id) once claimed; NULL while this member is a placeholder.
+  userId      String?       @map("user_id") @db.Uuid
   role        HouseholdRole
+  displayName String        @map("display_name") @db.VarChar(120)
   personName  String?       @map("person_name") @db.VarChar(64)
+  /// Invite INTENT only, for placeholders. Where an invitation would be sent
+  /// once that flow exists. Never queried against auth.users — an endpoint that
+  /// answers "does this address have an account?" is an enumeration oracle, and
+  /// this column must never become one. Cleared when the member is claimed.
+  inviteEmail String?       @map("invite_email") @db.VarChar(320)
   createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
 

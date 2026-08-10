@@ -4,7 +4,8 @@ import type { App } from 'supertest/types';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { createTestApp, prismaOf } from './harness/test-app';
 import { startTestDatabase, type TestDatabase } from './harness/test-database';
-import { errorOf } from './harness/response';
+import { bodyOf, errorOf } from './harness/response';
+import type { HouseholdMemberView } from '../src/households/dto/household.dto';
 import { buildOpenApiDocument } from '../src/openapi';
 import { newUserId, signAccessToken } from './harness/tokens';
 
@@ -44,6 +45,7 @@ interface Seeded {
   cookMemberId: string;
   eaterMemberId: string;
   outsiderMemberId: string;
+  placeholderMemberId: string;
 }
 
 const USER_IDS = {
@@ -62,7 +64,7 @@ describe('household authorization matrix (real Postgres)', () => {
 
   beforeAll(async () => {
     database = await startTestDatabase();
-    app = (await createTestApp(database.url)) as INestApplication<App>;
+    app = (await createTestApp(database)) as INestApplication<App>;
     prisma = prismaOf(app);
 
     tokens = {
@@ -99,39 +101,58 @@ describe('household authorization matrix (real Postgres)', () => {
       data: { name: 'Household B' },
     });
 
-    const [plannerMember, cookMember, eaterMember, outsiderMember] =
-      await Promise.all([
-        prisma.householdMember.create({
-          data: {
-            householdId: householdA.id,
-            userId: USER_IDS.planner,
-            role: 'planner',
-            personName: 'devon',
-          },
-        }),
-        prisma.householdMember.create({
-          data: {
-            householdId: householdA.id,
-            userId: USER_IDS.cook,
-            role: 'cook',
-          },
-        }),
-        prisma.householdMember.create({
-          data: {
-            householdId: householdA.id,
-            userId: USER_IDS.eater,
-            role: 'eater',
-            personName: 'jimbo',
-          },
-        }),
-        prisma.householdMember.create({
-          data: {
-            householdId: householdB.id,
-            userId: USER_IDS.outsider,
-            role: 'planner',
-          },
-        }),
-      ]);
+    const [
+      plannerMember,
+      cookMember,
+      eaterMember,
+      outsiderMember,
+      placeholderMember,
+    ] = await Promise.all([
+      prisma.householdMember.create({
+        data: {
+          householdId: householdA.id,
+          userId: USER_IDS.planner,
+          role: 'planner',
+          displayName: 'The Planner',
+          personName: 'devon',
+        },
+      }),
+      prisma.householdMember.create({
+        data: {
+          householdId: householdA.id,
+          userId: USER_IDS.cook,
+          role: 'cook',
+          displayName: 'The Cook',
+        },
+      }),
+      prisma.householdMember.create({
+        data: {
+          householdId: householdA.id,
+          userId: USER_IDS.eater,
+          role: 'eater',
+          displayName: 'The Eater',
+          personName: 'jimbo',
+        },
+      }),
+      prisma.householdMember.create({
+        data: {
+          householdId: householdB.id,
+          userId: USER_IDS.outsider,
+          role: 'planner',
+          displayName: 'The Outsider',
+        },
+      }),
+      // A PLACEHOLDER member of household A: a real member with no account.
+      prisma.householdMember.create({
+        data: {
+          householdId: householdA.id,
+          userId: null,
+          role: 'eater',
+          displayName: 'Alex (no account yet)',
+          personName: 'alex',
+        },
+      }),
+    ]);
 
     seeded = {
       householdA: householdA.id,
@@ -140,6 +161,7 @@ describe('household authorization matrix (real Postgres)', () => {
       cookMemberId: cookMember.id,
       eaterMemberId: eaterMember.id,
       outsiderMemberId: outsiderMember.id,
+      placeholderMemberId: placeholderMember.id,
     };
   });
 
@@ -223,7 +245,7 @@ describe('household authorization matrix (real Postgres)', () => {
       label: 'POST /households/:id/members',
       send: (caller) =>
         call('post', `/households/${seeded.householdA}/members`, caller, {
-          userId: newUserId(),
+          displayName: 'A New Person',
           role: 'eater',
         }),
       expected: {
@@ -267,6 +289,22 @@ describe('household authorization matrix (real Postgres)', () => {
         planner: 204,
         cook: 403,
         eater: 403,
+        outsider: 404,
+        stranger: 404,
+        anonymous: 401,
+      },
+    },
+    {
+      label: 'PATCH /households/:id/members/me (edit own profile)',
+      send: (caller) =>
+        call('patch', `/households/${seeded.householdA}/members/me`, caller, {
+          displayName: 'Renamed Myself',
+        }),
+      // Every member owns their own profile, so the ladder does not apply.
+      expected: {
+        planner: 200,
+        cook: 200,
+        eater: 200,
         outsider: 404,
         stranger: 404,
         anonymous: 401,
@@ -466,6 +504,172 @@ describe('household authorization matrix (real Postgres)', () => {
       expect(await prisma.household.count()).toBe(2);
     });
   });
+  describe('placeholder members', () => {
+    /**
+     * The load-bearing property of the whole placeholder design: a member row
+     * with `user_id NULL` is a real member, but can NEVER be a caller. Nothing
+     * can make a verified token subject NULL — the verifier requires a UUID —
+     * and `user_id = <uuid>` never matches NULL. If this ever stopped holding,
+     * every household containing a placeholder would be open to somebody.
+     */
+    it('never resolves a caller onto a placeholder member', async () => {
+      // A token whose subject is the placeholder's own row id: the closest an
+      // attacker can get to "being" that member.
+      const asPlaceholder = await signAccessToken({
+        sub: seeded.placeholderMemberId,
+      });
+
+      await request(app.getHttpServer())
+        .get(`/households/${seeded.householdA}`)
+        .set('Authorization', `Bearer ${asPlaceholder}`)
+        .expect(404);
+      await request(app.getHttpServer())
+        .patch(`/households/${seeded.householdA}/members/me`)
+        .set('Authorization', `Bearer ${asPlaceholder}`)
+        .send({ displayName: 'Hijacked' })
+        .expect(404);
+    });
+
+    it("does not appear in any account's household list", async () => {
+      const response = await request(app.getHttpServer())
+        .get('/households')
+        .set('Authorization', `Bearer ${tokens.stranger}`)
+        .expect(200);
+      expect(response.body).toEqual([]);
+    });
+
+    it('is visible to the household as a member with a null userId', async () => {
+      const response = await call(
+        'get',
+        `/households/${seeded.householdA}/members`,
+        'eater',
+      ).expect(200);
+
+      const placeholder = bodyOf<HouseholdMemberView[]>(response).find(
+        (member) => member.id === seeded.placeholderMemberId,
+      );
+      expect(placeholder).toMatchObject({
+        userId: null,
+        displayName: 'Alex (no account yet)',
+        personName: 'alex',
+        role: 'eater',
+      });
+    });
+
+    it('is fully editable by a planner', async () => {
+      const response = await call(
+        'patch',
+        `/households/${seeded.householdA}/members/${seeded.placeholderMemberId}`,
+        'planner',
+        { displayName: 'Alex Germano', personName: 'alexg', role: 'cook' },
+      ).expect(200);
+
+      expect(bodyOf<HouseholdMemberView>(response)).toMatchObject({
+        displayName: 'Alex Germano',
+        personName: 'alexg',
+        role: 'cook',
+        userId: null,
+      });
+    });
+
+    /**
+     * The other half of the owner ruling: once a member has an account, the
+     * account owns its profile. A planner keeps role control and nothing else.
+     */
+    it('is the only kind of member a planner may rename', async () => {
+      const response = await call(
+        'patch',
+        `/households/${seeded.householdA}/members/${seeded.eaterMemberId}`,
+        'planner',
+        { displayName: 'Renamed By Someone Else' },
+      ).expect(403);
+      expect(errorOf(response).code).toBe('forbidden');
+
+      const untouched = await prisma.householdMember.findUnique({
+        where: { id: seeded.eaterMemberId },
+      });
+      expect(untouched?.displayName).toBe('The Eater');
+    });
+
+    it("refuses to retarget a claimed member's linked person", async () => {
+      await call(
+        'patch',
+        `/households/${seeded.householdA}/members/${seeded.eaterMemberId}`,
+        'planner',
+        { personName: 'someone-else' },
+      ).expect(403);
+    });
+
+    it("still lets a planner change a claimed member's role", async () => {
+      await call(
+        'patch',
+        `/households/${seeded.householdA}/members/${seeded.eaterMemberId}`,
+        'planner',
+        { role: 'cook' },
+      ).expect(200);
+    });
+  });
+
+  describe('self-edit cannot become self-promotion', () => {
+    /**
+     * `UpdateOwnMembershipRequest` has no `role`, and `forbidNonWhitelisted`
+     * turns sending one into a 400 rather than a silent ignore. Both halves
+     * matter: a silent ignore would look identical to success in a client, and
+     * the next person to add a field would not know why role was missing.
+     */
+    it('rejects a role sent to the self-edit route', async () => {
+      const response = await call(
+        'patch',
+        `/households/${seeded.householdA}/members/me`,
+        'eater',
+        { role: 'planner' },
+      ).expect(400);
+      expect(errorOf(response).code).toBe('validation_failed');
+
+      const unchanged = await prisma.householdMember.findUnique({
+        where: { id: seeded.eaterMemberId },
+      });
+      expect(unchanged?.role).toBe('eater');
+    });
+
+    it('rejects a role smuggled alongside a legitimate field', async () => {
+      await call(
+        'patch',
+        `/households/${seeded.householdA}/members/me`,
+        'eater',
+        { displayName: 'Fine', role: 'planner' },
+      ).expect(400);
+
+      const unchanged = await prisma.householdMember.findUnique({
+        where: { id: seeded.eaterMemberId },
+      });
+      expect(unchanged).toMatchObject({
+        role: 'eater',
+        displayName: 'The Eater',
+      });
+    });
+
+    it('edits only the caller, never another member', async () => {
+      await call(
+        'patch',
+        `/households/${seeded.householdA}/members/me`,
+        'eater',
+        { displayName: 'Just Me' },
+      ).expect(200);
+
+      const [eater, cook] = await Promise.all([
+        prisma.householdMember.findUnique({
+          where: { id: seeded.eaterMemberId },
+        }),
+        prisma.householdMember.findUnique({
+          where: { id: seeded.cookMemberId },
+        }),
+      ]);
+      expect(eater?.displayName).toBe('Just Me');
+      expect(cook?.displayName).toBe('The Cook');
+    });
+  });
+
   /**
    * THE BACKSTOP.
    *

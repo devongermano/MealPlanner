@@ -4,6 +4,7 @@ import { AppModule } from '../../src/app.module';
 import { buildValidationPipe } from '../../src/common/validation';
 import { API_CONFIG, type ApiConfig } from '../../src/config';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { assertConnectedTo, type TestDatabase } from './test-database';
 import { TEST_AUDIENCE, TEST_ISSUER, TEST_JWT_SECRET } from './tokens';
 
 /**
@@ -17,13 +18,20 @@ import { TEST_AUDIENCE, TEST_ISSUER, TEST_JWT_SECRET } from './tokens';
  * The global validation pipe is applied here because `main.ts` applies it and
  * the tests must exercise the same request pipeline the server runs; a pipe
  * that only exists in production is a pipe nothing tests.
+ *
+ * Pass the `TestDatabase` (not a bare URL) and the app's own Prisma client is
+ * checked against that database's marker before any test runs — so a suite can
+ * never silently end up talking to a parallel worker's Postgres. A bare URL is
+ * accepted only for the no-database smoke test, which has nothing to verify.
  */
 export async function createTestApp(
-  databaseUrl: string,
+  database: TestDatabase | string,
   overrides: Partial<ApiConfig> = {},
   /** Set false for suites that deliberately provoke logged errors. */
   logging = true,
 ): Promise<INestApplication> {
+  const databaseUrl = typeof database === 'string' ? database : database.url;
+
   const config: ApiConfig = {
     port: 0,
     host: '127.0.0.1',
@@ -51,6 +59,14 @@ export async function createTestApp(
   });
   app.useGlobalPipes(buildValidationPipe());
   await app.init();
+
+  if (typeof database !== 'string') {
+    const prisma = prismaOf(app);
+    await assertConnectedTo(database, (sql) =>
+      prisma.$queryRawUnsafe<Array<{ id: string }>>(sql),
+    );
+  }
+
   return app;
 }
 

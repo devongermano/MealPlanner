@@ -52,9 +52,12 @@ describe('RLS safety net', () => {
       INSERT INTO households (id, name, created_at, updated_at) VALUES
         ('${HOUSEHOLD_A}', 'Household A', now(), now()),
         ('${HOUSEHOLD_B}', 'Household B', now(), now());
-      INSERT INTO household_members (id, household_id, user_id, role, created_at, updated_at) VALUES
-        ('33333333-3333-4333-8333-333333333333', '${HOUSEHOLD_A}', '${USER_A}', 'planner', now(), now()),
-        ('44444444-4444-4444-8444-444444444444', '${HOUSEHOLD_B}', '${USER_B}', 'planner', now(), now());
+      INSERT INTO household_members (id, household_id, user_id, role, display_name, created_at, updated_at) VALUES
+        ('33333333-3333-4333-8333-333333333333', '${HOUSEHOLD_A}', '${USER_A}', 'planner', 'A Planner', now(), now()),
+        ('44444444-4444-4444-8444-444444444444', '${HOUSEHOLD_B}', '${USER_B}', 'planner', 'B Planner', now(), now()),
+        -- Placeholder members: real members of A and B with no account.
+        ('77777777-7777-4777-8777-777777777771', '${HOUSEHOLD_A}', NULL, 'eater', 'A Placeholder', now(), now()),
+        ('77777777-7777-4777-8777-777777777772', '${HOUSEHOLD_B}', NULL, 'eater', 'B Placeholder', now(), now());
       INSERT INTO household_audit_log (id, household_id, actor_user_id, action, created_at) VALUES
         ('55555555-5555-4555-8555-555555555555', '${HOUSEHOLD_A}', '${USER_A}', 'household.created', now()),
         ('66666666-6666-4666-8666-666666666666', '${HOUSEHOLD_B}', '${USER_B}', 'household.created', now());
@@ -88,11 +91,31 @@ describe('RLS safety net', () => {
     });
 
     it('sees only membership rows of its own households', async () => {
-      const rows = await asAuthenticated<{ user_id: string }>(
+      const rows = await asAuthenticated<{ display_name: string }>(
         USER_A,
-        'SELECT user_id FROM household_members',
+        'SELECT display_name FROM household_members ORDER BY display_name',
       );
-      expect(rows.map((row) => row.user_id)).toEqual([USER_A]);
+      // Its own household's placeholder is visible; the other household's is not.
+      expect(rows.map((row) => row.display_name)).toEqual([
+        'A Placeholder',
+        'A Planner',
+      ]);
+    });
+
+    /**
+     * The whole placeholder design rests on this: a row with user_id NULL is a
+     * member of the household but can never be a caller, because SQL's
+     * `user_id = <uuid>` never matches NULL and nothing can make the current
+     * subject NULL. If a placeholder ever granted access, every household with
+     * one would be readable by anyone.
+     */
+    it('grants nothing through a placeholder member', async () => {
+      // The placeholder's own row id, used as if it were a user id.
+      const rows = await asAuthenticated(
+        '77777777-7777-4777-8777-777777777771',
+        'SELECT * FROM households',
+      );
+      expect(rows).toEqual([]);
     });
 
     it('sees only audit entries of its own households', async () => {

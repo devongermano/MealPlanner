@@ -541,6 +541,7 @@
         ]
       },
       "post": {
+        "description": "Omit userId to create a PLACEHOLDER — a real member with no account yet, which is the normal path: a household must be plannable before everyone has signed up. Send userId only when the caller already knows the account id.",
         "operationId": "HouseholdsController_addMember",
         "parameters": [
           {
@@ -633,13 +634,112 @@
             "bearer": []
           }
         ],
-        "summary": "Add an account to a household",
+        "summary": "Add a member to a household",
         "tags": [
           "households"
         ]
       }
     },
     "/households/{householdId}/members/me": {
+      "patch": {
+        "description": "Your profile is yours: a planner cannot change it for you, and this route cannot change your role.",
+        "operationId": "HouseholdsController_updateOwnMembership",
+        "parameters": [
+          {
+            "name": "householdId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOwnMembershipRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HouseholdMemberView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid access token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "You are a member, but your role is below what this route requires.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such household, OR you are not a member of it. Deliberately indistinguishable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "That person is already linked to another member."
+          },
+          "500": {
+            "description": "Internal error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Edit my own display name or linked person",
+        "tags": [
+          "households"
+        ]
+      },
       "delete": {
         "description": "Any member may remove their own membership. A sole planner cannot — promote someone first.",
         "operationId": "HouseholdsController_leave",
@@ -725,6 +825,7 @@
     },
     "/households/{householdId}/members/{memberId}": {
       "patch": {
+        "description": "A placeholder member (userId null) is fully editable by a planner. A member who has an account is role-only — their profile is theirs.",
         "operationId": "HouseholdsController_updateMember",
         "parameters": [
           {
@@ -826,7 +927,7 @@
             "bearer": []
           }
         ],
-        "summary": "Change a member's role or linked person",
+        "summary": "Change another member's role, or edit a placeholder",
         "tags": [
           "households"
         ]
@@ -1029,19 +1130,27 @@
         "properties": {
           "name": {
             "type": "string",
-            "description": "Display name.",
+            "description": "Household name.",
             "minLength": 1,
             "maxLength": 120,
             "example": "The Germanos"
           },
+          "displayName": {
+            "type": "string",
+            "description": "The creator's own human-readable name in this household. Required because every member has one — a member list of UUIDs is not a member list.",
+            "minLength": 1,
+            "maxLength": 120,
+            "example": "Devon"
+          },
           "personName": {
             "type": "string",
-            "description": "Which person in the library the creator eats as. Omit if the creator plans but does not eat — the membership is still created, as a planner.",
-            "example": "jimbo"
+            "description": "Which person in the library the creator eats as. Omit if the creator plans but does not eat.",
+            "example": "devon"
           }
         },
         "required": [
-          "name"
+          "name",
+          "displayName"
         ]
       },
       "HouseholdMemberView": {
@@ -1051,10 +1160,9 @@
             "type": "string",
             "format": "uuid"
           },
-          "userId": {
+          "displayName": {
             "type": "string",
-            "format": "uuid",
-            "description": "auth.users id."
+            "description": "Human-readable name. Always present."
           },
           "role": {
             "type": "string",
@@ -1064,10 +1172,21 @@
               "eater"
             ]
           },
+          "userId": {
+            "type": "object",
+            "format": "uuid",
+            "nullable": true,
+            "description": "auth.users id, or null when this member is a PLACEHOLDER — a real member with no account yet. Null here is the one flag that distinguishes the two kinds of member; a placeholder can never be a caller."
+          },
           "personName": {
             "type": "object",
             "nullable": true,
-            "description": "Library person key, or null if this account does not eat."
+            "description": "Library person key, or null if this member does not eat."
+          },
+          "inviteEmail": {
+            "type": "object",
+            "nullable": true,
+            "description": "Invite intent for a placeholder. Always null once the member has an account."
           },
           "createdAt": {
             "type": "string",
@@ -1076,9 +1195,11 @@
         },
         "required": [
           "id",
-          "userId",
+          "displayName",
           "role",
+          "userId",
           "personName",
+          "inviteEmail",
           "createdAt"
         ]
       },
@@ -1201,6 +1322,10 @@
             ],
             "description": "The CALLER's role here."
           },
+          "displayName": {
+            "type": "string",
+            "description": "The CALLER's display name here."
+          },
           "personName": {
             "type": "object",
             "nullable": true,
@@ -1208,7 +1333,7 @@
           },
           "memberCount": {
             "type": "number",
-            "description": "Members in this household, including the caller."
+            "description": "Members in this household, including placeholders and the caller."
           },
           "createdAt": {
             "type": "string",
@@ -1219,6 +1344,7 @@
           "id",
           "name",
           "role",
+          "displayName",
           "personName",
           "memberCount",
           "createdAt"
@@ -1240,10 +1366,12 @@
       "AddHouseholdMemberRequest": {
         "type": "object",
         "properties": {
-          "userId": {
+          "displayName": {
             "type": "string",
-            "format": "uuid",
-            "description": "auth.users id of the account to add. The caller must already know it — this API does not look accounts up by email, because a lookup endpoint tells an attacker which addresses have accounts. Email invitations are the intended replacement (see README open questions)."
+            "description": "This member's human-readable name.",
+            "minLength": 1,
+            "maxLength": 120,
+            "example": "Alex"
           },
           "role": {
             "type": "string",
@@ -1253,16 +1381,43 @@
               "eater"
             ]
           },
+          "userId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "auth.users id, when the caller already knows it. Omit to create a placeholder member with no account."
+          },
           "personName": {
             "type": "string",
-            "description": "The library person this account eats as.",
-            "example": "alice"
+            "description": "The library person this member eats as.",
+            "example": "alex"
+          },
+          "inviteEmail": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 320,
+            "description": "Where an invitation WOULD be sent once that flow exists. Stored as intent only: it is never checked against the account directory, so sending it reveals nothing about whether an account exists. Rejected on a member that already has an account."
           }
         },
         "required": [
-          "userId",
+          "displayName",
           "role"
         ]
+      },
+      "UpdateOwnMembershipRequest": {
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "personName": {
+            "type": "object",
+            "nullable": true,
+            "description": "The library person you eat as. Send null to stop eating in this plan.",
+            "example": "devon"
+          }
+        }
       },
       "UpdateHouseholdMemberRequest": {
         "type": "object",
@@ -1275,11 +1430,24 @@
               "eater"
             ]
           },
+          "displayName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "description": "Placeholder members only."
+          },
           "personName": {
             "type": "object",
             "nullable": true,
-            "description": "The library person this account eats as. Send null to unlink (the account keeps its membership but stops being an eater in the plan).",
-            "example": "alice"
+            "description": "Placeholder members only. Send null to unlink the member from the plan.",
+            "example": "alex"
+          },
+          "inviteEmail": {
+            "type": "object",
+            "format": "email",
+            "maxLength": 320,
+            "nullable": true,
+            "description": "Placeholder members only. Send null to clear."
           }
         }
       },

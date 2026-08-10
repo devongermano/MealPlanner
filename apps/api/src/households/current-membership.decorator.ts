@@ -6,8 +6,10 @@ import type { HouseholdRoleName } from './roles';
 export interface CurrentMembershipInfo {
   id: string;
   householdId: string;
-  userId: string;
+  /** Never null in practice — a placeholder member can never be the caller. */
+  userId: string | null;
   role: HouseholdRoleName;
+  displayName: string;
   personName: string | null;
 }
 

@@ -114,7 +114,10 @@ export interface paths {
         /** List members of a household */
         get: operations["HouseholdsController_listMembers"];
         put?: never;
-        /** Add an account to a household */
+        /**
+         * Add a member to a household
+         * @description Omit userId to create a PLACEHOLDER — a real member with no account yet, which is the normal path: a household must be plannable before everyone has signed up. Send userId only when the caller already knows the account id.
+         */
         post: operations["HouseholdsController_addMember"];
         delete?: never;
         options?: never;
@@ -139,7 +142,11 @@ export interface paths {
         delete: operations["HouseholdsController_leave"];
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Edit my own display name or linked person
+         * @description Your profile is yours: a planner cannot change it for you, and this route cannot change your role.
+         */
+        patch: operations["HouseholdsController_updateOwnMembership"];
         trace?: never;
     };
     "/households/{householdId}/members/{memberId}": {
@@ -156,7 +163,10 @@ export interface paths {
         delete: operations["HouseholdsController_removeMember"];
         options?: never;
         head?: never;
-        /** Change a member's role or linked person */
+        /**
+         * Change another member's role, or edit a placeholder
+         * @description A placeholder member (userId null) is fully editable by a planner. A member who has an account is role-only — their profile is theirs.
+         */
         patch: operations["HouseholdsController_updateMember"];
         trace?: never;
     };
@@ -194,28 +204,37 @@ export interface components {
         };
         CreateHouseholdRequest: {
             /**
-             * @description Display name.
+             * @description Household name.
              * @example The Germanos
              */
             name: string;
             /**
-             * @description Which person in the library the creator eats as. Omit if the creator plans but does not eat — the membership is still created, as a planner.
-             * @example jimbo
+             * @description The creator's own human-readable name in this household. Required because every member has one — a member list of UUIDs is not a member list.
+             * @example Devon
+             */
+            displayName: string;
+            /**
+             * @description Which person in the library the creator eats as. Omit if the creator plans but does not eat.
+             * @example devon
              */
             personName?: string;
         };
         HouseholdMemberView: {
             /** Format: uuid */
             id: string;
-            /**
-             * Format: uuid
-             * @description auth.users id.
-             */
-            userId: string;
+            /** @description Human-readable name. Always present. */
+            displayName: string;
             /** @enum {string} */
             role: "planner" | "cook" | "eater";
-            /** @description Library person key, or null if this account does not eat. */
+            /**
+             * Format: uuid
+             * @description auth.users id, or null when this member is a PLACEHOLDER — a real member with no account yet. Null here is the one flag that distinguishes the two kinds of member; a placeholder can never be a caller.
+             */
+            userId: Record<string, never> | null;
+            /** @description Library person key, or null if this member does not eat. */
             personName: Record<string, never> | null;
+            /** @description Invite intent for a placeholder. Always null once the member has an account. */
+            inviteEmail: Record<string, never> | null;
             /** Format: date-time */
             createdAt: string;
         };
@@ -266,9 +285,11 @@ export interface components {
              * @enum {string}
              */
             role: "planner" | "cook" | "eater";
+            /** @description The CALLER's display name here. */
+            displayName: string;
             /** @description The CALLER's library person key here. */
             personName: Record<string, never> | null;
-            /** @description Members in this household, including the caller. */
+            /** @description Members in this household, including placeholders and the caller. */
             memberCount: number;
             /** Format: date-time */
             createdAt: string;
@@ -278,26 +299,51 @@ export interface components {
         };
         AddHouseholdMemberRequest: {
             /**
-             * Format: uuid
-             * @description auth.users id of the account to add. The caller must already know it — this API does not look accounts up by email, because a lookup endpoint tells an attacker which addresses have accounts. Email invitations are the intended replacement (see README open questions).
+             * @description This member's human-readable name.
+             * @example Alex
              */
-            userId: string;
+            displayName: string;
             /** @enum {string} */
             role: "planner" | "cook" | "eater";
             /**
-             * @description The library person this account eats as.
-             * @example alice
+             * Format: uuid
+             * @description auth.users id, when the caller already knows it. Omit to create a placeholder member with no account.
+             */
+            userId?: string;
+            /**
+             * @description The library person this member eats as.
+             * @example alex
              */
             personName?: string;
+            /**
+             * Format: email
+             * @description Where an invitation WOULD be sent once that flow exists. Stored as intent only: it is never checked against the account directory, so sending it reveals nothing about whether an account exists. Rejected on a member that already has an account.
+             */
+            inviteEmail?: string;
+        };
+        UpdateOwnMembershipRequest: {
+            displayName?: string;
+            /**
+             * @description The library person you eat as. Send null to stop eating in this plan.
+             * @example devon
+             */
+            personName?: Record<string, never> | null;
         };
         UpdateHouseholdMemberRequest: {
             /** @enum {string} */
             role?: "planner" | "cook" | "eater";
+            /** @description Placeholder members only. */
+            displayName?: string;
             /**
-             * @description The library person this account eats as. Send null to unlink (the account keeps its membership but stops being an eater in the plan).
-             * @example alice
+             * @description Placeholder members only. Send null to unlink the member from the plan.
+             * @example alex
              */
             personName?: Record<string, never> | null;
+            /**
+             * Format: email
+             * @description Placeholder members only. Send null to clear.
+             */
+            inviteEmail?: Record<string, never> | null;
         };
         MeResponse: {
             /**
@@ -876,6 +922,83 @@ export interface operations {
                 };
             };
             /** @description You are the last planner. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Internal error. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+        };
+    };
+    HouseholdsController_updateOwnMembership: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                householdId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateOwnMembershipRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HouseholdMemberView"];
+                };
+            };
+            /** @description Validation failed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description Missing or invalid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description You are a member, but your role is below what this route requires. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description No such household, OR you are not a member of it. Deliberately indistinguishable. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiErrorResponse"];
+                };
+            };
+            /** @description That person is already linked to another member. */
             409: {
                 headers: {
                     [name: string]: unknown;

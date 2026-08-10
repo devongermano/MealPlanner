@@ -11,6 +11,7 @@ import {
   HouseholdSummary,
   UpdateHouseholdMemberRequest,
   UpdateHouseholdRequest,
+  UpdateOwnMembershipRequest,
 } from './dto/household.dto';
 
 type Tx = Prisma.TransactionClient;
@@ -22,6 +23,7 @@ type AuditAction =
   | 'household.deleted'
   | 'member.added'
   | 'member.updated'
+  | 'member.profile_updated'
   | 'member.removed'
   | 'member.left';
 
@@ -30,9 +32,15 @@ type AuditAction =
  *
  * This service holds no product logic — no plans, no solves, no meals. Its only
  * job is to decide who belongs to what and to record the decision. Role checks
- * live in `HouseholdMembershipGuard`, not here; the one thing this file
- * enforces beyond the guard is the last-planner invariant, which is a data
- * integrity rule rather than an authorization rule.
+ * live in `HouseholdMembershipGuard`, not here.
+ *
+ * Two rules do live here, because both depend on database state a guard
+ * cannot see from the request alone:
+ *   - the LAST-PLANNER invariant (a data integrity rule)
+ *   - PLACEHOLDER vs CLAIMED ownership: a planner owns a placeholder member
+ *     outright, but once a member has an account that account owns its own
+ *     profile and a planner may only change its role. Deciding that needs the
+ *     target row, so it is enforced in `assertPlannerMayEdit`.
  */
 @Injectable()
 export class HouseholdsService {
@@ -56,6 +64,7 @@ export class HouseholdsService {
       id: membership.household.id,
       name: membership.household.name,
       role: membership.role,
+      displayName: membership.displayName,
       personName: membership.personName,
       memberCount: membership.household._count.members,
       createdAt: membership.household.createdAt.toISOString(),
@@ -115,6 +124,7 @@ export class HouseholdsService {
           // Not a parameter. Whoever creates a household administers it, and a
           // household created with no planner would be unadministrable.
           role: 'planner',
+          displayName: body.displayName,
           personName: body.personName ?? null,
         },
       });
@@ -199,16 +209,36 @@ export class HouseholdsService {
     householdId: string,
     body: AddHouseholdMemberRequest,
   ): Promise<HouseholdMemberView> {
+    // An account already carries a real, verified email; an invite address on
+    // it would be a second, unverified one that nothing keeps in step.
+    if (body.userId && body.inviteEmail) {
+      throw ApiException.validationFailed(
+        [
+          {
+            field: 'inviteEmail',
+            message:
+              'not accepted together with userId — that member already has an account',
+          },
+        ],
+        'An account cannot carry invite intent.',
+      );
+    }
+
     return this.prisma.$transaction(async (tx) => {
       await this.lockHousehold(tx, householdId);
 
-      const existing = await tx.householdMember.findUnique({
-        where: { householdId_userId: { householdId, userId: body.userId } },
-      });
-      if (existing) {
-        throw ApiException.conflict(
-          'That account is already a member of this household.',
-        );
+      // Only an account can collide. Placeholders have user_id NULL, and the
+      // unique index treats NULLs as distinct, so a household may hold as many
+      // as it needs.
+      if (body.userId) {
+        const existing = await tx.householdMember.findUnique({
+          where: { householdId_userId: { householdId, userId: body.userId } },
+        });
+        if (existing) {
+          throw ApiException.conflict(
+            'That account is already a member of this household.',
+          );
+        }
       }
       await this.assertPersonNameFree(
         tx,
@@ -220,9 +250,14 @@ export class HouseholdsService {
       const member = await tx.householdMember.create({
         data: {
           householdId,
-          userId: body.userId,
+          // Absent userId is the placeholder path — the normal one, since the
+          // web app has no way to produce another account's UUID and this API
+          // deliberately offers no lookup that would give it one.
+          userId: body.userId ?? null,
           role: body.role,
+          displayName: body.displayName,
           personName: body.personName ?? null,
+          inviteEmail: body.inviteEmail ?? null,
         },
       });
       await this.audit(
@@ -233,7 +268,9 @@ export class HouseholdsService {
         member.id,
         {
           userId: member.userId,
+          placeholder: member.userId === null,
           role: member.role,
+          displayName: member.displayName,
           personName: member.personName,
         },
       );
@@ -247,9 +284,20 @@ export class HouseholdsService {
     memberId: string,
     body: UpdateHouseholdMemberRequest,
   ): Promise<HouseholdMemberView> {
-    if (body.role === undefined && body.personName === undefined) {
+    if (
+      body.role === undefined &&
+      body.displayName === undefined &&
+      body.personName === undefined &&
+      body.inviteEmail === undefined
+    ) {
       throw ApiException.validationFailed(
-        [{ field: 'role', message: 'send at least one of role or personName' }],
+        [
+          {
+            field: 'role',
+            message:
+              'send at least one of role, displayName, personName or inviteEmail',
+          },
+        ],
         'Nothing to update.',
       );
     }
@@ -261,6 +309,8 @@ export class HouseholdsService {
         householdId,
         memberId,
       );
+
+      assertPlannerMayEdit(member, body);
 
       if (body.personName !== undefined) {
         await this.assertPersonNameFree(
@@ -284,8 +334,14 @@ export class HouseholdsService {
         where: { id: memberId },
         data: {
           ...(body.role !== undefined ? { role: body.role } : {}),
+          ...(body.displayName !== undefined
+            ? { displayName: body.displayName }
+            : {}),
           ...(body.personName !== undefined
             ? { personName: body.personName }
+            : {}),
+          ...(body.inviteEmail !== undefined
+            ? { inviteEmail: body.inviteEmail }
             : {}),
         },
       });
@@ -296,8 +352,95 @@ export class HouseholdsService {
         'member.updated',
         memberId,
         {
-          before: { role: member.role, personName: member.personName },
-          after: { role: updated.role, personName: updated.personName },
+          before: {
+            role: member.role,
+            displayName: member.displayName,
+            personName: member.personName,
+          },
+          after: {
+            role: updated.role,
+            displayName: updated.displayName,
+            personName: updated.personName,
+          },
+        },
+      );
+      return toMemberView(updated);
+    });
+  }
+
+  /**
+   * A member editing their own profile.
+   *
+   * `memberId` comes from `req.membership` — resolved by the guard from the
+   * caller's own token — so this can only ever reach the caller's own row. It
+   * is never taken from the URL or the body, which is what keeps "edit
+   * yourself" from becoming "edit anyone".
+   *
+   * `role` is not in `UpdateOwnMembershipRequest` and must never be added: this
+   * route is reachable by an eater, and accepting a role here would be
+   * one-request self-promotion.
+   */
+  async updateOwnMembership(
+    user: AuthenticatedUser,
+    householdId: string,
+    memberId: string,
+    body: UpdateOwnMembershipRequest,
+  ): Promise<HouseholdMemberView> {
+    if (body.displayName === undefined && body.personName === undefined) {
+      throw ApiException.validationFailed(
+        [
+          {
+            field: 'displayName',
+            message: 'send at least one of displayName or personName',
+          },
+        ],
+        'Nothing to update.',
+      );
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      await this.lockHousehold(tx, householdId);
+      const member = await this.findMemberInHousehold(
+        tx,
+        householdId,
+        memberId,
+      );
+
+      if (body.personName !== undefined) {
+        await this.assertPersonNameFree(
+          tx,
+          householdId,
+          body.personName,
+          memberId,
+        );
+      }
+
+      const updated = await tx.householdMember.update({
+        where: { id: memberId },
+        data: {
+          ...(body.displayName !== undefined
+            ? { displayName: body.displayName }
+            : {}),
+          ...(body.personName !== undefined
+            ? { personName: body.personName }
+            : {}),
+        },
+      });
+      await this.audit(
+        tx,
+        householdId,
+        user.userId,
+        'member.profile_updated',
+        memberId,
+        {
+          before: {
+            displayName: member.displayName,
+            personName: member.personName,
+          },
+          after: {
+            displayName: updated.displayName,
+            personName: updated.personName,
+          },
         },
       );
       return toMemberView(updated);
@@ -447,12 +590,53 @@ export class HouseholdsService {
   }
 }
 
+/**
+ * Owner rule: a planner owns a PLACEHOLDER member outright, but once a member
+ * has an account, that account owns its own profile and a planner may only
+ * change its role.
+ *
+ * The distinction is `userId === null` and nothing else, so it cannot be
+ * spoofed from a request — a caller has no way to make an existing member's
+ * `user_id` NULL, and creating a placeholder never binds one.
+ *
+ * 403 rather than 400: the field is well-formed and would be accepted on a
+ * different target. This is a permission answer, and it does not leak anything
+ * the caller cannot already see — they are a planner of this household and the
+ * member list already tells them who has an account.
+ */
+function assertPlannerMayEdit(
+  member: HouseholdMember,
+  body: UpdateHouseholdMemberRequest,
+): void {
+  if (member.userId === null) return;
+
+  const ownedByTheAccount = (
+    [
+      ['displayName', body.displayName],
+      ['personName', body.personName],
+      ['inviteEmail', body.inviteEmail],
+    ] as const
+  )
+    .filter(([, value]) => value !== undefined)
+    .map(([field]) => field);
+
+  if (ownedByTheAccount.length > 0) {
+    throw ApiException.forbidden(
+      `${ownedByTheAccount.join(' and ')} belong to that member's own account; a planner can only change their role. ` +
+        'They can edit their profile themselves at PATCH /households/{householdId}/members/me.',
+    );
+  }
+}
+
 function toMemberView(member: HouseholdMember): HouseholdMemberView {
   return {
     id: member.id,
-    userId: member.userId,
+    displayName: member.displayName,
     role: member.role,
+    // null here is what tells a client this member is a placeholder.
+    userId: member.userId,
     personName: member.personName,
+    inviteEmail: member.inviteEmail,
     createdAt: member.createdAt.toISOString(),
   };
 }
