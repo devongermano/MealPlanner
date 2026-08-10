@@ -1,0 +1,163 @@
+<div class="wizard">
+  <header>
+    <p class="wordmark">mealplan</p>
+    <ol class="steps">
+      @for (entry of steps; track entry.id; let index = $index) {
+        <li [class.current]="index === stepIndex()" [class.done]="index < stepIndex()">
+          <span class="dot" aria-hidden="true">{{ index + 1 }}</span>
+          <span class="label">{{ entry.label }}</span>
+        </li>
+      }
+    </ol>
+  </header>
+
+  <main class="card">
+    @if (failure(); as message) {
+      <app-alert tone="error">{{ message }}</app-alert>
+    }
+
+    @switch (step()) {
+      @case ('household') {
+        <h1>Name your household</h1>
+        <p class="lede muted">
+          A household is the group that shares cook days and a shopping list. You can be the
+          only person in it.
+        </p>
+
+        <form class="form-stack" [formGroup]="householdForm" (ngSubmit)="createHousehold()" novalidate>
+          <div class="field">
+            <label for="householdName">Household name</label>
+            <input
+              id="householdName"
+              type="text"
+              formControlName="name"
+              placeholder="The Germanos"
+              [attr.aria-invalid]="
+                householdForm.controls.name.touched && householdForm.controls.name.invalid
+              "
+            />
+            @if (householdForm.controls.name.touched && householdForm.controls.name.invalid) {
+              <p class="hint error">Give the household a name — anything you will recognise.</p>
+            }
+          </div>
+
+          <fieldset class="roles">
+            <legend>Your role</legend>
+            @for (role of roles; track role) {
+              <label class="role" [class.selected]="householdForm.controls.creatorRole.value === role">
+                <input type="radio" formControlName="creatorRole" [value]="role" />
+                <span class="role-name">{{ role }}</span>
+                <span class="role-detail muted">{{ roleDescriptions[role] }}</span>
+              </label>
+            }
+          </fieldset>
+
+          <button class="btn btn-primary" type="submit" [disabled]="pending()">
+            {{ pending() ? 'Creating…' : 'Create household' }}
+          </button>
+        </form>
+      }
+
+      @case ('members') {
+        <h1>Who eats here?</h1>
+        <p class="lede muted">
+          Add everyone the plan cooks for. Roles decide what each person sees — you can change
+          them later in settings.
+        </p>
+
+        <ul class="members">
+          @for (member of members(); track member.id) {
+            <li>
+              <div class="who">
+                <span class="name">{{ member.displayName }}</span>
+                @if (member.isSelf) {
+                  <span class="tag">you</span>
+                }
+              </div>
+              <span class="tag role-tag">{{ member.role }}</span>
+              @if (!member.isSelf) {
+                <button
+                  class="btn btn-ghost remove"
+                  type="button"
+                  [disabled]="pending()"
+                  (click)="removeMember(member.id)"
+                >
+                  Remove<span class="visually-hidden"> {{ member.displayName }}</span>
+                </button>
+              }
+            </li>
+          }
+        </ul>
+
+        <form class="member-form" [formGroup]="memberForm" (ngSubmit)="addMember()" novalidate>
+          <div class="field">
+            <label for="memberName">Name</label>
+            <input
+              id="memberName"
+              type="text"
+              formControlName="displayName"
+              placeholder="Alex"
+              [attr.aria-invalid]="
+                memberForm.controls.displayName.touched && memberForm.controls.displayName.invalid
+              "
+            />
+          </div>
+
+          <div class="field">
+            <label for="memberRole">Role</label>
+            <select id="memberRole" formControlName="role">
+              @for (role of roles; track role) {
+                <option [value]="role">{{ role }}</option>
+              }
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="memberEmail">Email <span class="muted">(optional)</span></label>
+            <input
+              id="memberEmail"
+              type="email"
+              formControlName="email"
+              autocapitalize="off"
+              spellcheck="false"
+              placeholder="alex@example.com"
+            />
+          </div>
+
+          <button class="btn add" type="submit" [disabled]="pending()">Add person</button>
+        </form>
+
+        <p class="hint invite-note">
+          People with an email get an invite when the API lands. Until then they exist on the
+          plan without an account.
+        </p>
+
+        <div class="actions">
+          <button class="btn btn-primary" type="button" (click)="finishMembers()">
+            Done adding people
+          </button>
+        </div>
+      }
+
+      @case ('done') {
+        <h1>{{ household()?.name }} is set up</h1>
+        <p class="lede muted">
+          {{ members().length }} {{ members().length === 1 ? 'person' : 'people' }} on the plan.
+          Next comes the week itself — proposing a menu, collecting vetoes, locking it in.
+        </p>
+
+        <app-alert>
+          Planning is not wired up yet. The engine that builds menus, batches and shopping lists
+          is being finished in parallel; this is the account and household half of it.
+        </app-alert>
+
+        <div class="actions">
+          <button class="btn" type="button" (click)="backToMembers()">Back to people</button>
+          <button class="btn btn-primary" type="button" (click)="enterApp()">
+            Go to {{ household()?.name }}
+          </button>
+        </div>
+      }
+    }
+  </main>
+</div>

@@ -1,9 +1,7 @@
-<header>
-  <h1>mealplan</h1>
-  <nav>
-    <a routerLink="/health">Health</a>
-  </nav>
-</header>
-<main>
-  <router-outlet />
-</main>
+@if (isPreview) {
+  <p class="preview-banner" role="status">
+    <strong>Preview mode</strong> — accounts and households live in this browser tab only.
+    Nothing reaches a server.
+  </p>
+}
+<router-outlet />

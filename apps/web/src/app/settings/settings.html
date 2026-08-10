@@ -1,0 +1,144 @@
+<header class="page-head">
+  <h1>Settings</h1>
+  <p class="muted lede">Your account, the people in {{ household()?.name }}, and how the plan
+    treats each of them.</p>
+</header>
+
+@if (failure(); as message) {
+  <app-alert tone="error">{{ message }}</app-alert>
+}
+
+<section class="panel">
+  <div class="panel-head">
+    <h2>Your profile</h2>
+    <p class="muted">How you appear to the rest of the household.</p>
+  </div>
+
+  <dl class="facts">
+    <div>
+      <dt>Name</dt>
+      <dd>{{ displayName() }}</dd>
+    </div>
+    <div>
+      <dt>Email</dt>
+      <dd>{{ user()?.email }}</dd>
+    </div>
+  </dl>
+
+  <p class="hint">
+    Changing your name or email writes to your account record, so it waits for the API. Roles
+    and household members below are editable now.
+  </p>
+</section>
+
+<section class="panel">
+  <div class="panel-head">
+    <h2>Household</h2>
+    <p class="muted">
+      Roles decide what each person sees: planners configure and approve, cooks get the prep
+      plan, eaters get their sheets and a veto.
+    </p>
+  </div>
+
+  <ul class="members">
+    @for (member of members(); track member.id) {
+      <li>
+        <div class="who">
+          <span class="name">{{ member.displayName }}</span>
+          @if (member.isSelf) {
+            <span class="tag">you</span>
+          }
+          <span class="email muted">{{ member.email ?? 'No email yet' }}</span>
+        </div>
+
+        <label class="visually-hidden" [attr.for]="'role-' + member.id">
+          Role for {{ member.displayName }}
+        </label>
+        <select
+          class="role-select"
+          [id]="'role-' + member.id"
+          [value]="member.role"
+          [disabled]="pending()"
+          (change)="changeRole(member, $event)"
+        >
+          @for (role of roles; track role) {
+            <option [value]="role">{{ role }}</option>
+          }
+        </select>
+
+        <button
+          class="btn btn-ghost remove"
+          type="button"
+          [disabled]="pending() || member.isSelf"
+          (click)="removeMember(member)"
+        >
+          Remove<span class="visually-hidden"> {{ member.displayName }}</span>
+        </button>
+      </li>
+    } @empty {
+      <li class="empty muted">
+        Nobody here yet. Add the people you cook for and they will show up on every sheet.
+      </li>
+    }
+  </ul>
+
+  <form class="member-form" [formGroup]="memberForm" (ngSubmit)="addMember()" novalidate>
+    <div class="field">
+      <label for="newMemberName">Add a person</label>
+      <input
+        id="newMemberName"
+        type="text"
+        formControlName="displayName"
+        placeholder="Name"
+        [attr.aria-invalid]="
+          memberForm.controls.displayName.touched && memberForm.controls.displayName.invalid
+        "
+      />
+    </div>
+
+    <div class="field">
+      <label for="newMemberRole">Role</label>
+      <select id="newMemberRole" formControlName="role">
+        @for (role of roles; track role) {
+          <option [value]="role">{{ role }}</option>
+        }
+      </select>
+    </div>
+
+    <div class="field">
+      <label for="newMemberEmail">Email <span class="muted">(optional)</span></label>
+      <input
+        id="newMemberEmail"
+        type="email"
+        formControlName="email"
+        autocapitalize="off"
+        spellcheck="false"
+        placeholder="alex@example.com"
+      />
+    </div>
+
+    <button class="btn add" type="submit" [disabled]="pending()">Add</button>
+  </form>
+</section>
+
+<section class="panel">
+  <div class="panel-head">
+    <h2>Portions and targets</h2>
+    <p class="muted">Per-person settings that change what the solver is asked for.</p>
+  </div>
+
+  <div class="notes">
+    <app-pending-note heading="Precision or relaxed">
+      Whether a person's portions are given in grams for a kitchen scale, or in household units
+      with honest error bars. Set per person — one of you can weigh while another wings it.
+    </app-pending-note>
+    <app-pending-note heading="Portioned or family style">
+      Whether cook day packs per-meal containers, or batches stay in shared dishes and the
+      sheet says how much to take. Configurable per person, and per meal slot.
+    </app-pending-note>
+    <app-pending-note heading="Macro targets and meals per day">
+      Each person's daily targets and how many meals to deal them into. These are direct engine
+      inputs, so they land when the solver is wired to accounts.
+    </app-pending-note>
+  </div>
+</section>

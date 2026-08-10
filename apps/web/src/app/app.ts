@@ -1,10 +1,15 @@
-import { Component } from '@angular/core';
-import { RouterLink, RouterOutlet } from '@angular/router';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { RouterOutlet } from '@angular/router';
+import { RUNTIME_CONFIG } from './config/runtime-config';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, RouterLink],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [RouterOutlet],
   templateUrl: './app.html',
   styleUrl: './app.css',
 })
-export class App {}
+export class App {
+  /** Preview accounts are fake, so the app says so on every screen rather than once at sign-up. */
+  protected readonly isPreview = inject(RUNTIME_CONFIG).authMode === 'preview';
+}

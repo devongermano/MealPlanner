@@ -1,0 +1,66 @@
+<section class="intro">
+  <p class="eyebrow">{{ household()?.name }}</p>
+  <h1>Hello, {{ displayName() }}</h1>
+  <p class="muted lede">
+    @if (isSolo()) {
+      It is just you on the plan so far. Add the people you cook for and their portions come
+      out of the same pots as yours.
+    } @else {
+      {{ eaterCount() }} people on the plan. Everyone's portions come out of the same pots —
+      that is the whole trick.
+    }
+  </p>
+</section>
+
+<section class="stats">
+  <div class="stat card">
+    <p class="eyebrow">On the plan</p>
+    <p class="value">{{ eaterCount() }}</p>
+    <p class="muted note">{{ eaterCount() === 1 ? 'person' : 'people' }}</p>
+  </div>
+  <div class="stat card">
+    <p class="eyebrow">In the kitchen</p>
+    <p class="value">{{ cookNames().length }}</p>
+    <p class="muted note">
+      @if (cookNames().length) {
+        {{ cookNames().join(', ') }}
+      } @else {
+        nobody assigned yet
+      }
+    </p>
+  </div>
+  <div class="stat card">
+    <p class="eyebrow">This week</p>
+    <p class="value plain">No plan yet</p>
+    <p class="muted note">Planning arrives with the engine</p>
+  </div>
+</section>
+
+<section class="whats-next">
+  <h2>What lands here next</h2>
+  <p class="muted lede">
+    The three deliverables, once the solver is wired to accounts. Each one is being built
+    against result shapes that are still settling, so none of them are faked here.
+  </p>
+
+  <div class="notes">
+    <app-pending-note heading="Shop">
+      One list per week in the units the store actually sells, priced from your last trip.
+    </app-pending-note>
+    <app-pending-note heading="Cook">
+      A batch plan per cook day — what goes in which pot, in what order, with the portioning
+      matrix for every container.
+    </app-pending-note>
+    <app-pending-note heading="Eat">
+      Per-person, per-day sheets. Grams if you weigh, honest approximations if you do not.
+    </app-pending-note>
+    <app-pending-note heading="Propose, veto, lock" waitingOn="Coming with the API">
+      Eaters review the week before it locks. Once locked, everyone sees the same plan for the
+      rest of the week — never a fresh solve.
+    </app-pending-note>
+  </div>
+
+  <p class="muted footnote">
+    In the meantime, <a routerLink="/settings">settings</a> is where you manage the household.
+  </p>
+</section>

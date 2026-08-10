@@ -1,0 +1,49 @@
+<a class="skip" href="#main">Skip to content</a>
+
+<header>
+  <div class="bar">
+    <div class="identity">
+      <a class="wordmark" routerLink="/app">mealplan</a>
+      @if (household(); as active) {
+        <span class="divider" aria-hidden="true">/</span>
+        @if (canSwitch()) {
+          <label class="visually-hidden" for="householdSwitcher">Active household</label>
+          <select id="householdSwitcher" class="switcher" (change)="switchHousehold($event)">
+            @for (option of households(); track option.id) {
+              <option [value]="option.id" [selected]="option.id === active.id">
+                {{ option.name }}
+              </option>
+            }
+          </select>
+        } @else {
+          <span class="household-name">{{ active.name }}</span>
+        }
+      }
+    </div>
+
+    <div class="account">
+      <button
+        class="btn btn-ghost theme-toggle"
+        type="button"
+        (click)="theme.cycle()"
+        [attr.aria-label]="'Theme: ' + theme.choice() + '. Change theme.'"
+      >
+        {{ theme.choice() }}
+      </button>
+      <span class="avatar" aria-hidden="true">{{ initials() }}</span>
+      <span class="who">{{ displayName() }}</span>
+      <button class="btn btn-ghost" type="button" (click)="signOut()">Sign out</button>
+    </div>
+  </div>
+
+  <nav aria-label="Primary">
+    <a routerLink="/app" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
+      Overview
+    </a>
+    <a routerLink="/settings" routerLinkActive="active">Settings</a>
+  </nav>
+</header>
+
+<main id="main" tabindex="-1">
+  <router-outlet />
+</main>
