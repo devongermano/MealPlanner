@@ -112,7 +112,7 @@ later.
 | | `user_id` | Who owns it |
 |---|---|---|
 | **Placeholder** | `NULL` | The planner, entirely — display name, person, role, invite intent. |
-| **Claimed** | set | The account owns its profile. A planner may change its **role** and remove it, nothing more. |
+| **Claimed** | set | The account owns its profile. A planner may change its **role** and **personName**, and remove it. |
 
 A placeholder **cannot authenticate**, and that is structural rather than
 enforced: the verifier requires a UUID subject, and SQL's `user_id = <uuid>`
@@ -120,8 +120,13 @@ never matches NULL. No caller can ever resolve onto one.
 
 Three fields, easily confused:
 
-- `displayName` — what humans read. Required on every member.
+- `displayName` — what humans read. Required on every member. Once a member has
+  an account it is theirs alone; a planner cannot change it.
 - `personName` — the library/plan key (`alex`), the bridge to the engine.
+  **Co-owned** on a claimed member: the person or a planner may set it. It is
+  planning data wearing a profile's clothes — a wrong link breaks the whole
+  household's week, and the planner runs the plan, so "only the person who made
+  the mistake can fix it" would be bad operations.
 - `inviteEmail` — where an invitation *would* go. **Intent only**: never checked
   against the account directory, because answering "does this address have an
   account?" is an enumeration oracle. Passing a real user's address creates a
@@ -158,7 +163,7 @@ can hold all roles" works with a single column.
 | `PATCH /households/:id` | planner |
 | `DELETE /households/:id` | planner |
 | `POST /households/:id/members` | planner |
-| `PATCH /households/:id/members/:memberId` | planner (role only, unless the target is a placeholder) |
+| `PATCH /households/:id/members/:memberId` | planner (`role` + `personName`; everything else only on a placeholder) |
 | `DELETE /households/:id/members/:memberId` | planner |
 | `PATCH /households/:id/members/me` | member (eater+), self only |
 | `DELETE /households/:id/members/me` | member (eater+), self only |
@@ -182,8 +187,10 @@ self-promotion. With `forbidNonWhitelisted`, sending one is a 400 rather than a
 silent ignore.
 
 The one rule the guard cannot express is target-dependent: a planner owns a
-placeholder outright but may only change a claimed member's role. It lives in
-`assertPlannerMayEdit` in the service, and answers 403.
+placeholder outright, but on a claimed member may set only the planning fields
+(`role`, `personName`). It lives in `assertPlannerMayEdit` in the service and
+answers 403 — for the whole request, so a forbidden field cannot ride along with
+a permitted one and get partially applied.
 
 ---
 
@@ -297,11 +304,6 @@ except someone probing.
    migration; tightening later is a data cleanup — so it starts strict.
 5. **Audit entries are written but never read.** No endpoint exposes them yet.
    PRD §10 requires the trail; who gets to read it is unspecified.
-6. **A planner cannot fix a claimed member's `personName`.** Under the ruling
-   the account owns it, so if someone links themselves to the wrong library
-   person only they can correct it. That is the intended reading of "self owns
-   their profile", but it is worth confirming — `personName` is arguably
-   planning data rather than profile data.
-7. **`POST /members` with a `userId` adds that account without its consent.**
+6. **`POST /members` with a `userId` adds that account without its consent.**
    It gains access to the household; it loses nothing. Invitations replace this
    path.

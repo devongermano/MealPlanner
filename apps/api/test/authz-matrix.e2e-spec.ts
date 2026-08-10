@@ -591,12 +591,53 @@ describe('household authorization matrix (real Postgres)', () => {
       expect(untouched?.displayName).toBe('The Eater');
     });
 
-    it("refuses to retarget a claimed member's linked person", async () => {
+    /**
+     * The refinement to the ruling: personName is CO-OWNED. It is planning data
+     * wearing a profile's clothes — the key the engine builds the week from — so
+     * a wrong link breaks everybody's plan and the planner, who runs the plan,
+     * can fix it. displayName has no such blast radius and stays the account's.
+     */
+    it("lets a planner fix a claimed member's linked person", async () => {
+      const response = await call(
+        'patch',
+        `/households/${seeded.householdA}/members/${seeded.eaterMemberId}`,
+        'planner',
+        { personName: 'jimbo-corrected' },
+      ).expect(200);
+
+      expect(bodyOf<HouseholdMemberView>(response).personName).toBe(
+        'jimbo-corrected',
+      );
+      // ...and did not quietly take the display name with it.
+      expect(bodyOf<HouseholdMemberView>(response).displayName).toBe(
+        'The Eater',
+      );
+    });
+
+    it('draws the line at displayName even in the same request', async () => {
       await call(
         'patch',
         `/households/${seeded.householdA}/members/${seeded.eaterMemberId}`,
         'planner',
-        { personName: 'someone-else' },
+        { personName: 'jimbo-corrected', displayName: 'Renamed' },
+      ).expect(403);
+
+      // The whole request is refused — no partial application.
+      const untouched = await prisma.householdMember.findUnique({
+        where: { id: seeded.eaterMemberId },
+      });
+      expect(untouched).toMatchObject({
+        personName: 'jimbo',
+        displayName: 'The Eater',
+      });
+    });
+
+    it('refuses invite intent on a claimed member', async () => {
+      await call(
+        'patch',
+        `/households/${seeded.householdA}/members/${seeded.eaterMemberId}`,
+        'planner',
+        { inviteEmail: 'someone@example.com' },
       ).expect(403);
     });
 

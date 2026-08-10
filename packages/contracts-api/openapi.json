@@ -825,7 +825,7 @@
     },
     "/households/{householdId}/members/{memberId}": {
       "patch": {
-        "description": "A placeholder member (userId null) is fully editable by a planner. A member who has an account is role-only — their profile is theirs.",
+        "description": "A placeholder member (userId null) is fully editable by a planner. On a member who has an account, a planner may change role and personName (planning data) but not displayName — that is theirs.",
         "operationId": "HouseholdsController_updateMember",
         "parameters": [
           {
@@ -1434,12 +1434,12 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 120,
-            "description": "Placeholder members only."
+            "description": "Placeholder members only — once a member has an account, their display name is theirs."
           },
           "personName": {
             "type": "object",
             "nullable": true,
-            "description": "Placeholder members only. Send null to unlink the member from the plan.",
+            "description": "Accepted on ANY member, placeholder or not: the library link is planning data, and the planner runs the plan. Send null to unlink the member from it.",
             "example": "alex"
           },
           "inviteEmail": {

@@ -591,17 +591,28 @@ export class HouseholdsService {
 }
 
 /**
- * Owner rule: a planner owns a PLACEHOLDER member outright, but once a member
- * has an account, that account owns its own profile and a planner may only
- * change its role.
+ * Owner rule (2026-08-10, refined): what a planner may change on a member who
+ * already has an account.
  *
- * The distinction is `userId === null` and nothing else, so it cannot be
- * spoofed from a request — a caller has no way to make an existing member's
- * `user_id` NULL, and creating a placeholder never binds one.
+ *   role        — planner only (the ladder is the planner's to set)
+ *   personName  — CO-OWNED: planner or the member themselves
+ *   displayName — the member's own, once they have an account
+ *   inviteEmail — placeholder only; an account has a real, verified address
+ *
+ * `personName` is co-owned because it is PLANNING data wearing a profile's
+ * clothes: it is the key the engine uses to build this household's week, so a
+ * wrong link breaks everybody's plan, and the planner is the one who runs the
+ * plan. "Only the person who made the mistake can fix it" is bad operations.
+ * `displayName` has no such blast radius — it is just what people call you —
+ * so it stays the account's own.
+ *
+ * The placeholder/claimed distinction is `userId === null` and nothing else,
+ * so it cannot be spoofed from a request: a caller has no way to make an
+ * existing member's `user_id` NULL, and creating a placeholder never binds one.
  *
  * 403 rather than 400: the field is well-formed and would be accepted on a
- * different target. This is a permission answer, and it does not leak anything
- * the caller cannot already see — they are a planner of this household and the
+ * different target. This is a permission answer, and it leaks nothing the
+ * caller cannot already see — they are a planner of this household and the
  * member list already tells them who has an account.
  */
 function assertPlannerMayEdit(
@@ -613,7 +624,6 @@ function assertPlannerMayEdit(
   const ownedByTheAccount = (
     [
       ['displayName', body.displayName],
-      ['personName', body.personName],
       ['inviteEmail', body.inviteEmail],
     ] as const
   )
@@ -622,8 +632,9 @@ function assertPlannerMayEdit(
 
   if (ownedByTheAccount.length > 0) {
     throw ApiException.forbidden(
-      `${ownedByTheAccount.join(' and ')} belong to that member's own account; a planner can only change their role. ` +
-        'They can edit their profile themselves at PATCH /households/{householdId}/members/me.',
+      `${ownedByTheAccount.join(' and ')} belong to that member's own account. ` +
+        'A planner can change their role and their linked person; they edit the rest ' +
+        'themselves at PATCH /households/{householdId}/members/me.',
     );
   }
 }

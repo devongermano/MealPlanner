@@ -165,7 +165,7 @@ export interface paths {
         head?: never;
         /**
          * Change another member's role, or edit a placeholder
-         * @description A placeholder member (userId null) is fully editable by a planner. A member who has an account is role-only — their profile is theirs.
+         * @description A placeholder member (userId null) is fully editable by a planner. On a member who has an account, a planner may change role and personName (planning data) but not displayName — that is theirs.
          */
         patch: operations["HouseholdsController_updateMember"];
         trace?: never;
@@ -332,10 +332,10 @@ export interface components {
         UpdateHouseholdMemberRequest: {
             /** @enum {string} */
             role?: "planner" | "cook" | "eater";
-            /** @description Placeholder members only. */
+            /** @description Placeholder members only — once a member has an account, their display name is theirs. */
             displayName?: string;
             /**
-             * @description Placeholder members only. Send null to unlink the member from the plan.
+             * @description Accepted on ANY member, placeholder or not: the library link is planning data, and the planner runs the plan. Send null to unlink the member from it.
              * @example alex
              */
             personName?: Record<string, never> | null;

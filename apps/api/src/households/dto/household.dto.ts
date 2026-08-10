@@ -147,8 +147,11 @@ export class AddHouseholdMemberRequest {
  * What is accepted depends on the target (enforced in the service, because it
  * depends on database state a DTO cannot see):
  *   - placeholder target → every field here
- *   - claimed target     → `role` only. The account owns its own profile and
- *                          edits it through `PATCH /members/me`.
+ *   - claimed target     → `role` and `personName` only. `personName` is
+ *                          co-owned because it is planning data: a wrong link
+ *                          breaks the household's week and the planner runs
+ *                          the plan. `displayName` and `inviteEmail` belong to
+ *                          the account, which edits them at `PATCH /members/me`.
  */
 export class UpdateHouseholdMemberRequest {
   @ApiPropertyOptional({ enum: HOUSEHOLD_ROLES })
@@ -161,7 +164,8 @@ export class UpdateHouseholdMemberRequest {
   @ApiPropertyOptional({
     minLength: 1,
     maxLength: 120,
-    description: 'Placeholder members only.',
+    description:
+      'Placeholder members only — once a member has an account, their display name is theirs.',
   })
   @IsOptional()
   @Transform(trim)
@@ -172,7 +176,7 @@ export class UpdateHouseholdMemberRequest {
   @ApiPropertyOptional({
     nullable: true,
     description:
-      'Placeholder members only. Send null to unlink the member from the plan.',
+      'Accepted on ANY member, placeholder or not: the library link is planning data, and the planner runs the plan. Send null to unlink the member from it.',
     example: 'alex',
   })
   @IsOptional()

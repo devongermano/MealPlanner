@@ -59,7 +59,7 @@ import {
  * | POST   /households/:id/members              | planner                     |
  * | PATCH  /households/:id/members/me           | member (eater+), self only  |
  * | DELETE /households/:id/members/me           | member (eater+), self only  |
- * | PATCH  /households/:id/members/:memberId    | planner                     |
+ * | PATCH  /households/:id/members/:memberId    | planner (see note below)    |
  * | DELETE /households/:id/members/:memberId    | planner                     |
  *
  * Every `:id` route is gated by `HouseholdMembershipGuard`, so the floor is
@@ -69,9 +69,9 @@ import {
  * the request shape an eater is allowed to submit.
  *
  * One rule the guard cannot express, because it depends on the TARGET row and
- * not on the caller: a planner owns a PLACEHOLDER member outright, but may only
- * change the role of a member who has an account. That lives in
- * `assertPlannerMayEdit` in the service.
+ * not on the caller: a planner owns a PLACEHOLDER member outright, but on a
+ * member who has an account may change only `role` and `personName` — the
+ * planning fields. That lives in `assertPlannerMayEdit` in the service.
  */
 @ApiTags('households')
 @ApiBearerAuth()
@@ -260,7 +260,7 @@ export class HouseholdsController {
   @ApiOperation({
     summary: "Change another member's role, or edit a placeholder",
     description:
-      'A placeholder member (userId null) is fully editable by a planner. A member who has an account is role-only — their profile is theirs.',
+      'A placeholder member (userId null) is fully editable by a planner. On a member who has an account, a planner may change role and personName (planning data) but not displayName — that is theirs.',
   })
   @ApiParam({ name: HOUSEHOLD_ID_PARAM, format: 'uuid' })
   @ApiParam({ name: 'memberId', format: 'uuid' })
