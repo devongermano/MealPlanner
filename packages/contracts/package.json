@@ -1,0 +1,16 @@
+{
+  "name": "@mealplan/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "GENERATED TS types mirroring the solver engine's result models (pydantic -> OpenAPI -> openapi-typescript). Never hand-edited; regenerate with `npm run gen`, drift-gated by `npm run check` in CI.",
+  "types": "src/index.ts",
+  "scripts": {
+    "gen": "sh scripts/gen.sh",
+    "check": "sh scripts/check.sh",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "openapi-typescript": "7.13.0",
+    "typescript": "5.9.3"
+  }
+}

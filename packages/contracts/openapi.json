@@ -1,0 +1,1333 @@
+{
+  "components": {
+    "schemas": {
+      "AblationEntry": {
+        "additionalProperties": false,
+        "description": "doctor structural ablation, per person: how many lean mains the week\nactually needs (None = stays feasible no matter which mains are cut).",
+        "properties": {
+          "min_lean_mains": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Lean Mains"
+          },
+          "miss": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Miss",
+            "type": "object"
+          }
+        },
+        "required": [
+          "min_lean_mains",
+          "miss"
+        ],
+        "title": "AblationEntry",
+        "type": "object"
+      },
+      "BindingMacro": {
+        "additionalProperties": false,
+        "description": "engine.binding_macro: WHICH macro binds for a person on this library.",
+        "properties": {
+          "at_tolerance": {
+            "title": "At Tolerance",
+            "type": "number"
+          },
+          "direction": {
+            "enum": [
+              "over",
+              "short"
+            ],
+            "title": "Direction",
+            "type": "string"
+          },
+          "macro": {
+            "title": "Macro",
+            "type": "string"
+          },
+          "misses": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Misses",
+            "type": "object"
+          },
+          "signed_miss_g": {
+            "title": "Signed Miss G",
+            "type": "number"
+          }
+        },
+        "required": [
+          "macro",
+          "signed_miss_g",
+          "direction",
+          "at_tolerance",
+          "misses"
+        ],
+        "title": "BindingMacro",
+        "type": "object"
+      },
+      "CarbHeadroom": {
+        "additionalProperties": false,
+        "description": "engine.carb_headroom: per-day carb availability vs target, per person.",
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "per_day": {
+            "items": {
+              "$ref": "#/components/schemas/CarbHeadroomDay"
+            },
+            "title": "Per Day",
+            "type": "array"
+          },
+          "target_g": {
+            "title": "Target G",
+            "type": "number"
+          },
+          "worst_day": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Worst Day"
+          },
+          "worst_headroom_g": {
+            "title": "Worst Headroom G",
+            "type": "number"
+          }
+        },
+        "required": [
+          "target_g",
+          "per_day",
+          "worst_day",
+          "worst_headroom_g",
+          "ok"
+        ],
+        "title": "CarbHeadroom",
+        "type": "object"
+      },
+      "CarbHeadroomDay": {
+        "additionalProperties": false,
+        "properties": {
+          "day": {
+            "title": "Day",
+            "type": "integer"
+          },
+          "headroom_g": {
+            "title": "Headroom G",
+            "type": "number"
+          }
+        },
+        "required": [
+          "day",
+          "headroom_g"
+        ],
+        "title": "CarbHeadroomDay",
+        "type": "object"
+      },
+      "CookSession": {
+        "additionalProperties": false,
+        "properties": {
+          "batches": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Batches",
+            "type": "object"
+          },
+          "demand_g": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Demand G",
+            "type": "object"
+          },
+          "freezer_notes": {
+            "items": {
+              "$ref": "#/components/schemas/FreezerServe"
+            },
+            "title": "Freezer Notes",
+            "type": "array"
+          },
+          "index": {
+            "title": "Index",
+            "type": "integer"
+          },
+          "made_g": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Made G",
+            "type": "object"
+          },
+          "minutes": {
+            "title": "Minutes",
+            "type": "integer"
+          },
+          "start": {
+            "title": "Start",
+            "type": "integer"
+          },
+          "thaw_notes": {
+            "items": {
+              "$ref": "#/components/schemas/ThawNote"
+            },
+            "title": "Thaw Notes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "index",
+          "start",
+          "demand_g",
+          "batches",
+          "made_g",
+          "minutes",
+          "thaw_notes",
+          "freezer_notes"
+        ],
+        "title": "CookSession",
+        "type": "object"
+      },
+      "CostBlock": {
+        "additionalProperties": false,
+        "description": "costing.menu_cost + attribute + budget_ceiling, composed.",
+        "properties": {
+          "ceiling": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ceiling"
+          },
+          "eaten_value": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Eaten Value",
+            "type": "object"
+          },
+          "groceries": {
+            "title": "Groceries",
+            "type": "number"
+          },
+          "shares": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Shares",
+            "type": "object"
+          }
+        },
+        "required": [
+          "groceries",
+          "ceiling",
+          "eaten_value",
+          "shares"
+        ],
+        "title": "CostBlock",
+        "type": "object"
+      },
+      "DoctorReport": {
+        "additionalProperties": false,
+        "description": "Mirror of engine.doctor's structured ``data`` (the second element of\nits (text, data) return). ``raw_freshness`` is present only when doctor\nran with ingredient data (``ing`` passed).",
+        "properties": {
+          "binding_macro": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/BindingMacro"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Binding Macro",
+            "type": "object"
+          },
+          "carb_headroom": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/CarbHeadroom"
+            },
+            "title": "Carb Headroom",
+            "type": "object"
+          },
+          "feasibility": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/FeasibilityEntry"
+            },
+            "title": "Feasibility",
+            "type": "object"
+          },
+          "lean_coverage": {
+            "$ref": "#/components/schemas/LeanCoverage"
+          },
+          "raw_freshness": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/RawFreshnessIssue"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Raw Freshness"
+          },
+          "structural": {
+            "$ref": "#/components/schemas/StructuralCheck"
+          },
+          "volume_floor": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/VolumeFloor"
+            },
+            "title": "Volume Floor",
+            "type": "object"
+          }
+        },
+        "required": [
+          "feasibility",
+          "binding_macro",
+          "volume_floor",
+          "structural",
+          "lean_coverage",
+          "carb_headroom"
+        ],
+        "title": "DoctorReport",
+        "type": "object"
+      },
+      "FeasibilityEntry": {
+        "additionalProperties": false,
+        "description": "doctor feasibility, per person.",
+        "properties": {
+          "blocked": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Blocked",
+            "type": "array"
+          },
+          "clears_at_tolerance": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clears At Tolerance"
+          },
+          "eligible": {
+            "title": "Eligible",
+            "type": "integer"
+          },
+          "miss": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Miss",
+            "type": "object"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ok",
+          "miss",
+          "eligible",
+          "total",
+          "blocked",
+          "clears_at_tolerance"
+        ],
+        "title": "FeasibilityEntry",
+        "type": "object"
+      },
+      "FreezerServe": {
+        "additionalProperties": false,
+        "description": "Demand fed from the freezer bridge — thaw ahead (M0.5).",
+        "properties": {
+          "component": {
+            "title": "Component",
+            "type": "string"
+          },
+          "day": {
+            "title": "Day",
+            "type": "integer"
+          },
+          "grams": {
+            "title": "Grams",
+            "type": "number"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "session": {
+            "title": "Session",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "component",
+          "day",
+          "grams",
+          "session",
+          "note"
+        ],
+        "title": "FreezerServe",
+        "type": "object"
+      },
+      "Healthz": {
+        "additionalProperties": false,
+        "properties": {
+          "api_version": {
+            "title": "Api Version",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "api_version"
+        ],
+        "title": "Healthz",
+        "type": "object"
+      },
+      "LeanCoverage": {
+        "additionalProperties": false,
+        "description": "engine.lean_coverage: the REAL shelf-life stagger check.",
+        "properties": {
+          "lean_anchors": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Lean Anchors",
+            "type": "array"
+          },
+          "per_day": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "title": "Per Day",
+            "type": "object"
+          },
+          "uncovered_days": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Uncovered Days",
+            "type": "array"
+          }
+        },
+        "required": [
+          "lean_anchors",
+          "per_day",
+          "uncovered_days"
+        ],
+        "title": "LeanCoverage",
+        "type": "object"
+      },
+      "LeftoverServe": {
+        "additionalProperties": false,
+        "description": "Demand fed from cooked pantry leftovers — already paid for (M1.8).",
+        "properties": {
+          "component": {
+            "title": "Component",
+            "type": "string"
+          },
+          "day": {
+            "title": "Day",
+            "type": "integer"
+          },
+          "grams": {
+            "title": "Grams",
+            "type": "number"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          }
+        },
+        "required": [
+          "component",
+          "day",
+          "grams",
+          "note"
+        ],
+        "title": "LeftoverServe",
+        "type": "object"
+      },
+      "LibraryIdentity": {
+        "additionalProperties": false,
+        "description": "Which library produced this plan: a canonical-JSON sha256 over the\nthree inline documents plus human-oriented counts. Reproducibility is\nseed + library identity (PRD §8.3 determinism).",
+        "properties": {
+          "digest_sha256": {
+            "title": "Digest Sha256",
+            "type": "string"
+          },
+          "n_components": {
+            "title": "N Components",
+            "type": "integer"
+          },
+          "n_ingredients": {
+            "title": "N Ingredients",
+            "type": "integer"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "people": {
+            "items": {
+              "type": "string"
+            },
+            "title": "People",
+            "type": "array"
+          }
+        },
+        "required": [
+          "digest_sha256",
+          "n_ingredients",
+          "n_components",
+          "people"
+        ],
+        "title": "LibraryIdentity",
+        "type": "object"
+      },
+      "MenuInfo": {
+        "additionalProperties": false,
+        "description": "Mirror of score_menu's info dict (returned through choose_menu).",
+        "properties": {
+          "active_min": {
+            "title": "Active Min",
+            "type": "number"
+          },
+          "cuisines": {
+            "title": "Cuisines",
+            "type": "integer"
+          },
+          "roles": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Roles",
+            "type": "object"
+          },
+          "waste_perishable": {
+            "title": "Waste Perishable",
+            "type": "number"
+          }
+        },
+        "required": [
+          "waste_perishable",
+          "active_min",
+          "cuisines",
+          "roles"
+        ],
+        "title": "MenuInfo",
+        "type": "object"
+      },
+      "PlateResult": {
+        "additionalProperties": false,
+        "description": "Mirror of engine.PlateResult — (ok, {id: grams}, {macro: signed_miss})\nplus ``.warnings``. Misses are signed: positive = forced OVER target,\nnegative = cannot REACH target (M1.0).",
+        "properties": {
+          "misses": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Misses",
+            "type": "object"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "portions": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Portions",
+            "type": "object"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/StructuredWarning"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "ok",
+          "portions",
+          "misses"
+        ],
+        "title": "PlateResult",
+        "type": "object"
+      },
+      "RawBlocker": {
+        "additionalProperties": false,
+        "description": "One perishable, non-freezable ingredient past raw keeps_days at cook\ntime (costing.raw_freshness blocker entry).",
+        "properties": {
+          "ingredient": {
+            "title": "Ingredient",
+            "type": "string"
+          },
+          "keeps_days": {
+            "title": "Keeps Days",
+            "type": "integer"
+          },
+          "shop_day": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shop Day"
+          }
+        },
+        "required": [
+          "ingredient",
+          "shop_day",
+          "keeps_days"
+        ],
+        "title": "RawBlocker",
+        "type": "object"
+      },
+      "RawFreshnessIssue": {
+        "additionalProperties": false,
+        "description": "doctor: (component, session) pair the raw-freshness rule blocks.",
+        "properties": {
+          "blockers": {
+            "items": {
+              "$ref": "#/components/schemas/RawBlocker"
+            },
+            "title": "Blockers",
+            "type": "array"
+          },
+          "component": {
+            "title": "Component",
+            "type": "string"
+          },
+          "day": {
+            "title": "Day",
+            "type": "integer"
+          },
+          "session": {
+            "title": "Session",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "component",
+          "session",
+          "day",
+          "blockers"
+        ],
+        "title": "RawFreshnessIssue",
+        "type": "object"
+      },
+      "SessionPlan": {
+        "additionalProperties": false,
+        "description": "Mirror of costing.session_plan's return dict.",
+        "properties": {
+          "batches": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Batches",
+            "type": "object"
+          },
+          "freezer": {
+            "items": {
+              "$ref": "#/components/schemas/FreezerServe"
+            },
+            "title": "Freezer",
+            "type": "array"
+          },
+          "leftover": {
+            "items": {
+              "$ref": "#/components/schemas/LeftoverServe"
+            },
+            "title": "Leftover",
+            "type": "array"
+          },
+          "minutes": {
+            "title": "Minutes",
+            "type": "integer"
+          },
+          "sessions": {
+            "items": {
+              "$ref": "#/components/schemas/CookSession"
+            },
+            "title": "Sessions",
+            "type": "array"
+          },
+          "unattributed": {
+            "items": {
+              "$ref": "#/components/schemas/UnattributedDemand"
+            },
+            "title": "Unattributed",
+            "type": "array"
+          }
+        },
+        "required": [
+          "sessions",
+          "batches",
+          "minutes",
+          "unattributed",
+          "freezer",
+          "leftover"
+        ],
+        "title": "SessionPlan",
+        "type": "object"
+      },
+      "ShoppingRow": {
+        "additionalProperties": false,
+        "description": "Mirror of one costing.purchase row — engine-side it is the 7-tuple\n``(name, need_g, units, pack_g, leftover_g, perishable, keeps_days)``;\nthe positional mapping lives here and nowhere else.",
+        "properties": {
+          "ingredient": {
+            "title": "Ingredient",
+            "type": "string"
+          },
+          "keeps_days": {
+            "title": "Keeps Days",
+            "type": "integer"
+          },
+          "leftover_g": {
+            "title": "Leftover G",
+            "type": "integer"
+          },
+          "need_g": {
+            "title": "Need G",
+            "type": "integer"
+          },
+          "pack_g": {
+            "title": "Pack G",
+            "type": "number"
+          },
+          "perishable": {
+            "title": "Perishable",
+            "type": "boolean"
+          },
+          "units": {
+            "title": "Units",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ingredient",
+          "need_g",
+          "units",
+          "pack_g",
+          "leftover_g",
+          "perishable",
+          "keeps_days"
+        ],
+        "title": "ShoppingRow",
+        "type": "object"
+      },
+      "SolveOptions": {
+        "additionalProperties": false,
+        "description": "Options mirroring the CLI's knobs (subset — the spike's scope).",
+        "properties": {
+          "menu": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Menu"
+          },
+          "must": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Must",
+            "type": "array"
+          },
+          "n": {
+            "default": 12,
+            "title": "N",
+            "type": "integer"
+          },
+          "seed": {
+            "default": 0,
+            "title": "Seed",
+            "type": "integer"
+          }
+        },
+        "title": "SolveOptions",
+        "type": "object"
+      },
+      "SolveRequest": {
+        "additionalProperties": false,
+        "description": "Inline library documents (the YAML interchange documents, as JSON) +\noptions. Validation happens through the engine's own io_yaml validators —\nthe service adds none of its own rules.",
+        "properties": {
+          "components": {
+            "additionalProperties": true,
+            "title": "Components",
+            "type": "object"
+          },
+          "ingredients": {
+            "additionalProperties": true,
+            "title": "Ingredients",
+            "type": "object"
+          },
+          "library_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Library Name"
+          },
+          "options": {
+            "$ref": "#/components/schemas/SolveOptions"
+          },
+          "people": {
+            "additionalProperties": true,
+            "title": "People",
+            "type": "object"
+          }
+        },
+        "required": [
+          "ingredients",
+          "components",
+          "people"
+        ],
+        "title": "SolveRequest",
+        "type": "object"
+      },
+      "StructuralCheck": {
+        "additionalProperties": false,
+        "properties": {
+          "ablation": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/AblationEntry"
+            },
+            "title": "Ablation",
+            "type": "object"
+          },
+          "dense_carriers": {
+            "title": "Dense Carriers",
+            "type": "integer"
+          },
+          "lean_anchors": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Lean Anchors",
+            "type": "array"
+          }
+        },
+        "required": [
+          "lean_anchors",
+          "ablation",
+          "dense_carriers"
+        ],
+        "title": "StructuralCheck",
+        "type": "object"
+      },
+      "StructuredWarning": {
+        "additionalProperties": true,
+        "description": "One structured engine warning. ``code`` + ``message`` are universal;\nevery other key is code-specific payload (pin_adjusted carries bounds,\nstock_expiring_unused carries grams/ages, …) — mirrored open, on purpose.",
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "StructuredWarning",
+        "type": "object"
+      },
+      "ThawNote": {
+        "additionalProperties": false,
+        "description": "Frozen-on-arrival ingredient to thaw before a session (M0.6).",
+        "properties": {
+          "component": {
+            "title": "Component",
+            "type": "string"
+          },
+          "ingredient": {
+            "title": "Ingredient",
+            "type": "string"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "session": {
+            "title": "Session",
+            "type": "integer"
+          },
+          "shop_day": {
+            "title": "Shop Day",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "component",
+          "ingredient",
+          "shop_day",
+          "session",
+          "note"
+        ],
+        "title": "ThawNote",
+        "type": "object"
+      },
+      "UnattributedDemand": {
+        "additionalProperties": false,
+        "description": "Demand no cook session can feed — reported, never invented.",
+        "properties": {
+          "component": {
+            "title": "Component",
+            "type": "string"
+          },
+          "day": {
+            "title": "Day",
+            "type": "integer"
+          },
+          "grams": {
+            "title": "Grams",
+            "type": "number"
+          }
+        },
+        "required": [
+          "component",
+          "day",
+          "grams"
+        ],
+        "title": "UnattributedDemand",
+        "type": "object"
+      },
+      "ValidationErrorResponse": {
+        "additionalProperties": false,
+        "description": "422 body: EVERY issue found (io_yaml.ValidationError), never the first.",
+        "properties": {
+          "detail": {
+            "default": "library failed validation",
+            "title": "Detail",
+            "type": "string"
+          },
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationIssue"
+            },
+            "title": "Issues",
+            "type": "array"
+          }
+        },
+        "required": [
+          "issues"
+        ],
+        "title": "ValidationErrorResponse",
+        "type": "object"
+      },
+      "ValidationIssue": {
+        "additionalProperties": false,
+        "description": "Mirror of io_yaml.ValidationIssue: one problem, precisely located.",
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "severity": {
+            "default": "error",
+            "enum": [
+              "error",
+              "warning"
+            ],
+            "title": "Severity",
+            "type": "string"
+          },
+          "where": {
+            "title": "Where",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "where",
+          "message"
+        ],
+        "title": "ValidationIssue",
+        "type": "object"
+      },
+      "VolumeBlock": {
+        "additionalProperties": false,
+        "description": "Per-person daily food mass over the week's non-empty days.",
+        "properties": {
+          "avg_g": {
+            "title": "Avg G",
+            "type": "number"
+          },
+          "cap_g": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cap G"
+          },
+          "max_g": {
+            "title": "Max G",
+            "type": "number"
+          },
+          "min_g": {
+            "title": "Min G",
+            "type": "number"
+          }
+        },
+        "required": [
+          "avg_g",
+          "min_g",
+          "max_g",
+          "cap_g"
+        ],
+        "title": "VolumeBlock",
+        "type": "object"
+      },
+      "VolumeFloor": {
+        "additionalProperties": false,
+        "description": "engine.volume_floor: minimum daily food mass the targets require.",
+        "properties": {
+          "binding": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VolumeFloorBinding"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "floor_g": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Floor G"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "searched": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Searched",
+            "type": "array"
+          }
+        },
+        "required": [
+          "floor_g",
+          "binding",
+          "searched",
+          "note"
+        ],
+        "title": "VolumeFloor",
+        "type": "object"
+      },
+      "VolumeFloorBinding": {
+        "additionalProperties": false,
+        "properties": {
+          "direction": {
+            "enum": [
+              "over",
+              "short"
+            ],
+            "title": "Direction",
+            "type": "string"
+          },
+          "macro": {
+            "title": "Macro",
+            "type": "string"
+          },
+          "signed_miss_g": {
+            "title": "Signed Miss G",
+            "type": "number"
+          }
+        },
+        "required": [
+          "macro",
+          "signed_miss_g",
+          "direction"
+        ],
+        "title": "VolumeFloorBinding",
+        "type": "object"
+      },
+      "WeekPlanResult": {
+        "additionalProperties": false,
+        "description": "The /solve response: the full pipeline's outputs, verbatim (P10 — the\nengine is the sole producer; this model only names what it returned).",
+        "properties": {
+          "api_version": {
+            "const": "mealplan/v2",
+            "default": "mealplan/v2",
+            "title": "Api Version",
+            "type": "string"
+          },
+          "broke": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "number"
+              },
+              "type": "object"
+            },
+            "title": "Broke",
+            "type": "object"
+          },
+          "cost": {
+            "$ref": "#/components/schemas/CostBlock"
+          },
+          "demand": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Demand",
+            "type": "object"
+          },
+          "feasible": {
+            "title": "Feasible",
+            "type": "boolean"
+          },
+          "library": {
+            "$ref": "#/components/schemas/LibraryIdentity"
+          },
+          "menu": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Menu",
+            "type": "array"
+          },
+          "menu_info": {
+            "$ref": "#/components/schemas/MenuInfo"
+          },
+          "relax_tiers": {
+            "additionalProperties": {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            "title": "Relax Tiers",
+            "type": "object"
+          },
+          "seed": {
+            "title": "Seed",
+            "type": "integer"
+          },
+          "session_plan": {
+            "$ref": "#/components/schemas/SessionPlan"
+          },
+          "shopping": {
+            "items": {
+              "$ref": "#/components/schemas/ShoppingRow"
+            },
+            "title": "Shopping",
+            "type": "array"
+          },
+          "volume": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/VolumeBlock"
+            },
+            "title": "Volume",
+            "type": "object"
+          },
+          "waste_perishable_g": {
+            "title": "Waste Perishable G",
+            "type": "number"
+          },
+          "waste_total_g": {
+            "title": "Waste Total G",
+            "type": "number"
+          },
+          "weeks": {
+            "additionalProperties": {
+              "items": {
+                "additionalProperties": {
+                  "type": "integer"
+                },
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "title": "Weeks",
+            "type": "object"
+          }
+        },
+        "required": [
+          "seed",
+          "library",
+          "menu",
+          "feasible",
+          "broke",
+          "menu_info",
+          "weeks",
+          "demand",
+          "relax_tiers",
+          "session_plan",
+          "shopping",
+          "waste_perishable_g",
+          "waste_total_g",
+          "cost",
+          "volume"
+        ],
+        "title": "WeekPlanResult",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "SPIKE of the M2 solver service — contract-codegen source of truth only. Stateless, dumb, no auth (see module docstring). Engine result objects in/out, verbatim (P10).",
+    "title": "mealplan solver service",
+    "version": "0.1.0-spike"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/healthz": {
+      "get": {
+        "operationId": "healthz_healthz_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Healthz"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Healthz"
+      }
+    },
+    "/solve": {
+      "post": {
+        "description": "Validated library in → WeekPlanResult out. Thin orchestration of the\nexact pipeline the CLI runs: load → choose_menu (or explicit menu) →\nbuild_week → session_plan → purchase/cost. No solver logic lives here.",
+        "operationId": "solve_solve_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SolveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WeekPlanResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        },
+        "summary": "Solve"
+      }
+    }
+  }
+}
