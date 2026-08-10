@@ -91,6 +91,45 @@ def run_examples(timings):
     return engine.solve_counts()
 
 
+def run_examples_dishes(timings):
+    """M1.13: the DISH-MODE demo pipeline — examples/ carries dishes.yaml,
+    so this is what `mealplan week` actually runs on the founder corpus
+    now. New stages (M113_SPEC §12): `dish-skeleton` (zero-LP assignment,
+    timed standalone across the week) and the `plate-dish` CBC stage
+    inside build_week_dishes. The heritage `Examples corpus` section above
+    it is kept for the engine-path comparison."""
+    from mealplan import dishes as dishes_mod
+    from mealplan.model import resolve_meal_slots
+    engine.reset_solve_counts()
+    with contextlib.redirect_stderr(io.StringIO()):   # lint warnings
+        with span(timings, "load"):
+            ing, comps, people, settings = io_yaml.load(EXAMPLES)
+            dmap = io_yaml.load_dishes(EXAMPLES / "dishes.yaml",
+                                       comps=comps, people=people)
+    with span(timings, "choose_menu (dishes)"):
+        menu, info, feas, broke = dishes_mod.choose_menu_dishes(
+            comps, ing, people, settings, dmap, n=8, seed=0)
+    # the skeleton alone, separated (zero-LP, RNG-free — pure-Python
+    # regressions must stay visible apart from the CBC work)
+    with span(timings, "dish-skeleton"):
+        for pname, p in people.items():
+            slots = resolve_meal_slots(p)
+            for d in range(settings["days"]):
+                dishes_mod.skeleton_day(p, dmap, comps, settings, d,
+                                        slots, menu, ing=ing)
+    with span(timings, "build_week (plate-dish)"):
+        weeks, demand, mealdays = dishes_mod.build_week_dishes(
+            comps, people, settings, dmap, menu, seed=0, ing=ing)
+    with span(timings, "session_plan"):
+        sp = costing.session_plan(comps, ing, settings, weeks)
+    with span(timings, "purchase"):
+        costing.purchase(comps, ing,
+                         [i for i in info["closure"]
+                          if sp["batches"].get(i)],
+                         sp["batches"])
+    return engine.solve_counts()
+
+
 def run_solo(timings):
     """The frozen golden pipeline (test_capabilities.golden_payload)."""
     engine.reset_solve_counts()
@@ -240,6 +279,9 @@ def main():
     solo_counts, solo_t = measure(run_solo, a.runs)
     print(f"measuring examples week pipeline x{a.runs} ...", file=sys.stderr)
     ex_counts, ex_t = measure(run_examples, a.runs)
+    print(f"measuring examples DISH-MODE pipeline x{a.runs} ...",
+          file=sys.stderr)
+    exd_counts, exd_t = measure(run_examples_dishes, a.runs)
     print(f"measuring interactive plate/replate x{a.runs} ...",
           file=sys.stderr)
     int_counts, int_t = measure(run_interactive, a.runs)
@@ -271,6 +313,14 @@ def main():
                 "load -> doctor -> choose_menu(n=12, seed=0; CLI defaults) "
                 "-> build_week -> session_plan -> purchase on examples/.",
                 ex_counts, ex_t, a.runs)
+    L += render("Examples corpus — DISH MODE (`mealplan week`, M1.13)",
+                "load(+dishes.yaml) -> choose_menu_dishes(n=8, seed=0) -> "
+                "dish-skeleton (zero-LP, timed standalone) -> "
+                "build_week_dishes (stage `plate-dish`: one dish-blocked "
+                "LP + snap re-solve per person-day) -> session_plan -> "
+                "purchase on the component closure. PROVISIONAL labels "
+                "(P9) — never test-asserted.",
+                exd_counts, exd_t, a.runs)
     L += render("Interactive primitives — tests/fixtures/solo_lifter",
                 "One plate LP and one replate (day rebalance, §4.4) on the "
                 "golden menu — the solves an interactive surface waits on "

@@ -15,6 +15,13 @@ which it is, in plain words, before you read a single number.
 **Every gram in here is provisional.** They are reconstructions, not measurements. The
 point of this document is for you to fix them.
 
+**Where your corrections land (M1.13).** The planner reads
+`examples/dishes.yaml` — a live copy of this draft. Edit THAT file (approve /
+edit / reject here first if you like, then mirror the change) and re-run
+`mealplan week`; the plan re-solves immediately. `data/dishes-draft/` stays
+the annotated working copy. Deleting `examples/dishes.yaml` turns the whole
+dish layer off and the planner reverts to the old component-pool behavior.
+
 **How to work through it.** One dish per section. Read the one-line description, look at
 the amounts, then tick one box:
 

@@ -30,6 +30,11 @@ SLOW_MODULES = {
     "test_score_scale",         # frontier points run choose_menu
     "test_plate_bounds_replate",  # 20-seed property over plate solves
     "test_contracts_roundtrip",  # full pipeline + doctor vs pydantic mirrors
+    "test_dishes_e2e",          # M1.13 dish-blocked LPs: examples week,
+                                # lock/verify round trip, band-conflict /
+                                # big-eater / replate person-day solves
+                                # (the dish layer's combinatorial logic is
+                                # FAST-tier in test_dishes.py, zero CBC)
 }
 
 

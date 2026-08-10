@@ -98,7 +98,12 @@ def test_examples_methods_cook_script_all_artifacts_byte_stable(tmp_path,
     assert "— portioned" in jimbo
     assert "- packed container: " in jimbo
     devon = a["eat_devon.md"].decode()
-    assert "### breakfast — family style" in devon
+    # M1.13: examples is a DISH library — the meal heading SAYS the dish
+    # ("breakfast — <dish name> — family style") and the servings scalar
+    # is rendered; family-style take-amount voice survives underneath
+    assert "### breakfast — " in devon
+    assert "— family style" in devon
+    assert "portioned within its ratio bands" in devon
     assert "— take " in devon
 
     # one renderer, two outputs: the plan.md report carries the SAME

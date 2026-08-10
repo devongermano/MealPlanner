@@ -48,6 +48,7 @@ from pathlib import Path
 import yaml
 
 from . import artifacts, instrument, io_yaml, lockplan, meals
+from . import dishes as dishes_mod
 from . import methods as methods_mod
 from .costing import (age_pantry, attribute, budget_ceiling, cooked_leftovers,
                       menu_cost, purchase, session_plan)
@@ -99,7 +100,7 @@ class _Parser(argparse.ArgumentParser):
 # --------------------------------------------------------------------------- #
 def render(comps, ing, people, settings, menu, weeks, demand, docmsg, menuinfo,
            sp, pantry=None, diag=None, meals=None, methods=None,
-           techniques=None):
+           techniques=None, dish_menu=None, dishes=None):
     """``sp`` is the canonical session plan (costing.session_plan, M0.4/P10):
     the ONE source for the cook plan, minutes, purchasing, and cost below.
     ``pantry`` (M0.12, optional): stock is deducted from the shopping list —
@@ -113,7 +114,27 @@ def render(comps, ing, people, settings, menu, weeks, demand, docmsg, menuinfo,
     divergence), including shared-prep consolidation and the portioning
     matrix when meal structure exists."""
     relax = (diag or {}).get("relax_tiers", {})
-    L = ["# Week plan\n", docmsg, "\n## Menu\n"]
+    L = ["# Week plan\n", docmsg]
+    # M1.13: in dish mode the menu IS dishes — say so first (the sheet
+    # finally SAYS the dish); the component closure follows as the batch
+    # view. Heritage renders byte-identically (dish_menu None).
+    if dish_menu and dishes:
+        from .dishes import core_members, dish_cuisine
+        L.append("\n## Dishes\n")
+        for j in dish_menu:
+            d = dishes[j]
+            rec = d.get("reconstruction") or "?"
+            L.append(
+                f"- **{d.get('name') or j}** (`{j}`) — "
+                f"{dish_cuisine(d, comps) or '?'}, {rec} — "
+                + " + ".join(core_members(d))
+                + (f" — accents: {', '.join(d['accents'])}"
+                   if d["accents"] else "")
+                + (f" — sides: {', '.join(d['compatible_sides'])}"
+                   if d["compatible_sides"] else ""))
+        L.append("\n## Components (batch closure)\n")
+    else:
+        L.append("\n## Menu\n")
     for i in menu:
         c = comps[i]
         pc = c["per100"]
@@ -380,9 +401,11 @@ def _load_methods(methods_arg, comps):
 
 
 def _apply_overrides(comps, people, settings, budget, mass, exclude, force,
-                     bad_args_exit=EXIT_USAGE):
+                     bad_args_exit=EXIT_USAGE, extra_ids=()):
     """Budget/mass/exclude/force overrides, exactly the historical order.
-    Returns the validated forced-component list."""
+    Returns the validated forced-component list. ``extra_ids`` (M1.13):
+    additional valid --force ids — dish ids in dish mode (a forced
+    component id maps through dish membership downstream, §3)."""
     if budget:
         settings["budget"] = parse_budget(budget)
     if mass:
@@ -395,13 +418,43 @@ def _apply_overrides(comps, people, settings, budget, mass, exclude, force,
     # ``must`` list; unknown ids (or ids just removed by --exclude) are a
     # CLI error naming them.
     forced = [x.strip() for x in (force or "").split(",") if x.strip()]
-    unknown_forced = [x for x in forced if x not in comps]
+    unknown_forced = [x for x in forced
+                      if x not in comps and x not in extra_ids]
     if unknown_forced:
         raise CliError(
             "unknown_component",
             f"unknown components in --force: {', '.join(unknown_forced)}",
             bad_args_exit)
     return forced
+
+
+def _load_dish_layer(dishes_arg, implicit, lib, comps, people,
+                     bad_args_exit=EXIT_USAGE):
+    """M1.13: resolve + load the dish layer. The MODE KEY is the presence
+    of dishes.yaml (M113_SPEC §1): explicit ``--dishes PATH`` must exist
+    (bad arguments); the default ``<library>/dishes.yaml`` applies only
+    when present. Returns ``{dish_id: Dish}`` or None (heritage mode —
+    the entire layer dormant, pipeline byte-identical)."""
+    path = Path(dishes_arg) if dishes_arg else lib / "dishes.yaml"
+    if dishes_arg and not path.exists():
+        raise CliError("missing_dishes_file",
+                       f"--dishes {dishes_arg}: file not found",
+                       bad_args_exit)
+    dishes_map = None
+    if path.exists():
+        try:
+            dishes_map = io_yaml.load_dishes(path, comps=comps,
+                                             people=people)
+        except io_yaml.ValidationError as e:
+            raise CliError("invalid_dishes", str(e), EXIT_ERROR,
+                           issues=_issue_dicts(e.issues))
+    if implicit:
+        extra, warns = dishes_mod.implicit_dishes(comps,
+                                                  existing=dishes_map)
+        for w in warns:
+            print(f"[warning:{w['code']}] {w['message']}", file=sys.stderr)
+        dishes_map = {**(dishes_map or {}), **extra}
+    return dishes_map or None
 
 
 def _check_menu_size(n, comps, exit_code=EXIT_USAGE):
@@ -447,6 +500,58 @@ def _resolve_menu(comps, ing, people, settings, menu_arg, n, seed, force,
     return menu, menuinfo, feas, broke
 
 
+def _resolve_menu_dishes(comps, ing, people, settings, dishes_map, menu_arg,
+                         n, seed, force, timer, bad_args_exit=EXIT_USAGE):
+    """Dish-mode menu resolution (M1.13, M113_SPEC §3): explicit --menu
+    names DISHES; the seeded search is choose_menu_dishes. Returns
+    ``(dish_menu, menuinfo, feas, broke)`` — ``menuinfo['closure']`` is
+    the derived component closure everything downstream runs on."""
+    if menu_arg:
+        menu = [x.strip() for x in menu_arg.split(",")]
+        unknown = [x for x in menu if x not in dishes_map]
+        if unknown:
+            raise CliError(
+                "unknown_dish",
+                f"unknown dishes: {unknown} — in dish mode --menu names "
+                f"dish ids from dishes.yaml", bad_args_exit)
+        _, menuinfo = dishes_mod.score_menu_dishes(comps, ing, dishes_map,
+                                                   menu, settings, people)
+        return menu, menuinfo, None, {}
+    # n means DISHES here; choose_menu_dishes clamps n to the corpus size
+    # (a small dish library must not brick the default --n)
+    with timer.span("choose_menu"):
+        menu, menuinfo, feas, broke = dishes_mod.choose_menu_dishes(
+            comps, ing, people, settings, dishes_map, n=n, seed=seed,
+            must=force)
+    if not feas:
+        print("!! best dish menu found is not feasible for everyone:",
+              file=sys.stderr)
+        for who, miss in broke.items():
+            print(f"   {who}: {fmt_miss(miss)}", file=sys.stderr)
+        print("   -> run `mealplan doctor` — the dish section names the "
+              "gap (eligibility kill, dead dish, slot capacity); widen a "
+              "band someone would actually eat, author a heartier "
+              "compatible side, or raise --n. loosening tolerance is the "
+              "LAST resort.\n", file=sys.stderr)
+    return menu, menuinfo, feas, broke
+
+
+def _assemble_dishes(comps, people, settings, dishes_map, menu, seed, ing,
+                     leftovers, timer):
+    """Dish-mode assembly (M113_SPEC §1 steps 2–4): skeleton + one
+    dish-blocked LP per person-day; MealDay emitted directly from the
+    solve — no dealer pass. Session plan runs on the derived component
+    demand unchanged (downstream blindness)."""
+    diag = {}
+    with timer.span("build_week"):
+        weeks, demand, mealdays = dishes_mod.build_week_dishes(
+            comps, people, settings, dishes_map, menu, seed=seed, ing=ing,
+            diag=diag, leftovers=leftovers)
+    with timer.span("session_plan"):
+        sp = session_plan(comps, ing, settings, weeks, leftovers=leftovers)
+    return weeks, demand, sp, diag, mealdays
+
+
 def _assemble(comps, people, settings, menu, seed, ing, leftovers, timer):
     diag = {}      # P8: relaxation-ladder tiers surface in the rendered plan
     with timer.span("build_week"):
@@ -489,17 +594,43 @@ def _solve_from_snapshot(snap, timer):
     plan_date = datetime.date.fromisoformat(snap["plan_date"])
     seed = snap["seed"]
     ov = snap.get("overrides") or {}
+    # M1.13: a snapshot carrying a dishes document re-solves in dish mode —
+    # the snapshot IS the mode key, exactly like the library directory
+    dishes_map = None
+    if lib_docs.get("dishes") is not None:
+        issues = io_yaml.validate_dishes_doc(lib_docs["dishes"],
+                                             comps=comps, people=people)
+        if [i for i in issues if i.severity == "error"]:
+            raise CliError("invalid_snapshot",
+                           "snapshot dishes document does not validate",
+                           EXIT_ERROR, issues=_issue_dicts(issues))
+        from .model import Dish
+        dishes_map = {d["id"]: Dish.from_raw(d)
+                      for d in lib_docs["dishes"]["dishes"]}
+    if ov.get("implicit_dishes"):
+        extra, _warns = dishes_mod.implicit_dishes(comps,
+                                                   existing=dishes_map)
+        dishes_map = {**(dishes_map or {}), **extra}
     pantry, leftovers, _ = _pantry_effects(pantry, ing, comps, settings,
                                            plan_date)
     force = _apply_overrides(comps, people, settings, ov.get("budget"),
                              ov.get("mass"), ov.get("exclude"),
-                             ov.get("force"), bad_args_exit=EXIT_ERROR)
-    menu, menuinfo, feas, broke = _resolve_menu(
-        comps, ing, people, settings, ov.get("menu"), ov.get("n"), seed,
-        force, timer, bad_args_exit=EXIT_ERROR)
-    weeks, demand, sp, diag, mealdays = _assemble(comps, people, settings,
-                                                  menu, seed, ing, leftovers,
-                                                  timer)
+                             ov.get("force"), bad_args_exit=EXIT_ERROR,
+                             extra_ids=set(dishes_map or ()))
+    if dishes_map:
+        menu, menuinfo, feas, broke = _resolve_menu_dishes(
+            comps, ing, people, settings, dishes_map, ov.get("menu"),
+            ov.get("n"), seed, force, timer, bad_args_exit=EXIT_ERROR)
+        weeks, demand, sp, diag, mealdays = _assemble_dishes(
+            comps, people, settings, dishes_map, menu, seed, ing,
+            leftovers, timer)
+    else:
+        menu, menuinfo, feas, broke = _resolve_menu(
+            comps, ing, people, settings, ov.get("menu"), ov.get("n"),
+            seed, force, timer, bad_args_exit=EXIT_ERROR)
+        weeks, demand, sp, diag, mealdays = _assemble(comps, people,
+                                                      settings, menu, seed,
+                                                      ing, leftovers, timer)
     return dict(menu=menu, menuinfo=menuinfo, feasible=feas, misses=broke,
                 weeks=weeks, demand=demand, sp=sp, diag=diag,
                 meals=mealdays)
@@ -528,6 +659,21 @@ def main(argv=None):
                          "no wall clock (M1.8). REQUIRED for lock: the "
                          "artifact key is the primary trip date (PRD §8.2) "
                          "= this date advanced by sorted(shop_days)[0] days")
+    ap.add_argument("--dishes", default=None, metavar="PATH",
+                    help="dishes.yaml for THE DISH LAYER (M1.13, PRD §4.0): "
+                         "meals become one dish portioned within its ratio "
+                         "bands plus compatible sides; menu selection picks "
+                         "dishes. Default: <library>/dishes.yaml when it "
+                         "exists — the file's PRESENCE is the mode key; "
+                         "without one the entire layer is dormant and the "
+                         "pipeline is byte-identical heritage")
+    ap.add_argument("--implicit-dishes", action="store_true",
+                    help="synthesize one dish per legacy main not covered "
+                         "by dishes.yaml (M113_SPEC §9 migration shim): "
+                         "main + pairs_with accents, all starch/veg as "
+                         "compatible sides, bands from serve_g "
+                         "min/midpoint/max — every synthesized dish is "
+                         "flagged implicit_dish")
     ap.add_argument("--diagnose", action="store_true",
                     help="also run the full doctor diagnostics before "
                          "week/menu/shop/all and include the report (§8.3: "
@@ -653,15 +799,28 @@ def _run(a, timer):
             "no wall clock", EXIT_USAGE)
     pantry, leftovers, stock_warns = _pantry_effects(pantry, ing, comps,
                                                      settings, plan_date)
+    # M1.13: dish mode is keyed on the PRESENCE of dishes.yaml — loaded
+    # against the full corpus, BEFORE --exclude trims components (a dish
+    # whose core member is excluded dies later with the killer named).
+    dishes_map = _load_dish_layer(a.dishes, a.implicit_dishes, lib, comps,
+                                  people)
     force = _apply_overrides(comps, people, settings, a.budget, a.mass,
-                             a.exclude, a.force)
+                             a.exclude, a.force,
+                             extra_ids=set(dishes_map or ()))
     if a.cmd == "frontier":
+        if dishes_map:
+            # dish-mode budget frontier is a future task — never silently
+            # pretend the sweep understood dishes
+            print("[note] frontier sweeps the COMPONENT library; the dish "
+                  "layer is ignored for this command (dish-mode frontier "
+                  "is not built yet)", file=sys.stderr)
         lo, hi, st = (int(x) for x in a.range.split(":"))
         _check_menu_size(a.n, comps)
         rows = [] if a.json else None
         with timer.span("frontier"):
             frontier(comps, ing, people, settings, lo, hi, st, a.n,
-                     seed=a.seed, must=force, echo=not a.json, rows=rows)
+                     seed=a.seed, must=[x for x in force if x in comps],
+                     echo=not a.json, rows=rows)
         if a.json:
             _emit_json("frontier", True, result={"range": [lo, hi, st],
                                                  "points": rows})
@@ -673,7 +832,8 @@ def _run(a, timer):
     if a.cmd == "doctor" or a.diagnose:
         from .engine import doctor as _doctor
         with timer.span("doctor"):
-            docmsg, docdata = _doctor(comps, people, settings, ing=ing)
+            docmsg, docdata = _doctor(comps, people, settings, ing=ing,
+                                      dishes=dishes_map)
 
     if a.cmd == "doctor":
         if a.json:
@@ -683,29 +843,53 @@ def _run(a, timer):
             print(docmsg)
         return
 
-    menu, menuinfo, feas, broke = _resolve_menu(
-        comps, ing, people, settings, a.menu, a.n, a.seed, force, timer)
+    if dishes_map:
+        menu, menuinfo, feas, broke = _resolve_menu_dishes(
+            comps, ing, people, settings, dishes_map, a.menu, a.n, a.seed,
+            force, timer)
+        comp_menu = menuinfo["closure"]
+    else:
+        menu, menuinfo, feas, broke = _resolve_menu(
+            comps, ing, people, settings, a.menu, a.n, a.seed, force, timer)
+        comp_menu = menu
 
     if a.cmd == "menu":
         if a.json:
-            _emit_json("menu", feas is not False,
-                       result={"menu": menu, "menu_info": menuinfo,
-                               "feasible": feas, "misses": broke})
+            result = {"menu": menu, "menu_info": menuinfo,
+                      "feasible": feas, "misses": broke}
+            if dishes_map:
+                result["dish_mode"] = True
+                result["closure"] = comp_menu
+            _emit_json("menu", feas is not False, result=result)
             if feas is False:
                 raise SystemExit(EXIT_INFEASIBLE)
             return
-        for i in menu:
-            print(f"{i:24s} {comps[i]['cuisine']:9s} {comps[i]['role']}")
+        if dishes_map:
+            from .dishes import dish_cuisine
+            for j in menu:
+                print(f"{j:24s} {dish_cuisine(dishes_map[j], comps) or '?':9s} "
+                      "dish")
+            print(f"\ncomponent closure ({len(comp_menu)}): "
+                  + ", ".join(comp_menu))
+        else:
+            for i in menu:
+                print(f"{i:24s} {comps[i]['cuisine']:9s} {comps[i]['role']}")
         print(f"\nactive {menuinfo['active_min']}min, "
               f"perishable waste {menuinfo['waste_perishable']}g, "
               f"cuisines {menuinfo['cuisines']}")
         return
 
-    weeks, demand, sp, diag, mealdays = _assemble(comps, people, settings,
-                                                  menu, a.seed, ing,
-                                                  leftovers, timer)
+    if dishes_map:
+        weeks, demand, sp, diag, mealdays = _assemble_dishes(
+            comps, people, settings, dishes_map, menu, a.seed, ing,
+            leftovers, timer)
+    else:
+        weeks, demand, sp, diag, mealdays = _assemble(comps, people,
+                                                      settings, menu,
+                                                      a.seed, ing,
+                                                      leftovers, timer)
     batches = sp["batches"]
-    chosen = [i for i in menu if batches.get(i)]
+    chosen = [i for i in comp_menu if batches.get(i)]
     rows, wp, wt = purchase(comps, ing, chosen, batches, pantry=pantry)
     total = menu_cost(comps, ing, chosen, batches, pantry=pantry)
 
@@ -715,7 +899,8 @@ def _run(a, timer):
                   menuinfo=menuinfo, feas=feas, broke=broke, weeks=weeks,
                   sp=sp, diag=diag, pantry=pantry, stock_warns=stock_warns,
                   rows=rows, total=total, mealdays=mealdays,
-                  fragments=fragments, techniques=techniques)
+                  fragments=fragments, techniques=techniques,
+                  dishes_map=dishes_map, comp_menu=comp_menu)
         return
 
     # M1.1: the three human-readable deliverables (PRD §4.3 step 4).
@@ -725,8 +910,8 @@ def _run(a, timer):
             meta = dict(seed=a.seed, library=str(lib),
                         date=a.date or "unspecified")
             files = artifacts.render_artifacts(
-                comps, ing, people, settings, menu, weeks, sp, rows, total,
-                pantry=pantry, stock_warnings=stock_warns, diag=diag,
+                comps, ing, people, settings, comp_menu, weeks, sp, rows,
+                total, pantry=pantry, stock_warnings=stock_warns, diag=diag,
                 meta=meta, meals=mealdays, methods=fragments,
                 techniques=techniques)
             written = artifacts.write_artifacts(a.artifacts, files)
@@ -741,10 +926,23 @@ def _run(a, timer):
             "purchase_rows": rows, "waste_perishable_g": wp,
             "total_cost": total, "stock_warnings": stock_warns,
         }
+        if dishes_map:
+            # M1.13 (additive): dish mode names itself; menu is dish ids
+            # and the derived component closure rides along. Heritage
+            # documents are byte-identical (keys absent).
+            result["dish_mode"] = True
+            result["closure"] = comp_menu
         if a.cmd in ("week", "all"):
             result.update(
                 weeks=weeks, demand=demand, session_plan=sp,
                 relax_tiers=(diag or {}).get("relax_tiers"))
+            if dishes_map:
+                result["dish_diag"] = {
+                    "dish_retries": (diag or {}).get("dish_retries"),
+                    "dish_flag_counts":
+                        (diag or {}).get("dish_flag_counts"),
+                    "no_dish_assignable":
+                        (diag or {}).get("no_dish_assignable", [])}
             # M1.9: meal structure rides in the result ONLY when somebody
             # configures meals — the no-meals document is byte-identical
             if mealdays:
@@ -757,9 +955,11 @@ def _run(a, timer):
         return
 
     with timer.span("render"):
-        out = render(comps, ing, people, settings, menu, weeks, demand, docmsg,
-                     menuinfo, sp, pantry=pantry, diag=diag, meals=mealdays,
-                     methods=fragments, techniques=techniques)
+        out = render(comps, ing, people, settings, comp_menu, weeks, demand,
+                     docmsg, menuinfo, sp, pantry=pantry, diag=diag,
+                     meals=mealdays, methods=fragments,
+                     techniques=techniques, dish_menu=menu if dishes_map
+                     else None, dishes=dishes_map)
 
     if a.cmd == "shop":
         print(out.split("## Shopping list")[1])
@@ -776,17 +976,33 @@ def _run(a, timer):
 def _cmd_lock(a, timer, *, lib, settings, plan_date, comps, ing, people,
               menu, menuinfo, feas, broke, weeks, sp, diag, pantry,
               stock_warns, rows, total, mealdays=None, fragments=None,
-              techniques=None):
+              techniques=None, dishes_map=None, comp_menu=None):
     """Write the immutable locked plan artifact: plans/<key>/plan.yaml plus
-    the three M1.1 deliverables rendered alongside."""
+    the three M1.1 deliverables rendered alongside. M1.13: in dish mode
+    the dishes.yaml document joins the verbatim inputs snapshot (so the
+    inputs hash covers it automatically) and ``menu`` locks as dish ids;
+    a heritage lock document is byte-identical to pre-M1.13."""
     key = lockplan.primary_trip_date(plan_date, settings)
     raw_docs = io_yaml.load_raw_docs(lib)
+    if dishes_map and not a.implicit_dishes:
+        dishes_path = Path(a.dishes) if a.dishes else lib / "dishes.yaml"
+        raw_docs["dishes"] = yaml.safe_load(dishes_path.read_text())
+    elif dishes_map:
+        # --implicit-dishes: the authored doc (when present) snapshots
+        # verbatim; the synthesized dishes re-derive at verify time from
+        # the override flag (never snapshotted — they are derived state)
+        dishes_path = Path(a.dishes) if a.dishes else lib / "dishes.yaml"
+        if dishes_path.exists():
+            raw_docs["dishes"] = yaml.safe_load(dishes_path.read_text())
     pantry_doc = None
     if a.pantry:
         pantry_doc = yaml.safe_load(Path(a.pantry).read_text())
     overrides = {"budget": a.budget, "mass": a.mass,
                  "exclude": a.exclude or "", "force": a.force or "",
                  "n": a.n, "menu": a.menu}
+    if a.implicit_dishes:
+        # present ONLY when set: heritage snapshots stay byte-identical
+        overrides["implicit_dishes"] = True
     snapshot = lockplan.build_snapshot(raw_docs, pantry_doc, overrides,
                                        a.seed, plan_date)
     doc = lockplan.build_plan_doc(
@@ -804,9 +1020,10 @@ def _cmd_lock(a, timer, *, lib, settings, plan_date, comps, ing, people,
         # complete record of the locked week
         meta = dict(seed=a.seed, library=str(lib), date=plan_date.isoformat())
         files = artifacts.render_artifacts(
-            comps, ing, people, settings, menu, weeks, sp, rows, total,
-            pantry=pantry, stock_warnings=stock_warns, diag=diag, meta=meta,
-            meals=mealdays, methods=fragments, techniques=techniques)
+            comps, ing, people, settings, comp_menu or menu, weeks, sp,
+            rows, total, pantry=pantry, stock_warnings=stock_warns,
+            diag=diag, meta=meta, meals=mealdays, methods=fragments,
+            techniques=techniques)
         written = artifacts.write_artifacts(plan_dir, files)
     result = {
         "key": key.isoformat(), "plan_path": str(path),

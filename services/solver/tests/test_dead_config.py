@@ -66,23 +66,26 @@ def _menu_ids(out):
     return ids
 
 
-def test_cli_force_puts_components_on_the_menu(capsys):
-    """--force must put components on the menu that the free search did not
+@pytest.mark.slow
+def test_cli_force_puts_dishes_on_the_menu(capsys):
+    """--force must put entries on the menu that the free search did not
     choose. Self-adapting (PRD §9: the founder corpus is live data, not a
-    fixture): run the free menu first, then force two components it left
-    out — no component names are pinned."""
+    fixture). M1.13: examples/ is a DISH library now — the menu is dish
+    ids, so the forced ids are dishes the free search left out (--force
+    with a component id maps through dish membership; that path is
+    unit-tested in test_dishes.py). Slow: dish-menu search + LP verify."""
     cli.main(["menu", "--library", str(EXAMPLES), "--seed", "0", "--n", "8"])
     baseline = _menu_ids(capsys.readouterr().out)
-    ing, comps, people, settings = io_yaml.load(EXAMPLES)
-    left_out = sorted(set(comps) - set(baseline))[:2]
+    dishes = io_yaml.load_dishes(EXAMPLES / "dishes.yaml")
+    left_out = sorted(set(dishes) - set(baseline))[:2]
     assert len(left_out) == 2, \
-        "fixture assumption broke: the free menu selected the whole library"
+        "fixture assumption broke: the free menu selected every dish"
 
     cli.main(["menu", "--library", str(EXAMPLES), "--seed", "0", "--n", "8",
               "--force", ",".join(left_out)])
     forced = _menu_ids(capsys.readouterr().out)
-    for cid in left_out:
-        assert cid in forced, (cid, forced)
+    for did in left_out:
+        assert did in forced, (did, forced)
 
 
 def test_cli_force_unknown_component_is_an_error_naming_it():
@@ -358,9 +361,11 @@ def _engine_side_source():
     # is consumption — the field changes what the user sees). meals joined
     # in M1.9: the dealer consumes meals_per_day / serving_model /
     # meal_slots / pairs_with (via model.resolve_meal_slots, also included).
-    from mealplan import artifacts, meals
+    # dishes joined in M1.13: the dish layer consumes Dish.* plus
+    # Settings.dish_layer and Person.max_dishes_per_slot.
+    from mealplan import artifacts, dishes, meals
     srcs = [inspect.getsource(m)
-            for m in (engine, costing, cli, artifacts, meals)]
+            for m in (engine, costing, cli, artifacts, meals, dishes)]
     srcs.append(inspect.getsource(model.derive_component))
     srcs.append(inspect.getsource(model.resolve_meal_slots))
     return "".join(strip_comments_and_docstrings(s) for s in srcs)
@@ -392,7 +397,7 @@ def test_no_dead_config_gate():
     assert model.RESERVED_FIELDS == {"period"}
 
     for cls in (model.Ingredient, model.Component, model.Person,
-                model.Settings, model.Budget, model.Pantry):
+                model.Settings, model.Budget, model.Pantry, model.Dish):
         for f in dc_fields(cls):
             name = f.name
             if name == "raw":

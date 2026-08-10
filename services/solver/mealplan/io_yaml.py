@@ -15,6 +15,7 @@ M0.2: the ONE sanctioned behavior addition of the extraction. Rules:
 from __future__ import annotations
 
 import datetime
+import math
 import os
 import tempfile
 from dataclasses import dataclass
@@ -23,12 +24,16 @@ from typing import Any, Optional
 
 import yaml
 
-from .model import (COOK_PLAN_STYLES, PERSON_MODES, SERVING_MODELS,
-                    Ingredient, Pantry, Person, Settings, derive_component,
-                    resolve_meal_slots)
+from .model import (COOK_PLAN_STYLES, DISH_LAYER_MODES, DISH_RECONSTRUCTIONS,
+                    PERSON_MODES, SERVING_MODELS, Dish, Ingredient, Pantry,
+                    Person, Settings, derive_component, resolve_meal_slots)
 
 SCHEMA_VERSION = 1
 KNOWN_SCHEMA_VERSIONS = (1,)
+# dishes.yaml (M1.13): the data steward's draft ships schema_version 0 and
+# is consumed AS-IS (M113_SPEC §2); version 1 is reserved for the
+# post-review ratified schema.
+DISH_SCHEMA_VERSIONS = (0, 1)
 
 ROLES = ("main", "starch", "veg", "accent", "drink")
 BUDGET_MODES = ("shared", "per_person", "by_consumption", "off")
@@ -425,6 +430,16 @@ def validate_people_doc(doc: Any, fname: str = "people.yaml"
                     "bad_enum", f"{where}, field 'serving_model'",
                     f"serving_model must be one of "
                     f"{'|'.join(SERVING_MODELS)} (got {sm!r})"))
+            # M1.13 (M113_SPEC §7): two dishes in one slot is an EXPLICIT
+            # opt-in, never automatic — per person, per-slot overridable.
+            mdps = p.get("max_dishes_per_slot")
+            if mdps is not None and (not isinstance(mdps, int)
+                                     or isinstance(mdps, bool) or mdps < 1):
+                issues.append(ValidationIssue(
+                    "bad_max_dishes_per_slot",
+                    f"{where}, field 'max_dishes_per_slot'",
+                    f"max_dishes_per_slot must be an integer >= 1 "
+                    f"(got {mdps!r})"))
             ms = p.get("meal_slots")
             if ms is not None:
                 mwhere = f"{where}, field 'meal_slots'"
@@ -464,14 +479,26 @@ def validate_people_doc(doc: Any, fname: str = "people.yaml"
                                 "'interchangeable'",
                                 f"interchangeable must be a boolean "
                                 f"(got {ic!r})"))
+                        # M1.13: per-slot max_dishes_per_slot override
+                        smd = s.get("max_dishes_per_slot")
+                        if smd is not None and (not isinstance(smd, int)
+                                                or isinstance(smd, bool)
+                                                or smd < 1):
+                            issues.append(ValidationIssue(
+                                "bad_max_dishes_per_slot",
+                                f"{swhere}, 'max_dishes_per_slot'",
+                                f"max_dishes_per_slot must be an integer "
+                                f">= 1 (got {smd!r})"))
                         extra = sorted(set(s) - {"name", "serving_model",
-                                                 "interchangeable"})
+                                                 "interchangeable",
+                                                 "max_dishes_per_slot"})
                         if extra:
                             issues.append(ValidationIssue(
                                 "bad_meal_slots", swhere,
                                 f"unexpected slot field(s) {extra}; only "
-                                "'name', 'serving_model' and "
-                                "'interchangeable' are allowed"))
+                                "'name', 'serving_model', "
+                                "'interchangeable' and "
+                                "'max_dishes_per_slot' are allowed"))
                     dupes = sorted({n for n in names if names.count(n) > 1})
                     if dupes:
                         issues.append(ValidationIssue(
@@ -583,6 +610,13 @@ def validate_people_doc(doc: Any, fname: str = "people.yaml"
                 "bad_enum", f"{fname}: settings, field 'cook_plan_style'",
                 f"cook_plan_style must be one of "
                 f"{'|'.join(COOK_PLAN_STYLES)} (got {cps!r})"))
+        # M1.13 (M113_SPEC §9): orphan-side policy during dish migration
+        dl = st.get("dish_layer")
+        if dl is not None and dl not in DISH_LAYER_MODES:
+            issues.append(ValidationIssue(
+                "bad_enum", f"{fname}: settings, field 'dish_layer'",
+                f"dish_layer must be one of {'|'.join(DISH_LAYER_MODES)} "
+                f"(got {dl!r})"))
     # budget (optional; defaults to {"mode": "off"} at load). mode is an
     # enum; 'by_consumption' means NO ceiling — cost splits by consumption
     # share (costing.attribute), which render applies to every mode anyway.
@@ -698,11 +732,313 @@ def validate_pantry_doc(doc: Any, known_ingredients: Optional[set] = None,
     return issues
 
 
+# --------------------------------------------------------------------------- #
+#  dishes.yaml (M1.13, M113_SPEC §2) — schema + all-errors validation
+# --------------------------------------------------------------------------- #
+DISH_REQUIRED = ("id", "name", "components", "reconstruction")
+RESERVED_AFFINITY = ("breakfast", "lunch", "dinner")
+
+
+def _dish_band_ok(v):
+    return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+
+def validate_dishes_doc(doc: Any, comps=None, people=None,
+                        fname: str = "dishes.yaml") -> list[ValidationIssue]:
+    """All-errors validation of a dishes document against the loaded
+    component corpus (M113_SPEC §2). ``comps`` is the DERIVED component map
+    (serve_g / unit_g / role checks need it); ``people`` supplies the
+    validated meal_affinity label set (household slot names + the reserved
+    breakfast/lunch/dinner trio + 'any').
+
+    Draft-schema note (deviation from the spec's abstract sketch, ruled by
+    the spec's own "consume the data steward's draft schema AS-IS" clause):
+    ``accents`` is the SUBSET of ``components`` whose min_g is 0 — bands
+    live in one place (the components map), so nothing is measured twice.
+    The disjointness the spec sketch implies is enforced as the real data
+    contract: an accent id must appear in components WITH min_g == 0.
+    """
+    issues = []
+    if not isinstance(doc, dict):
+        return [ValidationIssue("bad_document", fname,
+                                "document is not a mapping")]
+    sv = doc.get("schema_version")
+    if sv is None:
+        issues.append(ValidationIssue(
+            "missing_field", f"{fname}: schema_version",
+            "document must declare a schema_version"))
+    elif sv not in DISH_SCHEMA_VERSIONS:
+        issues.append(ValidationIssue(
+            "unknown_schema_version", f"{fname}: schema_version",
+            f"unknown schema_version {sv!r}; "
+            f"known: {list(DISH_SCHEMA_VERSIONS)}"))
+    dishes = doc.get("dishes")
+    if not isinstance(dishes, list):
+        issues.append(ValidationIssue(
+            "missing_field", f"{fname}: dishes",
+            "top-level 'dishes' list is required"))
+        return issues
+
+    # affinity label set: household slot names + reserved trio + 'any'
+    labels = set(RESERVED_AFFINITY) | {"any"}
+    person_slots = {}
+    for pn, p in (people or {}).items():
+        slots = resolve_meal_slots(p)
+        names = [s["name"] for s in slots] if slots else []
+        person_slots[pn] = names
+        labels |= set(names)
+
+    from .dishes import DISH_WEIGHTS       # loose-band lint threshold (P9)
+    loose_ratio = DISH_WEIGHTS["DISH_BAND_LOOSE_RATIO"]
+
+    seen = set()
+    all_affinity = set()
+    used_component, used_accent, used_side = set(), set(), set()
+    for idx, d in enumerate(dishes):
+        if not isinstance(d, dict):
+            issues.append(ValidationIssue(
+                "bad_document", f"{fname}: dishes[{idx}]",
+                "entry is not a mapping"))
+            continue
+        did = d.get("id", f"dishes[{idx}]")
+        where = f"{fname}: dish '{did}'"
+        if did in seen:
+            issues.append(ValidationIssue(
+                "duplicate_dish_id", where, "dish id appears more than once"))
+        seen.add(did)
+        for f_ in DISH_REQUIRED:
+            if f_ not in d:
+                issues.append(ValidationIssue(
+                    "missing_field", f"{where}, field '{f_}'",
+                    f"required field '{f_}' is missing"))
+        rec = d.get("reconstruction")
+        if rec is not None and rec not in DISH_RECONSTRUCTIONS:
+            issues.append(ValidationIssue(
+                "bad_enum", f"{where}, field 'reconstruction'",
+                f"reconstruction must be one of "
+                f"{'|'.join(DISH_RECONSTRUCTIONS)} (got {rec!r})"))
+        members = d.get("components")
+        if not isinstance(members, dict) or not members:
+            issues.append(ValidationIssue(
+                "bad_document", f"{where}, field 'components'",
+                "components must be a non-empty mapping of "
+                "component id -> {base_g, min_g, max_g}"))
+            continue
+        accents = d.get("accents") or []
+        if not isinstance(accents, list):
+            issues.append(ValidationIssue(
+                "bad_document", f"{where}, field 'accents'",
+                f"accents must be a list of component ids (got {accents!r})"))
+            accents = []
+        sides = d.get("compatible_sides") or []
+        if not isinstance(sides, list):
+            issues.append(ValidationIssue(
+                "bad_document", f"{where}, field 'compatible_sides'",
+                f"compatible_sides must be a list of component ids "
+                f"(got {sides!r})"))
+            sides = []
+        # draft-schema contract: accents are the min_g==0 SUBSET of members
+        for a in accents:
+            if a not in members:
+                issues.append(ValidationIssue(
+                    "accent_not_in_components", f"{where}, accent '{a}'",
+                    "an accent must appear in the dish's components map "
+                    "(bands live in one place — nothing is measured twice)"))
+        core = {}
+        for cid, band in members.items():
+            used_component.add(cid)
+            bwhere = f"{where}, component '{cid}'"
+            if comps is not None and cid not in comps:
+                issues.append(ValidationIssue(
+                    "unknown_component", bwhere,
+                    f"dish references unknown component '{cid}'"))
+                continue
+            if not isinstance(band, dict):
+                issues.append(ValidationIssue(
+                    "bad_document", bwhere,
+                    f"band must be a mapping {{base_g, min_g, max_g}} "
+                    f"(got {band!r})"))
+                continue
+            base, lo, hi = (band.get("base_g"), band.get("min_g"),
+                            band.get("max_g"))
+            if not all(_dish_band_ok(v) for v in (base, lo, hi)):
+                issues.append(ValidationIssue(
+                    "bad_number", bwhere,
+                    f"base_g/min_g/max_g must all be numbers "
+                    f"(got {band!r})"))
+                continue
+            if not (0 <= lo <= base <= hi) or base <= 0:
+                issues.append(ValidationIssue(
+                    "dish_band_invalid", bwhere,
+                    f"band must satisfy 0 <= min_g <= base_g <= max_g with "
+                    f"base_g > 0 (got min {lo}, base {base}, max {hi})"))
+                continue
+            if cid in accents and lo != 0:
+                issues.append(ValidationIssue(
+                    "accent_min_nonzero", bwhere,
+                    f"accent '{cid}' must have min_g 0 (P4: an accent is "
+                    f"omittable per person; got min_g {lo})"))
+            if lo > 0:
+                core[cid] = band
+            if comps is not None:
+                c = comps[cid]
+                smax = c["serve_g"]["max"]
+                # M113_SPEC §2 (graft, P1, both judges): one serving must be
+                # able to exist inside the authored palatability absolutes
+                if lo > smax:
+                    issues.append(ValidationIssue(
+                        "dish_band_exceeds_serve", bwhere,
+                        f"min_g {lo} exceeds serve_g.max {smax} of "
+                        f"'{cid}' — one serving cannot exist inside the "
+                        "authored absolutes"))
+                elif hi > smax:
+                    issues.append(ValidationIssue(
+                        "dish_band_exceeds_serve", bwhere,
+                        f"max_g {hi} exceeds serve_g.max {smax} of "
+                        f"'{cid}' — the per-meal cap will truncate the "
+                        "band", severity="warning"))
+                u = c.get("unit_g")
+                if u:
+                    k_lo = 0 if lo == 0 else math.ceil(lo / u - 1e-9)
+                    k_hi = math.floor(hi / u + 1e-9)
+                    if k_hi < max(k_lo, 1) and lo > 0 or (lo == 0 and
+                                                          k_hi < 0):
+                        issues.append(ValidationIssue(
+                            "dish_band_off_grid", bwhere,
+                            f"[{lo}, {hi}]g admits no whole {u}g unit of "
+                            f"'{cid}' at one serving — align the band to "
+                            "the unit grid"))
+        if not core:
+            issues.append(ValidationIssue(
+                "dish_only_garnish", where,
+                "a dish needs at least one core member (min_g > 0) — a "
+                "dish that is only droppable garnish is not a plate"))
+        # dish_band_loose lint (graft, P2, both judges): hard bands are the
+        # identity guarantee; this keeps "in-band" meaning something
+        worst = 0.0
+        for ci, bi in core.items():
+            for cj, bj in core.items():
+                if ci == cj or not bj["min_g"]:
+                    continue
+                err = ((bi["max_g"] / bj["min_g"])
+                       / (bi["base_g"] / bj["base_g"]))
+                worst = max(worst, err)
+        if worst > loose_ratio:
+            issues.append(ValidationIssue(
+                "dish_band_loose", where,
+                f"authored bands permit degenerate ratios — worst-case "
+                f"pairwise ratio error {worst:.1f}x vs the "
+                f"{loose_ratio}x threshold (DISH_BAND_LOOSE_RATIO, P9)",
+                severity="warning"))
+        for sid in sides:
+            used_side.add(sid)
+            swhere = f"{where}, compatible side '{sid}'"
+            if comps is not None and sid not in comps:
+                issues.append(ValidationIssue(
+                    "unknown_component", swhere,
+                    f"dish references unknown component '{sid}'"))
+            elif sid in members:
+                issues.append(ValidationIssue(
+                    "side_is_member", swhere,
+                    "a compatible side may not also be a component of the "
+                    "same dish"))
+        for a in accents:
+            used_accent.add(a)
+        aff = d.get("meal_affinity") or []
+        if not isinstance(aff, list):
+            issues.append(ValidationIssue(
+                "bad_document", f"{where}, field 'meal_affinity'",
+                f"meal_affinity must be a list of slot labels "
+                f"(got {aff!r})"))
+            aff = []
+        bad = [x for x in aff if x not in labels]
+        if bad:
+            issues.append(ValidationIssue(
+                "bad_meal_affinity", f"{where}, field 'meal_affinity'",
+                f"unknown affinity label(s) {bad}; valid labels are the "
+                f"household's slot names plus "
+                f"{'/'.join(RESERVED_AFFINITY)}/any"))
+        if "any" in aff and len(aff) > 1:
+            issues.append(ValidationIssue(
+                "bad_meal_affinity", f"{where}, field 'meal_affinity'",
+                "'any' must not be mixed with specific slot labels"))
+        all_affinity |= set(aff) - {"any"}
+
+    # affinity inertness note (M113_SPEC §2): per person whose slot names
+    # never match any authored affinity label — breakfast semantics are
+    # never guessed (M19 §11.2 precedent); one aggregated note per person
+    for pn, names in person_slots.items():
+        if names and all_affinity and not (set(names) & all_affinity):
+            issues.append(ValidationIssue(
+                "affinity_slot_mismatch", f"{fname}: person '{pn}'",
+                f"'{pn}' has meal slots {names} but no dish affinity label "
+                f"matches them (labels in use: {sorted(all_affinity)}) — "
+                "meal_affinity is INERT for this person; rename slots to "
+                "breakfast/lunch/dinner to activate it",
+                severity="warning"))
+
+    # corpus reachability (M113_SPEC §9) — warnings, never errors:
+    # incremental authoring must not brick a library
+    if comps is not None:
+        mains = [cid for cid, c in comps.items() if c["role"] == "main"]
+        for cid in sorted(set(mains) - used_component):
+            issues.append(ValidationIssue(
+                "component_unreachable", f"{fname}: component '{cid}'",
+                f"main '{cid}' belongs to no dish — unschedulable as a "
+                "meal anchor and excluded from menu candidacy; author a "
+                "dish for it (or run with --implicit-dishes)",
+                severity="warning"))
+        accs = [cid for cid, c in comps.items() if c["role"] == "accent"]
+        for cid in sorted(set(accs) - used_accent):
+            issues.append(ValidationIssue(
+                "orphan_component", f"{fname}: component '{cid}'",
+                f"accent '{cid}' is in no dish's accents list — accents "
+                "attach only to their dish, so it is unservable",
+                severity="warning"))
+        sv_pool = [cid for cid, c in comps.items()
+                   if c["role"] in ("starch", "veg")]
+        orphan_sides = sorted(set(sv_pool) - used_side)
+        if orphan_sides:
+            issues.append(ValidationIssue(
+                "orphan_side", fname,
+                f"starch/veg in no dish's compatible_sides: "
+                f"{', '.join(orphan_sides)} — under dish_layer=permissive "
+                "they may serve as sides of any dish (flagged per use); "
+                "under strict they are unservable", severity="warning"))
+    return issues
+
+
+def load_dishes(path: str | os.PathLike, comps=None, people=None
+                ) -> dict[str, "Dish"]:
+    """Load and validate a dishes.yaml (M1.13). The file's PRESENCE is the
+    dish-mode key (M113_SPEC §1) — callers on a library without one simply
+    never call this, and the whole layer stays dormant. Errors raise one
+    all-errors ValidationError; warnings are reported to stderr. Returns
+    ``{dish_id: Dish}`` in document order."""
+    path = Path(path)
+    if not path.exists():
+        raise ValidationError([ValidationIssue(
+            "missing_file", str(path), "dishes file not found")])
+    try:
+        doc = yaml.safe_load(path.read_text())
+    except yaml.YAMLError as e:
+        raise ValidationError([ValidationIssue(
+            "bad_yaml", str(path), f"YAML parse error: {e}")])
+    issues = validate_dishes_doc(doc, comps=comps, people=people,
+                                 fname=path.name)
+    errors, warnings = _split(issues)
+    if errors:
+        raise ValidationError(issues)
+    _report_warnings(warnings)
+    return {d["id"]: Dish.from_raw(d) for d in doc["dishes"]}
+
+
 VALIDATORS = {
     "ingredients": lambda doc, **kw: validate_ingredients_doc(doc, **kw),
     "components": lambda doc, **kw: validate_components_doc(doc, **kw),
     "people": lambda doc, **kw: validate_people_doc(doc, **kw),
     "pantry": lambda doc, **kw: validate_pantry_doc(doc, **kw),
+    "dishes": lambda doc, **kw: validate_dishes_doc(doc, **kw),
 }
 
 

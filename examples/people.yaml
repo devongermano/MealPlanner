@@ -71,6 +71,14 @@ settings:
                                 # freezer on day 0 and the cook plan says when to thaw.
   max_batches_per_component: 3  # nobody wants 11 pounds of shrimp. caps how hard the
                                 # solver may lean on one component in a week.
+  dish_layer: strict            # M1.13: sides come ONLY from each dish's authored
+                                # compatible_sides. This corpus's coverage is complete
+                                # (every dish in dishes.yaml authors its sides, incl.
+                                # deliberate "no sides" bowls), so the permissive
+                                # migration mode would only reintroduce free mixing
+                                # (fusilli beside a breakfast burrito) — the exact
+                                # thing the dish layer exists to kill. The engine
+                                # DEFAULT stays permissive until M1.6 (M113_SPEC §9).
 
 # ---------------------------------------------------------------------------
 # BUDGET POLICY. Nothing here is hardcoded into the solver — change it and re-run,

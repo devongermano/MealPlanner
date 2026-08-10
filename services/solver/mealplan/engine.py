@@ -495,12 +495,19 @@ def carb_headroom(person, comps, settings, ids=None, ing=None):
                 ok=bool(worst) and worst["headroom_g"] >= tgt)
 
 
-def doctor(comps, people, settings, ing=None):
+def doctor(comps, people, settings, ing=None, dishes=None):
     """Diagnostics (PRD §8.3). Returns ``(text, data)``: the rendered
     markdown report AND a structured, JSON-ready mirror of every section
     (M0.11). Sections: raw freshness (M0.6, when ``ing`` given), per-person
     feasibility, binding macro, volume floor, structural ablation,
-    lean-anchor coverage, carb headroom."""
+    lean-anchor coverage, carb headroom.
+
+    ``dishes`` (M1.13): pass the loaded dish map and an ARITHMETIC-ONLY
+    dish section is appended (zero LP — dishes.doctor_dish_section):
+    eligibility kills, per-day dish availability with killers named,
+    lean-dish coverage, dish carb headroom, slot_target_unreachable. With
+    ``dishes=None`` (no dishes.yaml — heritage mode) the output is
+    byte-identical to pre-M1.13."""
     lines = []
     ids = list(comps)
     data = {}
@@ -683,8 +690,12 @@ def doctor(comps, people, settings, ing=None):
     # Meal-layer infeasibility is explained at the layer it occurs (P6),
     # before a full build. Section appears only when somebody configures
     # meals — the layer is inert otherwise (byte-identical doctor output).
+    # M1.13: in dish mode the meal layer's dealability arithmetic is
+    # re-based on dishes (the dish section below carries per-day dish
+    # availability + slot capacity) — the component-pool numbers would
+    # answer a question the dish pipeline never asks.
     meal_slots = {pn: resolve_meal_slots(p) for pn, p in people.items()}
-    if any(meal_slots.values()):
+    if not dishes and any(meal_slots.values()):
         from .meals import MEAL_WEIGHTS
         lines.append("\n## Meal layer\n")
         data["meal_layer"] = {}
@@ -726,6 +737,16 @@ def doctor(comps, people, settings, ing=None):
                 + (" — OK" if worst_side >= need_side
                    else " — **SHORT**: meals will lean on carved "
                         "sub-portions or ship flagged"))
+
+    # ---- M1.13: dish section (arithmetic only, ZERO LP — P6). Appears
+    # only in dish mode; heritage doctor output stays byte-identical.
+    # Lazy import: dishes.py imports from this module.
+    if dishes:
+        from .dishes import doctor_dish_section
+        dlines, ddata = doctor_dish_section(comps, people, settings, dishes,
+                                            ing=ing)
+        lines.extend(dlines)
+        data["dish_layer"] = ddata
     return "\n".join(lines), data
 
 

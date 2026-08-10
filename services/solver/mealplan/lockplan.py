@@ -67,8 +67,13 @@ def build_snapshot(library_docs: dict, pantry_doc, overrides: dict,
                    seed: int, plan_date: datetime.date) -> dict:
     """The verbatim inputs snapshot the hash covers — EXACTLY these fields
     (M1.3): the three library documents, the pantry document (or None),
-    the CLI overrides, the seed, and the plan date."""
-    return {
+    the CLI overrides, the seed, and the plan date.
+
+    M1.13: a ``dishes`` document joins the library snapshot ONLY in dish
+    mode (the key is absent otherwise, so heritage snapshots — and their
+    hashes — are byte-identical to pre-M1.13); the inputs hash covers
+    dishes.yaml automatically because the snapshot embeds it verbatim."""
+    snap = {
         "library": {
             "ingredients": library_docs["ingredients"],
             "components": library_docs["components"],
@@ -79,6 +84,9 @@ def build_snapshot(library_docs: dict, pantry_doc, overrides: dict,
         "seed": seed,
         "plan_date": plan_date.isoformat(),
     }
+    if library_docs.get("dishes") is not None:
+        snap["library"]["dishes"] = library_docs["dishes"]
+    return snap
 
 
 def inputs_sha256(snapshot: dict) -> str:

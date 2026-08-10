@@ -66,6 +66,18 @@ SERVING_MODELS = ("portioned", "family_style")
 # (never silently). Both are views of the same compiled session.
 COOK_PLAN_STYLES = ("recipe", "timeline")
 
+# M1.13 (dish layer, M113_SPEC §9): orphan-side policy during the steward's
+# reconstruction window. "permissive" (default until M1.6, P9): starch/veg
+# referenced by no dish's compatible_sides may serve as sides of any dish,
+# flagged orphan_side. "strict": unlisted sides are unservable. The
+# documented migration ratchet is flipping the default to strict once
+# compatible_sides coverage lands.
+DISH_LAYER_MODES = ("permissive", "strict")
+
+# M1.13 (M113_SPEC §2): dishes.yaml reconstruction provenance — the honesty
+# field that tells the reviewer how hard to look (data steward's schema).
+DISH_RECONSTRUCTIONS = ("from_source", "inferred", "invented")
+
 
 class _RawView:
     """Dict-style access shim delegating to the raw mapping the object was
@@ -194,6 +206,9 @@ class Person(_RawView):
     meals_per_day: Optional[int] = None    # LIVE (M1.9): meal-layer n
     serving_model: str = "portioned"       # LIVE (M1.9): rendering model
     meal_slots: Optional[list] = None      # LIVE (M1.9): per-slot config
+    max_dishes_per_slot: Optional[int] = None  # LIVE (M1.13): big-eater
+    #                       ladder rung 3 — explicit opt-in, default 1,
+    #                       per person with per-slot overrides (M113_SPEC §7)
     raw: dict = field(default_factory=dict, repr=False)
 
     @classmethod
@@ -213,6 +228,7 @@ class Person(_RawView):
                    meals_per_day=raw.get("meals_per_day"),
                    serving_model=sm,
                    meal_slots=raw.get("meal_slots"),
+                   max_dishes_per_slot=raw.get("max_dishes_per_slot"),
                    raw=raw)
 
 
@@ -248,6 +264,48 @@ def resolve_meal_slots(person) -> Optional[list]:
         return [dict(name=f"meal_{k + 1}", serving_model=sm,
                      interchangeable=False) for k in range(n)]
     return None
+
+
+@dataclass
+class Dish(_RawView):
+    """One named plate (M1.13, M113_SPEC §2 — the data steward's draft
+    schema consumed as-is). A dish is a named combination of components
+    with per-SERVING ratio bands: ``components`` maps component id →
+    ``{base_g, min_g, max_g}`` in grams of the finished component per one
+    serving. ``accents`` is the subset of ``components`` that is optional
+    per-person finishing (min_g 0 — droppable, dish intact); a CORE member
+    is a components entry with min_g > 0. ``compatible_sides`` may be
+    served ALONGSIDE (no bands here — the side's own serve_g governs).
+    ``meal_affinity`` labels match person slot NAMES only (breakfast
+    semantics are never guessed — M19 §11.2 precedent). ``cuisine`` is
+    optional authored data; absent, it derives from the main-role member.
+    ``reconstruction`` (from_source | inferred | invented) and ``source``
+    are the provenance the doctor reports; ``notes`` ride to the reviewer.
+    """
+
+    id: str
+    name: str
+    components: dict                 # {cid: {"base_g","min_g","max_g"}}
+    accents: list = field(default_factory=list)
+    compatible_sides: list = field(default_factory=list)
+    meal_affinity: list = field(default_factory=list)
+    cuisine: Optional[str] = None    # optional authored; else derived
+    source: Optional[str] = None
+    reconstruction: Optional[str] = None
+    notes: Optional[str] = None
+    raw: dict = field(default_factory=dict, repr=False)
+
+    @classmethod
+    def from_raw(cls, d: dict) -> "Dish":
+        return cls(id=d.get("id"), name=d.get("name"),
+                   components={cid: dict(b) for cid, b in
+                               (d.get("components") or {}).items()},
+                   accents=list(d.get("accents") or []),
+                   compatible_sides=list(d.get("compatible_sides") or []),
+                   meal_affinity=list(d.get("meal_affinity") or []),
+                   cuisine=d.get("cuisine"), source=d.get("source"),
+                   reconstruction=d.get("reconstruction"),
+                   notes=d.get("notes"), raw=dict(d))
 
 
 @dataclass
@@ -323,6 +381,9 @@ SETTINGS_DEFAULTS = {
     "max_batches_per_component": 3,
     "use_freezer": True,
     "cook_plan_style": "recipe",
+    "dish_layer": "permissive",    # M1.13: orphan-side policy (P9 — the
+                                   # documented ratchet flips this to
+                                   # "strict" after steward coverage)
 }
 
 
@@ -338,6 +399,7 @@ class Settings(_RawView):
     max_batches_per_component: Optional[int] = None
     use_freezer: Optional[bool] = None    # M0.5: freezer bridging, default true
     cook_plan_style: Optional[str] = None  # M1.10: recipe | timeline
+    dish_layer: Optional[str] = None      # M1.13: permissive | strict
     budget: Any = None
     raw: dict = field(default_factory=dict, repr=False)
 
@@ -365,6 +427,7 @@ class Settings(_RawView):
                    max_batches_per_component=raw["max_batches_per_component"],
                    use_freezer=raw["use_freezer"],
                    cook_plan_style=raw["cook_plan_style"],
+                   dish_layer=raw["dish_layer"],
                    budget=budget, raw=raw)
 
 

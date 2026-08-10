@@ -636,7 +636,24 @@ def render_eat_sheet(pname, person, comps, week, settings, menu, ing=None,
             # family_style = take-amount voice, accents attached to their
             # base (attach_accents mirrors the dealer's affinity data).
             for meal in md["meals"]:
-                L.append(f"### {meal['slot']} — {meal['serving_model'].replace('_', ' ')}\n")
+                # M1.13: the sheet finally SAYS the dish — dish-mode meals
+                # carry dish_name (+ dishes on an opt-in second dish); the
+                # heading reads "slot — gorditas de picadillo — portioned".
+                # Heritage meals lack the key and render byte-identically.
+                dish_bit = ""
+                if meal.get("dish_name"):
+                    names = meal["dish_name"]
+                    extra_dishes = (meal.get("dishes") or [])[1:]
+                    if extra_dishes:
+                        names += " + " + " + ".join(extra_dishes)
+                    dish_bit = f" — {names}"
+                L.append(f"### {meal['slot']}{dish_bit} — "
+                         f"{meal['serving_model'].replace('_', ' ')}\n")
+                servings = meal.get("servings") or {}
+                for j, t_ in servings.items():
+                    L.append(f"- *{j}: {t_:g} serving"
+                             f"{'s' if t_ != 1 else ''}, portioned within "
+                             "its ratio bands*")
                 if not meal["items"]:
                     L.append("_nothing dealt to this meal_")
                 elif meal["serving_model"] == "portioned":
