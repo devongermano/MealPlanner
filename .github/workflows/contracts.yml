@@ -15,6 +15,15 @@ on:
     paths:
       - "services/solver/mealplan/schemas.py"
       - "services/solver/mealplan/service.py"
+      - "services/solver/pyproject.toml"
+      - "packages/contracts/**"
+      - ".github/workflows/contracts.yml"
+  push:
+    branches: [main]
+    paths:
+      - "services/solver/mealplan/schemas.py"
+      - "services/solver/mealplan/service.py"
+      - "services/solver/pyproject.toml"
       - "packages/contracts/**"
       - ".github/workflows/contracts.yml"
 
