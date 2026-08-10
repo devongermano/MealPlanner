@@ -1,0 +1,142 @@
+.page-head {
+  margin-bottom: var(--space-6);
+}
+
+.lede {
+  margin-top: var(--space-3);
+  max-width: 58ch;
+}
+
+.panel {
+  padding-top: var(--space-6);
+  margin-top: var(--space-6);
+  border-top: 1px solid var(--border);
+}
+
+.panel:first-of-type {
+  padding-top: 0;
+  margin-top: 0;
+  border-top: 0;
+}
+
+.panel-head p {
+  margin-top: var(--space-2);
+  max-width: 58ch;
+  font-size: var(--text-sm);
+}
+
+/* ---- Profile facts ---------------------------------------------------- */
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: var(--space-4);
+  margin: var(--space-5) 0 0;
+}
+
+dt {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+dd {
+  margin: var(--space-1) 0 0;
+}
+
+.hint {
+  margin-top: var(--space-4);
+  font-size: var(--text-xs);
+  color: var(--ink-muted);
+  max-width: 58ch;
+}
+
+/* ---- Member list ------------------------------------------------------ */
+
+.members {
+  margin: var(--space-5) 0 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.members li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.members li:last-child {
+  border-bottom: 0;
+}
+
+.members li.empty {
+  display: block;
+  font-size: var(--text-sm);
+  padding: var(--space-5) var(--space-4);
+  max-width: 58ch;
+}
+
+.who {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.name {
+  font-weight: 500;
+}
+
+.email {
+  font-size: var(--text-sm);
+}
+
+.role-select {
+  width: auto;
+  min-width: 7.5rem;
+  padding-block: 0.25rem;
+  font-size: var(--text-sm);
+  text-transform: capitalize;
+}
+
+.remove {
+  min-height: 1.75rem;
+  padding: 0 var(--space-2);
+  font-size: var(--text-sm);
+}
+
+/* ---- Add-member form -------------------------------------------------- */
+
+.member-form {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+}
+
+.member-form .add {
+  justify-self: start;
+}
+
+.notes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  gap: var(--space-4);
+  margin-top: var(--space-5);
+}
+
+@media (min-width: 40rem) {
+  .member-form {
+    grid-template-columns: 1.3fr 1fr 1.3fr auto;
+    align-items: end;
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "name": "mealplan",
+  "short_name": "mealplan",
+  "description": "Plan a week of food for everyone in the household, cook it in batches, and portion it out.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#faf8f5",
+  "theme_color": "#faf8f5",
+  "icons": [
+    {
+      "src": "favicon.ico",
+      "sizes": "48x48",
+      "type": "image/x-icon"
+    }
+  ]
+}

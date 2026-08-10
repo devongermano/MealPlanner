@@ -1,0 +1,11 @@
+.preview-banner {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-xs);
+  text-align: center;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--accent) 18%, var(--bg));
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+}
