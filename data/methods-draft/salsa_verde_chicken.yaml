@@ -1,0 +1,51 @@
+schema_version: 0
+component: salsa_verde_chicken
+steps:
+  - phase: prep
+    text: Halve and seed the poblanos and jalapenos; quarter the onion
+    station: prep
+    mode: active
+    duration_min: 5
+    operation: chop
+  - phase: cook
+    text: Char the poblanos, jalapenos, onion, and garlic under the broiler until blistered
+    station: oven
+    mode: active
+    duration_min: 10
+    oven_temp_f: 500
+    operation: char
+  - phase: cook
+    text: Blend the charred vegetables with the lime juice and half the cilantro
+    station: prep
+    mode: active
+    duration_min: 4
+    operation: blend
+  - phase: cook
+    text: Fry the blended salsa in the oil in a wide pot until it darkens slightly
+    station: stove
+    mode: active
+    duration_min: 4
+    operation: fry
+  - phase: cook
+    text: Add the chicken stock and poach the chicken breasts in the salsa at a bare simmer until cooked through
+    station: stove
+    mode: passive
+    duration_min: 20
+    operation: poach
+  - phase: finish
+    text: Shred the chicken into the salsa
+    station: prep
+    mode: active
+    duration_min: 8
+    operation: shred
+  - phase: finish
+    text: Season with lime and salt and stir the remaining cilantro through
+    station: stove
+    mode: active
+    duration_min: 2
+  - phase: finish
+    text: Portion into containers
+    station: none
+    mode: active
+    duration_min: 4
+    operation: portion

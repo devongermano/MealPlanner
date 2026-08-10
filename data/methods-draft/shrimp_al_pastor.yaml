@@ -1,0 +1,45 @@
+schema_version: 0
+component: shrimp_al_pastor
+steps:
+  - phase: prep
+    text: Stem and seed the dried chiles, then toast in a dry skillet until fragrant
+    station: stove
+    mode: active
+    duration_min: 4
+    operation: toast
+  - phase: prep
+    text: Soak the toasted chiles in hot water until pliable
+    station: none
+    mode: passive
+    duration_min: 15
+    operation: soak
+  - phase: prep
+    text: Blend the soaked chiles, the pineapple, the lime juice, the garlic, and the spices into a marinade
+    station: prep
+    mode: active
+    duration_min: 4
+    operation: blend
+  - phase: prep
+    text: Pat the shrimp dry, toss with the marinade, and refrigerate
+    station: none
+    mode: passive
+    duration_min: 20
+    operation: marinate
+  - phase: cook
+    text: Sear the shrimp in the oil in a ripping-hot skillet, in batches, until just opaque
+    station: stove
+    mode: active
+    duration_min: 8
+    operation: sear
+  - phase: cook
+    text: Pour the remaining marinade into the pan, reduce to a glaze, and toss the shrimp back through
+    station: stove
+    mode: active
+    duration_min: 4
+    operation: reduce
+  - phase: finish
+    text: Portion into containers
+    station: none
+    mode: active
+    duration_min: 3
+    operation: portion

@@ -1,0 +1,47 @@
+schema_version: 0
+component: carnitas
+steps:
+  - phase: prep
+    text: Cut the pork shoulder into large chunks
+    station: prep
+    mode: active
+    duration_min: 10
+    operation: cube
+  - phase: prep
+    text: Quarter the onion and halve the limes
+    station: prep
+    mode: active
+    duration_min: 3
+    operation: chop
+  - phase: cook
+    text: Toss the pork with the spices, pack into a Dutch oven with the lard, orange juice, lime halves, onion, and garlic, and bring to a bare simmer
+    station: stove
+    mode: active
+    duration_min: 6
+    operation: mix
+  - phase: cook
+    text: Cover and braise in the oven until fork-tender
+    station: oven
+    mode: passive
+    duration_min: 180
+    oven_temp_f: 300
+    operation: braise
+  - phase: finish
+    text: Shred the pork, discarding the lime husks
+    station: prep
+    mode: active
+    duration_min: 8
+    operation: shred
+  - phase: finish
+    text: Spread the shredded pork on a sheet pan and crisp under the broiler until the edges brown
+    station: oven
+    mode: active
+    duration_min: 8
+    oven_temp_f: 500
+    operation: broil
+  - phase: finish
+    text: Portion into containers
+    station: none
+    mode: active
+    duration_min: 4
+    operation: portion

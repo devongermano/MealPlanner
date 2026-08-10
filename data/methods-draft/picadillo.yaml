@@ -1,0 +1,74 @@
+schema_version: 0
+component: picadillo
+steps:
+  - phase: prep
+    text: Stem and seed the dried chiles, then toast in a dry skillet until fragrant
+    station: stove
+    mode: active
+    duration_min: 4
+    operation: toast
+  - phase: prep
+    text: Soak the toasted chiles in hot water until pliable
+    station: none
+    mode: passive
+    duration_min: 15
+    operation: soak
+  - phase: prep
+    text: Dice the potatoes and the carrot
+    station: prep
+    mode: active
+    duration_min: 8
+    operation: dice
+  - phase: prep
+    text: Dice the onion
+    station: prep
+    mode: active
+    duration_min: 4
+    operation: dice
+  - phase: prep
+    text: Mince the garlic
+    station: prep
+    mode: active
+    duration_min: 2
+    operation: mince
+  - phase: prep
+    text: Blend the soaked chiles with the tomatoes to a smooth puree
+    station: prep
+    mode: active
+    duration_min: 4
+    operation: blend
+  - phase: cook
+    text: Brown the ground beef in the oil, breaking it into crumbles
+    station: stove
+    mode: active
+    duration_min: 8
+    operation: brown
+  - phase: cook
+    text: Add the diced onion and carrot and cook until softened
+    station: stove
+    mode: active
+    duration_min: 5
+    operation: saute
+  - phase: cook
+    text: Stir in the minced garlic and the spices; cook until fragrant
+    station: stove
+    mode: active
+    duration_min: 1
+    operation: bloom
+  - phase: cook
+    text: Pour in the chile-tomato puree, add the diced potato, and simmer until the potato is tender
+    station: stove
+    mode: passive
+    duration_min: 20
+    operation: simmer
+  - phase: finish
+    text: Season to taste and pull off the heat
+    station: stove
+    mode: active
+    duration_min: 2
+  - phase: finish
+    text: Portion into containers
+    station: none
+    mode: active
+    duration_min: 4
+    operation: portion

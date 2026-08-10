@@ -1,0 +1,38 @@
+schema_version: 0
+component: gordita_shell
+steps:
+  - phase: prep
+    text: Work the lard into the masa harina with warm salted water until a soft dough forms
+    station: prep
+    mode: active
+    duration_min: 8
+    operation: knead
+  - phase: prep
+    text: Rest the dough, covered with a damp towel
+    station: none
+    mode: passive
+    duration_min: 10
+    operation: rest
+  - phase: prep
+    text: Divide the dough into balls and press into thick rounds
+    station: prep
+    mode: active
+    duration_min: 8
+    operation: shape
+  - phase: cook
+    text: Griddle the rounds on a dry comal until puffed and browned in spots, flipping once
+    station: stove
+    mode: active
+    duration_min: 14
+    operation: griddle
+  - phase: finish
+    text: Split each shell partway open along the edge while still warm
+    station: prep
+    mode: active
+    duration_min: 4
+  - phase: finish
+    text: Cool the shells and portion
+    station: none
+    mode: active
+    duration_min: 3
+    operation: portion

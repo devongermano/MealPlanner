@@ -1,0 +1,44 @@
+schema_version: 0
+component: cilantro_lime_rice
+steps:
+  - phase: prep
+    text: Rinse the rice until the water runs clear; drain well
+    station: prep
+    mode: active
+    duration_min: 4
+    operation: rinse
+  - phase: cook
+    text: Toast the drained rice in the oil until chalky and fragrant
+    station: stove
+    mode: active
+    duration_min: 3
+    operation: toast
+  - phase: cook
+    text: Add water and salt, bring to a boil, then cover and simmer on low
+    station: stove
+    mode: passive
+    duration_min: 15
+    operation: simmer
+  - phase: cook
+    text: Rest off the heat, covered
+    station: none
+    mode: passive
+    duration_min: 10
+    operation: rest
+  - phase: finish
+    text: Chop the cilantro
+    station: prep
+    mode: active
+    duration_min: 3
+    operation: chop
+  - phase: finish
+    text: Fluff the rice, folding in the chopped cilantro and the lime zest and juice
+    station: prep
+    mode: active
+    duration_min: 3
+  - phase: finish
+    text: Portion into containers
+    station: none
+    mode: active
+    duration_min: 4
+    operation: portion
