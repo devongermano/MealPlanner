@@ -1173,18 +1173,18 @@
             ]
           },
           "userId": {
-            "type": "object",
+            "type": "string",
             "format": "uuid",
             "nullable": true,
             "description": "auth.users id, or null when this member is a PLACEHOLDER — a real member with no account yet. Null here is the one flag that distinguishes the two kinds of member; a placeholder can never be a caller."
           },
           "personName": {
-            "type": "object",
+            "type": "string",
             "nullable": true,
             "description": "Library person key, or null if this member does not eat."
           },
           "inviteEmail": {
-            "type": "object",
+            "type": "string",
             "nullable": true,
             "description": "Invite intent for a placeholder. Always null once the member has an account."
           },
@@ -1327,7 +1327,7 @@
             "description": "The CALLER's display name here."
           },
           "personName": {
-            "type": "object",
+            "type": "string",
             "nullable": true,
             "description": "The CALLER's library person key here."
           },
@@ -1412,7 +1412,7 @@
             "maxLength": 120
           },
           "personName": {
-            "type": "object",
+            "type": "string",
             "nullable": true,
             "description": "The library person you eat as. Send null to stop eating in this plan.",
             "example": "devon"
@@ -1437,13 +1437,13 @@
             "description": "Placeholder members only — once a member has an account, their display name is theirs."
           },
           "personName": {
-            "type": "object",
+            "type": "string",
             "nullable": true,
             "description": "Accepted on ANY member, placeholder or not: the library link is planning data, and the planner runs the plan. Send null to unlink the member from it.",
             "example": "alex"
           },
           "inviteEmail": {
-            "type": "object",
+            "type": "string",
             "format": "email",
             "maxLength": 320,
             "nullable": true,
@@ -1460,7 +1460,7 @@
             "description": "auth.users id of the verified caller."
           },
           "email": {
-            "type": "object",
+            "type": "string",
             "nullable": true
           },
           "isAnonymous": {
