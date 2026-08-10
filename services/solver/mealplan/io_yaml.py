@@ -997,7 +997,9 @@ def validate_dishes_doc(doc: Any, comps=None, people=None,
                 severity="warning"))
         sv_pool = [cid for cid, c in comps.items()
                    if c["role"] in ("starch", "veg")]
-        orphan_sides = sorted(set(sv_pool) - used_side)
+        # a starch/veg that is a dish MEMBER is reachable through its dish —
+        # only one that is neither member nor side anywhere is unservable
+        orphan_sides = sorted(set(sv_pool) - used_side - used_component)
         if orphan_sides:
             issues.append(ValidationIssue(
                 "orphan_side", fname,

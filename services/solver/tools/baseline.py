@@ -118,8 +118,9 @@ def run_examples_dishes(timings):
                 dishes_mod.skeleton_day(p, dmap, comps, settings, d,
                                         slots, menu, ing=ing)
     with span(timings, "build_week (plate-dish)"):
+        diag = {}
         weeks, demand, mealdays = dishes_mod.build_week_dishes(
-            comps, people, settings, dmap, menu, seed=0, ing=ing)
+            comps, people, settings, dmap, menu, seed=0, ing=ing, diag=diag)
     with span(timings, "session_plan"):
         sp = costing.session_plan(comps, ing, settings, weeks)
     with span(timings, "purchase"):
@@ -127,6 +128,13 @@ def run_examples_dishes(timings):
                          [i for i in info["closure"]
                           if sp["batches"].get(i)],
                          sp["batches"])
+    # M113_SPEC §12/§13 (Judge 2 dissent, accepted): the retry/flag-rate
+    # report must be RECORDED, not just transiently asserted — stash the
+    # diag for render_dish_instrumentation, guarded like the solve counts
+    prev = getattr(run_examples_dishes, "diag", None)
+    if prev is not None and prev != diag:
+        sys.exit("NONDETERMINISM: dish diag differs across runs")
+    run_examples_dishes.diag = diag
     return engine.solve_counts()
 
 
@@ -230,6 +238,72 @@ def render(name, what, counts, timings, runs):
     return L
 
 
+def render_dish_instrumentation(diag):
+    """M113_SPEC §12/§13 (pre-M1.6 requirement — Judge 2 dissent, accepted):
+    the recorded skeleton-retry + flag-rate report the escalation criterion
+    reads. The §13 trigger for the dish-binary day MILP is DATA-FORCED from
+    these numbers: ASSIGN_RETRIES exhaustion or no_dish_assignable on > 5%
+    of person-days, or band_unmet / dish_band_binding above
+    BAND_ESCALATION_THRESHOLD (0.20). Values provisional (P9) — recorded
+    here on every `make baseline`, never test-asserted."""
+    from mealplan.dishes import DISH_WEIGHTS
+    from mealplan.meals import MEAL_WEIGHTS
+    retries = diag.get("dish_retries", {})
+    flags = diag.get("dish_flag_counts", {})
+    flag_days = diag.get("dish_flag_days", {})
+    person_days = sum(len(v) for v in retries.values())
+    exhausted = sum(1 for v in retries.values()
+                    for r in v if r >= DISH_WEIGHTS["ASSIGN_RETRIES"])
+    retried = sum(1 for v in retries.values() for r in v if r > 0)
+    total_retries = sum(r for v in retries.values() for r in v)
+    holes = len(diag.get("no_dish_assignable", []))
+    thr = MEAL_WEIGHTS["BAND_ESCALATION_THRESHOLD"]
+
+    def rate(n):
+        return n / person_days if person_days else 0.0
+
+    struct_rate = rate(exhausted + holes)
+    L = ["### Dish instrumentation — the §13 escalation report "
+         "(M113_SPEC §12; recorded-only)", "",
+         f"Person-days: **{person_days}**. Escalation to the dish-binary "
+         "day MILP is data-forced when the structural rate exceeds **5%** "
+         "of person-days, or the fraction of person-days carrying "
+         "`band_unmet`/`dish_band_binding` exceeds "
+         f"**BAND_ESCALATION_THRESHOLD ({thr:.2f})**, on an M1.6-class "
+         "real week.", "",
+         "| measure | occurrences | person-days | day fraction | trigger |",
+         "|---|---|---|---|---|",
+         f"| skeleton retries | {total_retries} | {retried} "
+         f"| {rate(retried):.3f} | — |",
+         f"| ASSIGN_RETRIES exhausted | — | {exhausted} "
+         f"| {rate(exhausted):.3f} | > 0.05 (with holes) |",
+         f"| no_dish_assignable holes | {holes} | — "
+         f"| {rate(holes):.3f} | > 0.05 (with exhaustion) |"]
+    seen_codes = sorted(set(flags) | {"band_unmet", "dish_band_binding"})
+    for code in seen_codes:
+        trig = (f"> {thr:.2f}" if code in ("band_unmet", "dish_band_binding")
+                else "—")
+        L.append(f"| flag `{code}` | {flags.get(code, 0)} "
+                 f"| {flag_days.get(code, 0)} "
+                 f"| {rate(flag_days.get(code, 0)):.3f} | {trig} |")
+    fired = struct_rate > 0.05 or any(
+        rate(flag_days.get(c, 0)) > thr
+        for c in ("band_unmet", "dish_band_binding"))
+    L += ["",
+          ("**Criterion FIRED on this corpus** — carry these counts to the "
+           "owner's desk (M113_SPEC §13)."
+           if fired else
+           "**Criterion not met on this corpus** — the skeleton holds; the "
+           "MILP stays parked (M113_SPEC §13)."),
+          "",
+          "`band_unmet` is expected to read high until M1.6 ratifies "
+          "MEAL_BAND: meal bands are the designed SOFT mode pre-M1.6, so "
+          "the flag records pressure, not failure — the escalation "
+          "decision reads it against an M1.6-class real week, not this "
+          "demo corpus.", ""]
+    return L
+
+
 def render_targets(int_t, ex_t, lock_t, runs):
     """M1.5 (PRD §8.5, measure-then-promise): provisional interactive-
     latency targets = 2x headroom over the recorded medians."""
@@ -321,6 +395,7 @@ def main():
                 "purchase on the component closure. PROVISIONAL labels "
                 "(P9) — never test-asserted.",
                 exd_counts, exd_t, a.runs)
+    L += render_dish_instrumentation(run_examples_dishes.diag)
     L += render("Interactive primitives — tests/fixtures/solo_lifter",
                 "One plate LP and one replate (day rebalance, §4.4) on the "
                 "golden menu — the solves an interactive surface waits on "

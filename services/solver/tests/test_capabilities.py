@@ -39,7 +39,7 @@ import refenv
 
 # The frozen golden parameter set lives in tests/_shared.py (M1.0: test
 # modules never import each other — importlib-mode safe).
-from _shared import GOLDEN_MENU_KW, GOLDEN_SEED
+from _shared import GOLDEN_DISH_MENU_KW, GOLDEN_MENU_KW, GOLDEN_SEED
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 GOLDEN = Path(__file__).resolve().parent / "golden"
@@ -71,6 +71,39 @@ def solo_pipeline():
                 menu=menu, feasible=feasible, broke=broke, weeks=weeks,
                 demand=demand, diag=diag, session_plan=sp, purchase=rows,
                 waste_perishable=waste_perishable, waste_total=waste_total)
+
+
+def dish_pipeline_run():
+    """The frozen DISH-MODE pipeline (M1.13) on fixtures/solo_dishes: load
+    (+dishes.yaml via the real default path) -> choose_menu_dishes ->
+    build_week_dishes -> session_plan -> purchase over the dish closure.
+    One function shared by the golden fixture and the regen entry point so
+    they cannot drift."""
+    from mealplan import dishes as dishes_mod
+    ing, comps, people, settings = load("solo_dishes")
+    dmap = io_yaml.load_dishes(FIXTURES / "solo_dishes" / "dishes.yaml",
+                               comps=comps, people=people)
+    menu, info, feasible, broke = dishes_mod.choose_menu_dishes(
+        comps, ing, people, settings, dmap, **GOLDEN_DISH_MENU_KW)
+    diag = {}
+    weeks, demand, mealdays = dishes_mod.build_week_dishes(
+        comps, people, settings, dmap, menu, seed=GOLDEN_SEED, ing=ing,
+        diag=diag)
+    sp = costing.session_plan(comps, ing, settings, weeks)
+    rows, waste_perishable, waste_total = costing.purchase(
+        comps, ing, [i for i in info["closure"] if sp["batches"].get(i)],
+        sp["batches"])
+    return dict(ing=ing, comps=comps, people=people, settings=settings,
+                dishes=dmap, menu=menu, closure=info["closure"],
+                feasible=feasible, broke=broke, weeks=weeks, demand=demand,
+                mealdays=mealdays, diag=diag, session_plan=sp,
+                purchase=rows, waste_perishable=waste_perishable,
+                waste_total=waste_total)
+
+
+@pytest.fixture(scope="module")
+def solo_dish_pipeline():
+    return dish_pipeline_run()
 
 
 @pytest.fixture(scope="module")
@@ -414,6 +447,78 @@ def test_determinism_golden_full_pipeline_byte_stable(solo_pipeline):
         " tests/golden/README.md")
 
 
+def golden_dish_payload(p):
+    """The byte-stable serialization of the solo_dishes DISH-MODE pipeline
+    (M1.13, M113_SPEC §12: the determinism golden extends to dish output —
+    mealdays carry dish identity, servings scalars, and flags)."""
+    obj = dict(
+        fixture="solo_dishes", seed=GOLDEN_SEED,
+        menu_kwargs={k: v for k, v in GOLDEN_DISH_MENU_KW.items()},
+        menu=p["menu"], closure=p["closure"],
+        feasible=p["feasible"], broke=p["broke"],
+        weeks=p["weeks"], demand=p["demand"], mealdays=p["mealdays"],
+        session_plan=p["session_plan"], purchase=p["purchase"],
+        waste_perishable=p["waste_perishable"],
+        waste_total=p["waste_total"])
+    return json.dumps(_jsonable(obj), sort_keys=True, indent=1,
+                      ensure_ascii=False) + "\n"
+
+
+def test_determinism_golden_dish_pipeline_byte_stable(solo_dish_pipeline):
+    """M1.13's half of the golden policy (M113_SPEC §12/§14 slow-1):
+    same inputs + seed must reproduce the recorded DISH-MODE plan byte for
+    byte on the pinned reference environment — dish assignment (skeleton),
+    portioning (plate-dish LP), meal composition, session attribution, and
+    purchasing all inside the guarantee. Off-reference this SKIPS and
+    test_golden_dish_pipeline_properties_all_platforms carries it."""
+    if not refenv.is_reference_env():
+        pytest.skip(refenv.off_reference_reason())
+    got = golden_dish_payload(solo_dish_pipeline)
+    ref = (GOLDEN / "solo_dishes_pipeline.json").read_text()
+    assert got == ref, (
+        "dish pipeline output diverged from"
+        " tests/golden/solo_dishes_pipeline.json — if the change is"
+        " intended, regenerate deliberately per tests/golden/README.md")
+
+
+def test_golden_dish_pipeline_properties_all_platforms(solo_dish_pipeline):
+    """The every-platform half for dish mode: properties of the frozen
+    solo_dishes pipeline that hold on any OS/arch/CBC build."""
+    p = solo_dish_pipeline
+    settings, dishes = p["settings"], p["dishes"]
+    assert p["feasible"] is True and p["broke"] == {}
+    assert p["menu"] and set(p["menu"]) <= set(dishes)
+    assert set(p["weeks"]) == set(p["people"]) == set(p["mealdays"])
+    for pname, mds in p["mealdays"].items():
+        assert len(mds) == settings["days"], pname
+        for md in mds:
+            for meal in md["meals"]:
+                # a hole would carry dish=None — the frozen fixture solves
+                # every slot with a named menu dish
+                assert meal["dish"] in p["menu"], (pname, meal)
+    # conservation: Σ meals == day plate == demand (definitional, §8)
+    total = {}
+    for pname, wk in p["weeks"].items():
+        assert len(wk) == settings["days"]
+        for plate, md in zip(wk, p["mealdays"][pname]):
+            dealt = {}
+            for meal in md["meals"]:
+                for cid, g in meal["items"].items():
+                    dealt[cid] = dealt.get(cid, 0) + g
+            assert dealt == plate
+            for cid, g in plate.items():
+                total[cid] = total.get(cid, 0) + g
+    assert total == p["demand"]
+    sp = p["session_plan"]
+    assert sp["unattributed"] == []
+    for name, need, units, pack, left, per, keeps in p["purchase"]:
+        assert units * pack >= need, name
+    # determinism ON this machine: the same frozen inputs re-run must
+    # serialize identically to the fixture's run
+    assert golden_dish_payload(dish_pipeline_run()) == \
+        golden_dish_payload(p)
+
+
 def test_golden_pipeline_properties_all_platforms(solo_pipeline):
     """The every-platform half of the golden policy (PRD §9): where the byte
     compare only runs on the pinned reference environment, these PROPERTIES
@@ -563,4 +668,8 @@ if __name__ == "__main__":
                  waste_perishable=wp, waste_total=wt)
         out = GOLDEN / "solo_lifter_pipeline.json"
         out.write_text(golden_payload(p))
+        print(f"wrote {out}")
+        # M1.13: the dish-mode golden (same deliberate-regeneration policy)
+        out = GOLDEN / "solo_dishes_pipeline.json"
+        out.write_text(golden_dish_payload(dish_pipeline_run()))
         print(f"wrote {out}")

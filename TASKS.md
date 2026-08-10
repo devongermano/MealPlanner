@@ -19,20 +19,20 @@ it. Every workstream lands via branch → PR → CI gates → orchestrator revie
 
 | Lane | Scope | Owner / tier | Branch | Status |
 |---|---|---|---|---|
-| Main chain | M1 phases + dish layer (engine files — single-writer, serialized) | Workflows (Fable) | main | M1.10 in flight |
-| Track F | Data: DATA_GUIDE, dish reconstruction, corpus curation | `data-steward` (Opus, persistent) | track-f-data | in flight |
-| Track G | API: Supabase auth, households, roles, contracts-api types | `api-steward` (Opus, persistent) | track-g-api | in flight |
-| Track H | Web: shell, auth flows, onboarding, settings | `web-steward` (Opus, persistent) | track-h-web | in flight |
-| Design | Dish-layer mechanism panel → M1.13 spec | Workflow (Fable, read-only) | — | in flight |
-| Queued | M1.11 ∥ M1.12 (parallel worktrees on M1.10 landing) | Workflows (Fable) | — | queued |
-| Done | Track B contracts · Track C scaffolds · Track D USDA corpus · Track E method fragments · M1.9 meal layer | — | merged | ✅ |
+| Main chain | M1 phases + dish layer (engine files — single-writer, serialized) | Workflows (Fable) | main | M1.13 landed; M1.11 next |
+| M1.12 | Timeline compiler v0 (VERIFIED PASS) | Workflow (Fable) | track-i-timeline | rebase onto main → PR |
+| Track F | Data: DATA_GUIDE, dish reconstruction, corpus curation | `data-steward` (Opus, persistent) | track-f-data | ✅ stood down |
+| Track G | API: Supabase auth, households, roles, contracts-api types | `api-steward` (Opus, persistent) | track-g-api | ✅ stood down |
+| Track H | Web: shell, auth flows, onboarding, settings | `web-steward` (Opus, persistent) | track-h-web | ✅ stood down |
+| Done | Track B contracts · Track C scaffolds · Track D USDA corpus · Track E method fragments · M1.9 meal layer · M1.13 dish layer | — | merged | ✅ |
 
-### The frozen zone
+### The frozen zone — LIFTED 2026-08-10
 
-Nothing may build against **meal/dish result shapes** (plan views, eat-sheet UI,
-solve endpoints, WeekPlanResult meal structure) until **M1.13 (dish layer) lands** —
-those shapes are mid-churn by owner correction. Auth/households/shell/settings are
-engine-independent and green-lit (PR-2 ratified).
+M1.13 landed: meal/dish result shapes (mealdays with dish identity, servings
+scalars, flags) are now stable enough to build against. Consumers should read
+the shape from the M1.13 golden (`tests/golden/solo_dishes_pipeline.json`)
+and the dish-mode e2e tests, not from prose. Remaining churn risk: M1.6 may
+ratify MEAL_BAND (flag semantics tighten, shapes stay).
 
 ### Steward roster (persistent, name-addressable — say "have the X-steward do Y")
 
@@ -97,9 +97,9 @@ and eaten from M1 output. Targets are arbitrary by design (owner, 2026-08-09:
 - [x] M1.8 Pantry aging + cooked leftovers (PRD §8.1): consume stock `acquired` dates (age reduces effective raw `keeps_days` — validated but unconsumed in M0, PRD Appendix B item 3); integrate pantry `cooked` list into availability (documented M1+ since M0.12)
 - [x] M1.9 Meal layer: post-solve dealer per `M19_SPEC.md` (judge-ratified) — meals_per_day LIVE, per-slot serving models, composed meals, conservation + inertness constitutional, strict-opt-in interchangeability *(22782be)*
 - [x] M1.10 Sheet rework: serving-model phrasing, compiled cook script from method fragments, shared-prep consolidation, portioning matrix *(workflow in flight; golden regen ratified by orchestrator 2026-08-09 — feeds rows are P10 canonical attribution; additive-only diff verified. Ripple: `session_plan` sessions gain `feeds` rows → golden + packages/contracts regenerated; batches/minutes/portions/purchasing byte-identical; regen justification in tests/golden/README.md per PRD §9)*
-- [ ] M1.13 **THE DISH LAYER** (owner correction: "these aren't meals") — dishes.yaml assembly restored; meals = one dish portioned + sides; menu selects dishes; design panel + data-steward draft converging *(runs after M1.10; spec + data in flight)*
-- [ ] M1.11 Target profiles: day-type cycling anchored to plan date *(parallel worktree after M1.10)*
-- [ ] M1.12 Timeline compiler v0: greedy interleaved cook schedule with timers, station buckets, cook_plan_style: timeline *(parallel worktree after M1.10; dish-independent — cooking is by component)*
+- [x] M1.13 **THE DISH LAYER** (owner correction: "these aren't meals") — dishes.yaml assembly restored; meals = one dish portioned + sides; menu selects dishes. Landed 2026-08-10: skeleton-then-solve per M113_SPEC, heritage byte-inert, dish golden (`solo_dishes_pipeline.json`) + §13 instrumentation report in BASELINES.md; examples/dishes.yaml synced from the re-banded draft (lint-silent); jimbo named slots (#28)
+- [ ] M1.11 Target profiles: day-type cycling anchored to plan date *(next on main chain)*
+- [ ] M1.12 Timeline compiler v0: greedy interleaved cook schedule with timers, station buckets, cook_plan_style: timeline — **VERIFIED PASS** on track-i-timeline; held for M1.13 ordering, now: rebase → PR → merge
 
 ## M2 — Collaborative web app *(service posture begins)*
 

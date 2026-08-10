@@ -1,0 +1,42 @@
+schema_version: 0
+# solo_dishes/dishes.yaml — three authored dishes over the solo_lifter corpus,
+# one per main. Bands are within-ONE-serving ratio flex (appetite is the
+# continuous servings scalar t, M1.13 §5). Accents follow the ruled subset
+# schema: listed in `accents` AND present in `components` with min_g 0.
+dishes:
+
+- id: grilled_chicken_bowl
+  name: Grilled chicken rice bowl
+  cuisine: test
+  reconstruction: invented
+  components:
+    chicken_grill: {base_g: 200, min_g: 150, max_g: 300}
+    rice_pot:      {base_g: 250, min_g: 150, max_g: 350}
+    herb_sauce:    {base_g: 30,  min_g: 0,   max_g: 100}
+  accents: [herb_sauce]
+  compatible_sides: [garden_veg]
+  meal_affinity: [lunch, dinner]
+
+- id: braised_beef_plate
+  name: Braised beef plate
+  cuisine: test2
+  reconstruction: invented
+  components:
+    beef_braise: {base_g: 220, min_g: 160, max_g: 280}
+    garden_veg:  {base_g: 120, min_g: 80,  max_g: 180}
+    oil_drizzle: {base_g: 15,  min_g: 0,   max_g: 60}
+  accents: [oil_drizzle]
+  compatible_sides: [rice_pot]
+  meal_affinity: [lunch, dinner]
+
+- id: pork_rice_scramble
+  name: Pork and rice scramble
+  cuisine: test3
+  reconstruction: invented
+  components:
+    pork_roast: {base_g: 150, min_g: 100, max_g: 200}
+    rice_pot:   {base_g: 200, min_g: 120, max_g: 280}
+    herb_sauce: {base_g: 20,  min_g: 0,   max_g: 80}
+  accents: [herb_sauce]
+  compatible_sides: []
+  meal_affinity: [breakfast]

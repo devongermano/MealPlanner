@@ -15,6 +15,9 @@ import ast
 # all three import it from here.
 GOLDEN_SEED = 0
 GOLDEN_MENU_KW = dict(n=6, seed=GOLDEN_SEED, iters=600, shortlist=8)
+# M1.13: the frozen parameter set of the DISH-MODE golden (fixture
+# solo_dishes — 3 authored dishes, so the search space is tiny on purpose).
+GOLDEN_DISH_MENU_KW = dict(n=3, seed=GOLDEN_SEED, iters=200, shortlist=4)
 
 
 def strip_comments_and_docstrings(src: str) -> str:

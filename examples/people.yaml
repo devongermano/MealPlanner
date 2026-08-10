@@ -19,9 +19,14 @@ people:
   jimbo:
     targets: {protein: 235, fat: 157, carb: 588}
     tolerance: 0.05
-    meals_per_day: 3      # LIVE (M1.9, PRD §4.0): the solved day is dealt into
-                          # 3 composed meals (auto-named meal_1..meal_3; the
-                          # serving model defaults to portioned)
+    meal_slots:           # M1.9/M1.13: NAMED slots (was meals_per_day: 3 —
+                          # auto-named meal_1..meal_3 can never match a dish's
+                          # meal_affinity, which silently turned affinity
+                          # scoring off for jimbo). Serving model defaults to
+                          # portioned for all three.
+      - {name: breakfast}
+      - {name: lunch}
+      - {name: dinner}
     exclude: [soy, peanut, garbanzo]
     # VOLUME CAP. 588g of carbs from rice is ~4.9 lb of rice; from tortillas it is
     # ~2.5 lb. Setting this forces the menu toward dense carbs instead of asking him

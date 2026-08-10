@@ -1136,8 +1136,11 @@ def build_week_dishes(comps, people, settings, dishes, menu, seed=0,
 
     Returns ``(weeks, demand, mealdays)``. ``diag`` (P8) gains
     ``dish_retries`` (per person: skeleton retry count per day),
-    ``dish_flag_counts``, and ``no_dish_assignable`` — the §13 pre-M1.6
-    escalation instrumentation."""
+    ``dish_flag_counts`` (occurrences per code), ``dish_flag_days``
+    (person-days carrying the code — the measure §13's
+    BAND_ESCALATION_THRESHOLD compares against), and
+    ``no_dish_assignable`` — the §13 pre-M1.6 escalation
+    instrumentation."""
     W = _weights()
     days = settings["days"]
     leftover_days = {}
@@ -1145,6 +1148,10 @@ def build_week_dishes(comps, people, settings, dishes, menu, seed=0,
         leftover_days.setdefault(e["component"], set()).update(e["days"])
     weeks, demand, mealdays = {}, {}, {}
     flag_counts = {}
+    # §13's escalation criterion is a FRACTION OF PERSON-DAYS carrying a
+    # flag (vs BAND_ESCALATION_THRESHOLD) — occurrences alone can exceed
+    # 1.0/day and compare against the wrong measure
+    flag_days = {}
     for pname in sorted(people):
         person = people[pname]
         slots = resolve_meal_slots(person)
@@ -1205,13 +1212,18 @@ def build_week_dishes(comps, people, settings, dishes, menu, seed=0,
                                       for m in MACROS},
                                   flags=[dict(hole)]) for a in asn]
             md = dict(meals=meals_out, notes=list(notes))
+            codes_today = set()
             for f in res["day_flags"]:
                 md["notes"].append(dict(f))
                 flag_counts[f["code"]] = flag_counts.get(f["code"], 0) + 1
+                codes_today.add(f["code"])
             for meal in meals_out:
                 for f in meal.get("flags", []):
                     flag_counts[f["code"]] = \
                         flag_counts.get(f["code"], 0) + 1
+                    codes_today.add(f["code"])
+            for code in codes_today:
+                flag_days[code] = flag_days.get(code, 0) + 1
             # derived day plate: Σ meals ≡ day plate (conservation is
             # definitional — kept as the cheap sanity check, §8)
             plate = {}
@@ -1242,6 +1254,7 @@ def build_week_dishes(comps, people, settings, dishes, menu, seed=0,
         mealdays[pname] = mds
     if diag is not None:
         diag["dish_flag_counts"] = flag_counts
+        diag["dish_flag_days"] = flag_days
     return weeks, demand, mealdays
 
 

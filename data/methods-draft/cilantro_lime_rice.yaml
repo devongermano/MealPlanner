@@ -14,10 +14,16 @@ steps:
     duration_min: 3
     operation: toast
   - phase: cook
-    text: Add water and salt, bring to a boil, then cover and simmer on low
+    text: Add water and salt and bring to a boil
+    station: stove
+    mode: active
+    duration_min: 3
+    operation: simmer
+  - phase: cook
+    text: Cover and simmer on low
     station: stove
     mode: passive
-    duration_min: 15
+    duration_min: 12
     operation: simmer
   - phase: cook
     text: Rest off the heat, covered

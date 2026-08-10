@@ -1,0 +1,1380 @@
+{
+ "broke": {},
+ "closure": [
+  "beef_braise",
+  "chicken_grill",
+  "garden_veg",
+  "herb_sauce",
+  "oil_drizzle",
+  "pork_roast",
+  "rice_pot"
+ ],
+ "demand": {
+  "beef_braise": 1057,
+  "chicken_grill": 1848,
+  "garden_veg": 301,
+  "herb_sauce": 224,
+  "oil_drizzle": 91,
+  "pork_roast": 1337,
+  "rice_pot": 5362
+ },
+ "feasible": true,
+ "fixture": "solo_dishes",
+ "mealdays": {
+  "sol": [
+   {
+    "meals": [
+     {
+      "dish": "pork_rice_scramble",
+      "dish_name": "Pork and rice scramble",
+      "dishes": [
+       "pork_rice_scramble"
+      ],
+      "flags": [],
+      "items": {
+       "herb_sauce": 11,
+       "pork_roast": 191,
+       "rice_pot": 226
+      },
+      "macros": {
+       "carb": 68.3,
+       "fat": 17.8,
+       "kcal": 597.7,
+       "protein": 41.0
+      },
+      "serving_model": "family_style",
+      "servings": {
+       "pork_rice_scramble": 0.95
+      },
+      "slot": "breakfast",
+      "target": {
+       "carb": 83.3,
+       "fat": 21.7,
+       "protein": 50.0
+      }
+     },
+     {
+      "dish": "braised_beef_plate",
+      "dish_name": "Braised beef plate",
+      "dishes": [
+       "braised_beef_plate"
+      ],
+      "flags": [
+       {
+        "achieved_g": 28.5,
+        "band": [
+         15.2,
+         28.2
+        ],
+        "binding_bound": null,
+        "code": "band_unmet",
+        "delta_g": 6.8,
+        "macro": "fat",
+        "message": "'lunch' is 7g over of its fat slot target — dish integrity wins (braised_beef_plate)",
+        "responsible_component": "beef_braise",
+        "responsible_dish": "braised_beef_plate",
+        "slot": "lunch",
+        "target_g": 21.7
+       },
+       {
+        "achieved_g": 108.4,
+        "band": [
+         58.3,
+         108.3
+        ],
+        "binding_bound": null,
+        "code": "band_unmet",
+        "delta_g": 25.0,
+        "macro": "carb",
+        "message": "'lunch' is 25g over of its carb slot target — dish integrity wins (braised_beef_plate)",
+        "responsible_component": "rice_pot",
+        "responsible_dish": "braised_beef_plate",
+        "slot": "lunch",
+        "target_g": 83.3
+       }
+      ],
+      "items": {
+       "beef_braise": 151,
+       "garden_veg": 43,
+       "oil_drizzle": 13,
+       "rice_pot": 349
+      },
+      "macros": {
+       "carb": 108.4,
+       "fat": 28.5,
+       "kcal": 829.7,
+       "protein": 35.0
+      },
+      "serving_model": "portioned",
+      "servings": {
+       "braised_beef_plate": 0.54
+      },
+      "slot": "lunch",
+      "target": {
+       "carb": 83.3,
+       "fat": 21.7,
+       "protein": 50.0
+      }
+     },
+     {
+      "dish": "grilled_chicken_bowl",
+      "dish_name": "Grilled chicken rice bowl",
+      "dishes": [
+       "grilled_chicken_bowl"
+      ],
+      "flags": [],
+      "items": {
+       "chicken_grill": 264,
+       "herb_sauce": 21,
+       "rice_pot": 191
+      },
+      "macros": {
+       "carb": 58.3,
+       "fat": 15.2,
+       "kcal": 629.8,
+       "protein": 65.0
+      },
+      "serving_model": "portioned",
+      "servings": {
+       "grilled_chicken_bowl": 0.88
+      },
+      "slot": "dinner",
+      "target": {
+       "carb": 83.3,
+       "fat": 21.7,
+       "protein": 50.0
+      }
+     }
+    ],
+    "notes": []
+   },
+   {
+    "meals": [
+     {
+      "dish": "pork_rice_scramble",
+      "dish_name": "Pork and rice scramble",
+      "dishes": [
+       "pork_rice_scramble"
+      ],
+      "flags": [],
+      "items": {
+       "herb_sauce": 11,
+       "pork_roast": 191,
+       "rice_pot": 226
+      },
+      "macros": {
+       "carb": 68.3,
+       "fat": 17.8,
+       "kcal": 597.7,
+       "protein": 41.0
+      },
+      "serving_model": "family_style",
+      "servings": {
+       "pork_rice_scramble": 0.95
+      },
+      "slot": "breakfast",
+      "target": {
+       "carb": 83.3,
+       "fat": 21.7,
+       "protein": 50.0
+      }
+     },
+     {
+      "dish": "braised_beef_plate",
+      "dish_name": "Braised beef plate",
+      "dishes": [
+       "braised_beef_plate"
+      ],
+      "flags": [
+       {
+        "achieved_g": 28.5,
+        "band": [
+         15.2,
+         28.2
+        ],
+        "binding_bound": null,
+        "code": "band_unmet",
+        "delta_g": 6.8,
+        "macro": "fat",
+        "message": "'lunch' is 7g over of its fat slot target — dish integrity wins (braised_beef_plate)",
+        "responsible_component": "beef_braise",
+        "responsible_dish": "braised_beef_plate",
+        "slot": "lunch",
+        "target_g": 21.7
+       },
+       {
+        "achieved_g": 108.4,
+        "band": [
+         58.3,
+         108.3
+        ],
+        "binding_bound": null,
+        "code": "band_unmet",
+        "delta_g": 25.0,
+        "macro": "carb",
+        "message": "'lunch' is 25g over of its carb slot target — dish integrity wins (braised_beef_plate)",
+        "responsible_component": "rice_pot",
+        "responsible_dish": "braised_beef_plate",
+        "slot": "lunch",
+        "target_g": 83.3
+       }
+      ],
+      "items": {
+       "beef_braise": 151,
+       "garden_veg": 43,
+       "oil_drizzle": 13,
+       "rice_pot": 349
+      },
+      "macros": {
+       "carb": 108.4,
+       "fat": 28.5,
+       "kcal": 829.7,
+       "protein": 35.0
+      },
+      "serving_model": "portioned",
+      "servings": {
+       "braised_beef_plate": 0.54
+      },
+      "slot": "lunch",
+      "target": {
+       "carb": 83.3,
+       "fat": 21.7,
+       "protein": 50.0
+      }
+     },
+     {
+      "dish": "grilled_chicken_bowl",
+      "dish_name": "Grilled chicken rice bowl",
+      "dishes": [
+       "grilled_chicken_bowl"
+      ],
+      "flags": [],
+      "items": {
+       "chicken_grill": 264,
+       "herb_sauce": 21,
+       "rice_pot": 191
+      },
+      "macros": {
+       "carb": 58.3,
+       "fat": 15.2,
+       "kcal": 629.8,
+       "protein": 65.0
+      },
+      "serving_model": "portioned",
+      "servings": {
+       "grilled_chicken_bowl": 0.88
+      },
+      "slot": "dinner",
+      "target": {
+       "carb": 83.3,
+       "fat": 21.7,
+       "protein": 50.0
+      }
+     }
+    ],
+    "notes": []
+   },
+   {
+    "meals": [
+     {
+      "dish": "pork_rice_scramble",
+      "dish_name": "Pork and rice scramble",
+      "dishes": [
+       "pork_rice_scramble"
+      ],
+      "flags": [],
+      "items": {
+       "herb_sauce": 11,
+       "pork_roast": 191,
+       "rice_pot": 226
+      },
+      "macros": {
+       "carb": 68.3,
+       "fat": 17.8,
+       "kcal": 597.7,
+       "protein": 41.0
+      },
+      "serving_model": "family_style",
+      "servings": {
+       "pork_rice_scramble": 0.95
+      },
+      "slot": "breakfast",
+      "target": {
+       "carb": 83.3,
+       "fat": 21.7,
+       "protein": 50.0
+      }
+     },
+     {
+      "dish": "braised_beef_plate",
+      "dish_name": "Braised beef plate",
+      "dishes": [
+       "braised_beef_plate"
+      ],
+      "flags": [
+       {
+        "achieved_g": 28.5,
+        "band": [
+         15.2,
+         28.2
+        ],
+        "binding_bound": null,
+        "code": "band_unmet",
+        "delta_g": 6.8,
+        "macro": "fat",
+        "message": "'lunch' is 7g over of its fat slot target — dish integrity wins (braised_beef_plate)",
+        "responsible_component": "beef_braise",
+        "responsible_dish": "braised_beef_plate",
+        "slot": "lunch",
+        "target_g": 21.7
+       },
+       {
+        "achieved_g": 108.4,
+        "band": [
+         58.3,
+         108.3
+        ],
+        "binding_bound": null,
+        "code": "band_unmet",
+        "delta_g": 25.0,
+        "macro": "carb",
+        "message": "'lunch' is 25g over of its carb slot target — dish integrity wins (braised_beef_plate)",
+        "responsible_component": "rice_pot",
+        "responsible_dish": "braised_beef_plate",
+        "slot": "lunch",
+        "target_g": 83.3
+       }
+      ],
+      "items": {
+       "beef_braise": 151,
+       "garden_veg": 43,
+       "oil_drizzle": 13,
+       "rice_pot": 349
+      },
+      "macros": {
+       "carb": 108.4,
+       "fat": 28.5,
+       "kcal": 829.7,
+       "protein": 35.0
+      },
+      "serving_model": "portioned",
+      "servings": {
+       "braised_beef_plate": 0.54
+      },
+      "slot": "lunch",
+      "target": {
+       "carb": 83.3,
+       "fat": 21.7,
+       "protein": 50.0
+      }
+     },
+     {
+      "dish": "grilled_chicken_bowl",
+      "dish_name": "Grilled chicken rice bowl",
+      "dishes": [
+       "grilled_chicken_bowl"
+      ],
+      "flags": [],
+      "items": {
+       "chicken_grill": 264,
+       "herb_sauce": 21,
+       "rice_pot": 191
+      },
+      "macros": {
+       "carb": 58.3,
+       "fat": 15.2,
+       "kcal": 629.8,
+       "protein": 65.0
+      },
+      "serving_model": "portioned",
+      "servings": {
+       "grilled_chicken_bowl": 0.88
+      },
+      "slot": "dinner",
+      "target": {
+       "carb": 83.3,
+       "fat": 21.7,
+       "protein": 50.0
+      }
+     }
+    ],
+    "notes": []
+   },
+   {
+    "meals": [
+     {
+      "dish": "pork_rice_scramble",
+      "dish_name": "Pork and rice scramble",
+      "dishes": [
+       "pork_rice_scramble"
+      ],
+      "flags": [],
+      "items": {
+       "herb_sauce": 11,
+       "pork_roast": 191,
+       "rice_pot": 226
+      },
+      "macros": {
+       "carb": 68.3,
+       "fat": 17.8,
+       "kcal": 597.7,
+       "protein": 41.0
+      },
+      "serving_model": "family_style",
+      "servings": {
+       "pork_rice_scramble": 0.95
+      },
+      "slot": "breakfast",
+      "target": {
+       "carb": 83.3,
+       "fat": 21.7,
+       "protein": 50.0
+      }
+     },
+     {
+      "dish": "braised_beef_plate",
+      "dish_name": "Braised beef plate",
+      "dishes": [
+       "braised_beef_plate"
+      ],
+      "flags": [
+       {
+        "achieved_g": 28.5,
+        "band": [
+         15.2,
+         28.2
+        ],
+        "binding_bound": null,
+        "code": "band_unmet",
+        "delta_g": 6.8,
+        "macro": "fat",
+        "message": "'lunch' is 7g over of its fat slot target — dish integrity wins (braised_beef_plate)",
+        "responsible_component": "beef_braise",
+        "responsible_dish": "braised_beef_plate",
+        "slot": "lunch",
+        "target_g": 21.7
+       },
+       {
+        "achieved_g": 108.4,
+        "band": [
+         58.3,
+         108.3
+        ],
+        "binding_bound": null,
+        "code": "band_unmet",
+        "delta_g": 25.0,
+        "macro": "carb",
+        "message": "'lunch' is 25g over of its carb slot target — dish integrity wins (braised_beef_plate)",
+        "responsible_component": "rice_pot",
+        "responsible_dish": "braised_beef_plate",
+        "slot": "lunch",
+        "target_g": 83.3
+       }
+      ],
+      "items": {
+       "beef_braise": 151,
+       "garden_veg": 43,
+       "oil_drizzle": 13,
+       "rice_pot": 349
+      },
+      "macros": {
+       "carb": 108.4,
+       "fat": 28.5,
+       "kcal": 829.7,
+       "protein": 35.0
+      },
+      "serving_model": "portioned",
+      "servings": {
+       "braised_beef_plate": 0.54
+      },
+      "slot": "lunch",
+      "target": {
+       "carb": 83.3,
+       "fat": 21.7,
+       "protein": 50.0
+      }
+     },
+     {
+      "dish": "grilled_chicken_bowl",
+      "dish_name": "Grilled chicken rice bowl",
+      "dishes": [
+       "grilled_chicken_bowl"
+      ],
+      "flags": [],
+      "items": {
+       "chicken_grill": 264,
+       "herb_sauce": 21,
+       "rice_pot": 191
+      },
+      "macros": {
+       "carb": 58.3,
+       "fat": 15.2,
+       "kcal": 629.8,
+       "protein": 65.0
+      },
+      "serving_model": "portioned",
+      "servings": {
+       "grilled_chicken_bowl": 0.88
+      },
+      "slot": "dinner",
+      "target": {
+       "carb": 83.3,
+       "fat": 21.7,
+       "protein": 50.0
+      }
+     }
+    ],
+    "notes": []
+   },
+   {
+    "meals": [
+     {
+      "dish": "pork_rice_scramble",
+      "dish_name": "Pork and rice scramble",
+      "dishes": [
+       "pork_rice_scramble"
+      ],
+      "flags": [],
+      "items": {
+       "herb_sauce": 11,
+       "pork_roast": 191,
+       "rice_pot": 226
+      },
+      "macros": {
+       "carb": 68.3,
+       "fat": 17.8,
+       "kcal": 597.7,
+       "protein": 41.0
+      },
+      "serving_model": "family_style",
+      "servings": {
+       "pork_rice_scramble": 0.95
+      },
+      "slot": "breakfast",
+      "target": {
+       "carb": 83.3,
+       "fat": 21.7,
+       "protein": 50.0
+      }
+     },
+     {
+      "dish": "braised_beef_plate",
+      "dish_name": "Braised beef plate",
+      "dishes": [
+       "braised_beef_plate"
+      ],
+      "flags": [
+       {
+        "achieved_g": 28.5,
+        "band": [
+         15.2,
+         28.2
+        ],
+        "binding_bound": null,
+        "code": "band_unmet",
+        "delta_g": 6.8,
+        "macro": "fat",
+        "message": "'lunch' is 7g over of its fat slot target — dish integrity wins (braised_beef_plate)",
+        "responsible_component": "beef_braise",
+        "responsible_dish": "braised_beef_plate",
+        "slot": "lunch",
+        "target_g": 21.7
+       },
+       {
+        "achieved_g": 108.4,
+        "band": [
+         58.3,
+         108.3
+        ],
+        "binding_bound": null,
+        "code": "band_unmet",
+        "delta_g": 25.0,
+        "macro": "carb",
+        "message": "'lunch' is 25g over of its carb slot target — dish integrity wins (braised_beef_plate)",
+        "responsible_component": "rice_pot",
+        "responsible_dish": "braised_beef_plate",
+        "slot": "lunch",
+        "target_g": 83.3
+       }
+      ],
+      "items": {
+       "beef_braise": 151,
+       "garden_veg": 43,
+       "oil_drizzle": 13,
+       "rice_pot": 349
+      },
+      "macros": {
+       "carb": 108.4,
+       "fat": 28.5,
+       "kcal": 829.7,
+       "protein": 35.0
+      },
+      "serving_model": "portioned",
+      "servings": {
+       "braised_beef_plate": 0.54
+      },
+      "slot": "lunch",
+      "target": {
+       "carb": 83.3,
+       "fat": 21.7,
+       "protein": 50.0
+      }
+     },
+     {
+      "dish": "grilled_chicken_bowl",
+      "dish_name": "Grilled chicken rice bowl",
+      "dishes": [
+       "grilled_chicken_bowl"
+      ],
+      "flags": [],
+      "items": {
+       "chicken_grill": 264,
+       "herb_sauce": 21,
+       "rice_pot": 191
+      },
+      "macros": {
+       "carb": 58.3,
+       "fat": 15.2,
+       "kcal": 629.8,
+       "protein": 65.0
+      },
+      "serving_model": "portioned",
+      "servings": {
+       "grilled_chicken_bowl": 0.88
+      },
+      "slot": "dinner",
+      "target": {
+       "carb": 83.3,
+       "fat": 21.7,
+       "protein": 50.0
+      }
+     }
+    ],
+    "notes": []
+   },
+   {
+    "meals": [
+     {
+      "dish": "pork_rice_scramble",
+      "dish_name": "Pork and rice scramble",
+      "dishes": [
+       "pork_rice_scramble"
+      ],
+      "flags": [],
+      "items": {
+       "herb_sauce": 11,
+       "pork_roast": 191,
+       "rice_pot": 226
+      },
+      "macros": {
+       "carb": 68.3,
+       "fat": 17.8,
+       "kcal": 597.7,
+       "protein": 41.0
+      },
+      "serving_model": "family_style",
+      "servings": {
+       "pork_rice_scramble": 0.95
+      },
+      "slot": "breakfast",
+      "target": {
+       "carb": 83.3,
+       "fat": 21.7,
+       "protein": 50.0
+      }
+     },
+     {
+      "dish": "braised_beef_plate",
+      "dish_name": "Braised beef plate",
+      "dishes": [
+       "braised_beef_plate"
+      ],
+      "flags": [
+       {
+        "achieved_g": 28.5,
+        "band": [
+         15.2,
+         28.2
+        ],
+        "binding_bound": null,
+        "code": "band_unmet",
+        "delta_g": 6.8,
+        "macro": "fat",
+        "message": "'lunch' is 7g over of its fat slot target — dish integrity wins (braised_beef_plate)",
+        "responsible_component": "beef_braise",
+        "responsible_dish": "braised_beef_plate",
+        "slot": "lunch",
+        "target_g": 21.7
+       },
+       {
+        "achieved_g": 108.4,
+        "band": [
+         58.3,
+         108.3
+        ],
+        "binding_bound": null,
+        "code": "band_unmet",
+        "delta_g": 25.0,
+        "macro": "carb",
+        "message": "'lunch' is 25g over of its carb slot target — dish integrity wins (braised_beef_plate)",
+        "responsible_component": "rice_pot",
+        "responsible_dish": "braised_beef_plate",
+        "slot": "lunch",
+        "target_g": 83.3
+       }
+      ],
+      "items": {
+       "beef_braise": 151,
+       "garden_veg": 43,
+       "oil_drizzle": 13,
+       "rice_pot": 349
+      },
+      "macros": {
+       "carb": 108.4,
+       "fat": 28.5,
+       "kcal": 829.7,
+       "protein": 35.0
+      },
+      "serving_model": "portioned",
+      "servings": {
+       "braised_beef_plate": 0.54
+      },
+      "slot": "lunch",
+      "target": {
+       "carb": 83.3,
+       "fat": 21.7,
+       "protein": 50.0
+      }
+     },
+     {
+      "dish": "grilled_chicken_bowl",
+      "dish_name": "Grilled chicken rice bowl",
+      "dishes": [
+       "grilled_chicken_bowl"
+      ],
+      "flags": [],
+      "items": {
+       "chicken_grill": 264,
+       "herb_sauce": 21,
+       "rice_pot": 191
+      },
+      "macros": {
+       "carb": 58.3,
+       "fat": 15.2,
+       "kcal": 629.8,
+       "protein": 65.0
+      },
+      "serving_model": "portioned",
+      "servings": {
+       "grilled_chicken_bowl": 0.88
+      },
+      "slot": "dinner",
+      "target": {
+       "carb": 83.3,
+       "fat": 21.7,
+       "protein": 50.0
+      }
+     }
+    ],
+    "notes": []
+   },
+   {
+    "meals": [
+     {
+      "dish": "pork_rice_scramble",
+      "dish_name": "Pork and rice scramble",
+      "dishes": [
+       "pork_rice_scramble"
+      ],
+      "flags": [],
+      "items": {
+       "herb_sauce": 11,
+       "pork_roast": 191,
+       "rice_pot": 226
+      },
+      "macros": {
+       "carb": 68.3,
+       "fat": 17.8,
+       "kcal": 597.7,
+       "protein": 41.0
+      },
+      "serving_model": "family_style",
+      "servings": {
+       "pork_rice_scramble": 0.95
+      },
+      "slot": "breakfast",
+      "target": {
+       "carb": 83.3,
+       "fat": 21.7,
+       "protein": 50.0
+      }
+     },
+     {
+      "dish": "braised_beef_plate",
+      "dish_name": "Braised beef plate",
+      "dishes": [
+       "braised_beef_plate"
+      ],
+      "flags": [
+       {
+        "achieved_g": 28.5,
+        "band": [
+         15.2,
+         28.2
+        ],
+        "binding_bound": null,
+        "code": "band_unmet",
+        "delta_g": 6.8,
+        "macro": "fat",
+        "message": "'lunch' is 7g over of its fat slot target — dish integrity wins (braised_beef_plate)",
+        "responsible_component": "beef_braise",
+        "responsible_dish": "braised_beef_plate",
+        "slot": "lunch",
+        "target_g": 21.7
+       },
+       {
+        "achieved_g": 108.4,
+        "band": [
+         58.3,
+         108.3
+        ],
+        "binding_bound": null,
+        "code": "band_unmet",
+        "delta_g": 25.0,
+        "macro": "carb",
+        "message": "'lunch' is 25g over of its carb slot target — dish integrity wins (braised_beef_plate)",
+        "responsible_component": "rice_pot",
+        "responsible_dish": "braised_beef_plate",
+        "slot": "lunch",
+        "target_g": 83.3
+       }
+      ],
+      "items": {
+       "beef_braise": 151,
+       "garden_veg": 43,
+       "oil_drizzle": 13,
+       "rice_pot": 349
+      },
+      "macros": {
+       "carb": 108.4,
+       "fat": 28.5,
+       "kcal": 829.7,
+       "protein": 35.0
+      },
+      "serving_model": "portioned",
+      "servings": {
+       "braised_beef_plate": 0.54
+      },
+      "slot": "lunch",
+      "target": {
+       "carb": 83.3,
+       "fat": 21.7,
+       "protein": 50.0
+      }
+     },
+     {
+      "dish": "grilled_chicken_bowl",
+      "dish_name": "Grilled chicken rice bowl",
+      "dishes": [
+       "grilled_chicken_bowl"
+      ],
+      "flags": [],
+      "items": {
+       "chicken_grill": 264,
+       "herb_sauce": 21,
+       "rice_pot": 191
+      },
+      "macros": {
+       "carb": 58.3,
+       "fat": 15.2,
+       "kcal": 629.8,
+       "protein": 65.0
+      },
+      "serving_model": "portioned",
+      "servings": {
+       "grilled_chicken_bowl": 0.88
+      },
+      "slot": "dinner",
+      "target": {
+       "carb": 83.3,
+       "fat": 21.7,
+       "protein": 50.0
+      }
+     }
+    ],
+    "notes": []
+   }
+  ]
+ },
+ "menu": [
+  "braised_beef_plate",
+  "grilled_chicken_bowl",
+  "pork_rice_scramble"
+ ],
+ "menu_kwargs": {
+  "iters": 200,
+  "n": 3,
+  "seed": 0,
+  "shortlist": 4
+ },
+ "purchase": [
+  [
+   "rice_mix",
+   6000,
+   7,
+   900,
+   300,
+   false,
+   999
+  ],
+  [
+   "chicken_mix",
+   2500,
+   5,
+   500,
+   0,
+   false,
+   999
+  ],
+  [
+   "pork_mix",
+   2000,
+   4,
+   500,
+   0,
+   false,
+   999
+  ],
+  [
+   "beef_mix",
+   1500,
+   3,
+   500,
+   0,
+   false,
+   999
+  ],
+  [
+   "veg_mix",
+   800,
+   2,
+   400,
+   0,
+   false,
+   999
+  ],
+  [
+   "herb_mix",
+   400,
+   2,
+   200,
+   0,
+   false,
+   999
+  ],
+  [
+   "oil_mix",
+   200,
+   1,
+   500,
+   300,
+   false,
+   999
+  ]
+ ],
+ "seed": 0,
+ "session_plan": {
+  "batches": {
+   "beef_braise": 3,
+   "chicken_grill": 5,
+   "garden_veg": 2,
+   "herb_sauce": 2,
+   "oil_drizzle": 1,
+   "pork_roast": 4,
+   "rice_pot": 3
+  },
+  "freezer": [],
+  "leftover": [],
+  "minutes": 321,
+  "sessions": [
+   {
+    "batches": {
+     "beef_braise": 2,
+     "chicken_grill": 3,
+     "garden_veg": 1,
+     "herb_sauce": 2,
+     "oil_drizzle": 1,
+     "pork_roast": 3,
+     "rice_pot": 3
+    },
+    "demand_g": {
+     "beef_braise": 906,
+     "chicken_grill": 1320,
+     "garden_veg": 258,
+     "herb_sauce": 224,
+     "oil_drizzle": 91,
+     "pork_roast": 1146,
+     "rice_pot": 5362
+    },
+    "feeds": [
+     {
+      "component": "beef_braise",
+      "day": 0,
+      "grams": 151
+     },
+     {
+      "component": "beef_braise",
+      "day": 1,
+      "grams": 151
+     },
+     {
+      "component": "beef_braise",
+      "day": 2,
+      "grams": 151
+     },
+     {
+      "component": "beef_braise",
+      "day": 3,
+      "grams": 151
+     },
+     {
+      "component": "beef_braise",
+      "day": 4,
+      "grams": 151
+     },
+     {
+      "component": "beef_braise",
+      "day": 5,
+      "grams": 151
+     },
+     {
+      "component": "chicken_grill",
+      "day": 0,
+      "grams": 264
+     },
+     {
+      "component": "chicken_grill",
+      "day": 1,
+      "grams": 264
+     },
+     {
+      "component": "chicken_grill",
+      "day": 2,
+      "grams": 264
+     },
+     {
+      "component": "chicken_grill",
+      "day": 3,
+      "grams": 264
+     },
+     {
+      "component": "chicken_grill",
+      "day": 4,
+      "grams": 264
+     },
+     {
+      "component": "garden_veg",
+      "day": 0,
+      "grams": 43
+     },
+     {
+      "component": "garden_veg",
+      "day": 1,
+      "grams": 43
+     },
+     {
+      "component": "garden_veg",
+      "day": 2,
+      "grams": 43
+     },
+     {
+      "component": "garden_veg",
+      "day": 3,
+      "grams": 43
+     },
+     {
+      "component": "garden_veg",
+      "day": 4,
+      "grams": 43
+     },
+     {
+      "component": "garden_veg",
+      "day": 5,
+      "grams": 43
+     },
+     {
+      "component": "herb_sauce",
+      "day": 0,
+      "grams": 32
+     },
+     {
+      "component": "herb_sauce",
+      "day": 1,
+      "grams": 32
+     },
+     {
+      "component": "herb_sauce",
+      "day": 2,
+      "grams": 32
+     },
+     {
+      "component": "herb_sauce",
+      "day": 3,
+      "grams": 32
+     },
+     {
+      "component": "herb_sauce",
+      "day": 4,
+      "grams": 32
+     },
+     {
+      "component": "herb_sauce",
+      "day": 5,
+      "grams": 32
+     },
+     {
+      "component": "herb_sauce",
+      "day": 6,
+      "grams": 32
+     },
+     {
+      "component": "oil_drizzle",
+      "day": 0,
+      "grams": 13
+     },
+     {
+      "component": "oil_drizzle",
+      "day": 1,
+      "grams": 13
+     },
+     {
+      "component": "oil_drizzle",
+      "day": 2,
+      "grams": 13
+     },
+     {
+      "component": "oil_drizzle",
+      "day": 3,
+      "grams": 13
+     },
+     {
+      "component": "oil_drizzle",
+      "day": 4,
+      "grams": 13
+     },
+     {
+      "component": "oil_drizzle",
+      "day": 5,
+      "grams": 13
+     },
+     {
+      "component": "oil_drizzle",
+      "day": 6,
+      "grams": 13
+     },
+     {
+      "component": "pork_roast",
+      "day": 0,
+      "grams": 191
+     },
+     {
+      "component": "pork_roast",
+      "day": 1,
+      "grams": 191
+     },
+     {
+      "component": "pork_roast",
+      "day": 2,
+      "grams": 191
+     },
+     {
+      "component": "pork_roast",
+      "day": 3,
+      "grams": 191
+     },
+     {
+      "component": "pork_roast",
+      "day": 4,
+      "grams": 191
+     },
+     {
+      "component": "pork_roast",
+      "day": 5,
+      "grams": 191
+     },
+     {
+      "component": "rice_pot",
+      "day": 0,
+      "grams": 766
+     },
+     {
+      "component": "rice_pot",
+      "day": 1,
+      "grams": 766
+     },
+     {
+      "component": "rice_pot",
+      "day": 2,
+      "grams": 766
+     },
+     {
+      "component": "rice_pot",
+      "day": 3,
+      "grams": 766
+     },
+     {
+      "component": "rice_pot",
+      "day": 4,
+      "grams": 766
+     },
+     {
+      "component": "rice_pot",
+      "day": 5,
+      "grams": 766
+     },
+     {
+      "component": "rice_pot",
+      "day": 6,
+      "grams": 766
+     }
+    ],
+    "freezer_notes": [],
+    "index": 0,
+    "made_g": {
+     "beef_braise": 1000,
+     "chicken_grill": 1500,
+     "garden_veg": 400,
+     "herb_sauce": 400,
+     "oil_drizzle": 200,
+     "pork_roast": 1500,
+     "rice_pot": 6000
+    },
+    "minutes": 210,
+    "start": 0,
+    "thaw_notes": []
+   },
+   {
+    "batches": {
+     "beef_braise": 1,
+     "chicken_grill": 2,
+     "garden_veg": 1,
+     "pork_roast": 1
+    },
+    "demand_g": {
+     "beef_braise": 151,
+     "chicken_grill": 528,
+     "garden_veg": 43,
+     "pork_roast": 191
+    },
+    "feeds": [
+     {
+      "component": "beef_braise",
+      "day": 6,
+      "grams": 151
+     },
+     {
+      "component": "chicken_grill",
+      "day": 5,
+      "grams": 264
+     },
+     {
+      "component": "chicken_grill",
+      "day": 6,
+      "grams": 264
+     },
+     {
+      "component": "garden_veg",
+      "day": 6,
+      "grams": 43
+     },
+     {
+      "component": "pork_roast",
+      "day": 6,
+      "grams": 191
+     }
+    ],
+    "freezer_notes": [],
+    "index": 1,
+    "made_g": {
+     "beef_braise": 500,
+     "chicken_grill": 1000,
+     "garden_veg": 400,
+     "pork_roast": 500
+    },
+    "minutes": 111,
+    "start": 4,
+    "thaw_notes": []
+   }
+  ],
+  "unattributed": []
+ },
+ "waste_perishable": 0,
+ "waste_total": 600,
+ "weeks": {
+  "sol": [
+   {
+    "beef_braise": 151,
+    "chicken_grill": 264,
+    "garden_veg": 43,
+    "herb_sauce": 32,
+    "oil_drizzle": 13,
+    "pork_roast": 191,
+    "rice_pot": 766
+   },
+   {
+    "beef_braise": 151,
+    "chicken_grill": 264,
+    "garden_veg": 43,
+    "herb_sauce": 32,
+    "oil_drizzle": 13,
+    "pork_roast": 191,
+    "rice_pot": 766
+   },
+   {
+    "beef_braise": 151,
+    "chicken_grill": 264,
+    "garden_veg": 43,
+    "herb_sauce": 32,
+    "oil_drizzle": 13,
+    "pork_roast": 191,
+    "rice_pot": 766
+   },
+   {
+    "beef_braise": 151,
+    "chicken_grill": 264,
+    "garden_veg": 43,
+    "herb_sauce": 32,
+    "oil_drizzle": 13,
+    "pork_roast": 191,
+    "rice_pot": 766
+   },
+   {
+    "beef_braise": 151,
+    "chicken_grill": 264,
+    "garden_veg": 43,
+    "herb_sauce": 32,
+    "oil_drizzle": 13,
+    "pork_roast": 191,
+    "rice_pot": 766
+   },
+   {
+    "beef_braise": 151,
+    "chicken_grill": 264,
+    "garden_veg": 43,
+    "herb_sauce": 32,
+    "oil_drizzle": 13,
+    "pork_roast": 191,
+    "rice_pot": 766
+   },
+   {
+    "beef_braise": 151,
+    "chicken_grill": 264,
+    "garden_veg": 43,
+    "herb_sauce": 32,
+    "oil_drizzle": 13,
+    "pork_roast": 191,
+    "rice_pot": 766
+   }
+  ]
+ }
+}

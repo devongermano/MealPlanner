@@ -67,8 +67,14 @@ def test_every_meal_is_one_dish_within_bands(solved):
                 for j, t in meal["servings"].items():
                     tm = max(D.t_max(dishes[j], comps, person),
                              D.DISH_WEIGHTS["DISH_T_MIN"])
-                    assert D.DISH_WEIGHTS["DISH_T_MIN"] - 1e-9 <= t \
-                        <= tm + 1e-6, (pname, j, t, tm)
+                    # servings is a 2-dp DISPLAY value (round-half-up):
+                    # a t solved exactly at its cap may read half a
+                    # quantum (0.005) past it. The LP enforced the true
+                    # bound; plate_dishes' structural asserts checked the
+                    # exact grams.
+                    q = 0.005
+                    assert D.DISH_WEIGHTS["DISH_T_MIN"] - q <= t \
+                        <= tm + q + 1e-9, (pname, j, t, tm)
 
 
 def test_day_plate_is_sum_of_meals_and_demand_of_plates(solved):
@@ -109,6 +115,12 @@ def test_instrumentation_recorded_for_escalation_gate(solved):
     assert set(diag["dish_retries"]) == set(solved["people"])
     assert all(len(v) == days for v in diag["dish_retries"].values())
     assert "dish_flag_counts" in diag
+    # dish_flag_days is §13's actual measure (fraction of person-days):
+    # bounded by the person-day count and by the occurrence count per code
+    person_days = days * people_n
+    for code, nd in diag["dish_flag_days"].items():
+        assert 1 <= nd <= person_days, (code, nd)
+        assert nd <= diag["dish_flag_counts"][code], (code, nd)
     total_attempts = sum(r + 1 for v in diag["dish_retries"].values()
                          for r in v)
     assert solved["solves"].get("plate-dish", 0) <= 2 * total_attempts

@@ -44,15 +44,33 @@ schema_version: 0
 #                of the FINISHED component (cooked weight, as it comes out of the
 #                batch container).
 #                  base_g — the canonical serving. The dish's shape.
-#                  min_g / max_g — the ratio band. How far the solver may move this
-#                    component for a bigger or smaller eater and still have the plate
-#                    read as this dish. Devon's gordita = more picadillo, no queso;
-#                    Jimbo's = the same dish, more of everything.
-#   accents:     [component_id] — the subset of `components` that is optional
-#                per-person finishing (PRD P4). Their min_g is 0: one batch stays
-#                universal until the plate, and the eater who can't have dairy just
-#                gets 0 g of queso. Accents still carry bands in `components` —
-#                one place for every quantity, so nothing is measured twice.
+#                  min_g / max_g — how far this component may flex WITHIN ONE SERVING
+#                    and still read as this dish. This is Devon's gordita: more
+#                    picadillo, less shell, same dish.
+#                    These bands are NOT the appetite range. A bigger eater gets more
+#                    by eating more SERVINGS — M1.13 §5's continuous scalar `t` scales
+#                    every member together, so the ratio survives at any size, up to
+#                    T_MAX = min over members of serve_g.max / base_g. Widening a band
+#                    to feed someone is therefore always a mistake: it adds no food,
+#                    it only legalises a worse-looking plate.
+#   cuisine:     the dish's cuisine. M1.13 §2 DERIVES this from the main-role member
+#                when absent; stating it explicitly removes the ambiguity for a dish
+#                with two mains and keeps the value stable if a component is ever
+#                relabelled. Every value here matches what would be derived — nothing
+#                is being overridden.
+#   accents:     [component_id] — the optional per-person finishing layer (PRD P4).
+#                One batch stays universal until the plate; the eater who can't have
+#                dairy simply gets no queso and the dish is intact without it.
+#                RULED SCHEMA (M1.13 as built, verifier-accepted deviation from
+#                the spec sketch): an accent is the min_g == 0 SUBSET of
+#                `components` — every accent id ALSO appears in the components
+#                map with min_g 0, so bands live in one place and nothing is
+#                measured twice. base/max per accent come from the steward's
+#                accent_baselines.yaml and are reviewed in DISH_REVIEW.md.
+#                OPEN QUESTION for the design panel: those amounts genuinely differ by
+#                dish — 45 g of mozzarella baked onto fusilli al forno is not the 20 g
+#                crumbled over a taco — so per-dish accent bands may be worth having.
+#                Raised, not assumed.
 #   compatible_sides: [component_id] — things that may be served ALONGSIDE this dish
 #                but are not part of it (beans next to gorditas). No bands here: the
 #                side's own serve_g in components.yaml governs it.
@@ -77,17 +95,55 @@ schema_version: 0
 # RULES THE LINT ENFORCES (data/dishes-draft/lint.py)
 # --------------------------------------------------
 #   - every component_id exists in examples/components.yaml
-#   - every dish has >= 1 non-accent component (no dish is only garnish)
-#   - 0 <= min_g <= base_g <= max_g, whole grams
-#   - accents: min_g == 0 (P4 — an accent must be omittable), role must be `accent`
-#   - max_g <= that component's serve_g.max, and non-accent min_g >= serve_g.min.
+#   - every dish has >= 1 core component (no dish is only garnish)
+#   - 0 < min_g <= base_g <= max_g, whole grams (M1.13 §2: a core member has min_g > 0)
+#   - every accent id appears in `components` with min_g 0 (ruled subset
+#     schema), and has role `accent` in the corpus
+#   - max_g <= that component's serve_g.max, and min_g >= serve_g.min.
 #     serve_g bounds are per-dish palatability ABSOLUTES (PRD Appendix B item 2 —
 #     the lard-beans incident). A dish may not authorize a portion the component
-#     itself calls inedible.
+#     itself calls inedible. M1.13 §2 makes min_g > serve_g.max an ERROR — one
+#     serving could not exist inside the authored absolutes.
 #   - components with unit_g (tortillas, wings, meatballs, shells): base/min/max sit
 #     on the unit grid. You cannot serve 1.4 tortillas.
 #   - every `main` component appears in >= 1 dish; every accent attaches somewhere
 #   - meal_affinity values valid; `any` never mixed with specific slots
+#   - DISH_BAND_LOOSE (M1.13 §2): warns when the bands permit a degenerate ratio —
+#     worst-case pairwise (max_i/min_j)/(base_i/base_j) over 3.0. See below.
+#
+#
+# BAND WIDTH — RE-AUTHORED 2026-08-10
+# -----------------------------------
+# The first draft of these bands was written before M1.13 existed, and every one of
+# them made each band do two jobs at once: express how far the ratio may flex, AND
+# cover the whole appetite range from the smallest eater to the largest. That is why
+# gorditas once allowed 85-340 g of shell against 80-340 g of picadillo — a band that
+# legalised four shells with the minimum filling (a dry gordita) and one shell under
+# 340 g of meat (a bowl of meat with a shell in it). All 16 dishes tripped the spec's
+# DISH_BAND_LOOSE lint at ratio errors of 4.0-6.0 against a 3.0 threshold. Exactly the
+# incoherence the dish layer exists to prevent, quantified.
+#
+# M1.13 §5 removes the second job: `t` is a continuous SERVINGS scalar, so appetite is
+# served by eating 1.5 or 2 servings with every member scaling together and the ratio
+# preserved, capped by T_MAX = min over members of serve_g.max / base_g. Bands now
+# cover ratio flex within ONE serving only.
+#
+# Re-authored on that meaning, roughly +/-30% around base for continuous members, with
+# culinary judgement where a percentage is the wrong tool:
+#   - Discrete carriers flex by whole pieces, not percentages. Tacos are 2-3 tortillas
+#     (142-213 g), gorditas 2-3 shells (170-255 g), wings 5-7 (225-315 g), meatballs
+#     3-5 (120-200 g).
+#   - The breakfast burrito's tortilla is PINNED at 71 g. One 10-inch tortilla is what
+#     a burrito is; two is two burritos, which is t = 2, not a wider band.
+#   - refried_pintos bottoms out at 80 g rather than 70 g in every bowl, because 80 g
+#     is the component's own authored serve_g minimum — a dish may not ask for a
+#     portion smaller than the smallest sensible one.
+#
+# Result: worst-case ratio errors now run 1.33-2.18, all inside the 3.0 threshold, and
+# no dish lost reach — T_MAX runs 1.78-3.00, so a ~1570 kcal meal is reachable on core
+# members alone for ten of the sixteen dishes and on core-plus-sides for the rest
+# (M1.13 §7's ladder, in order: scale within bands, then hearty sides, then the opt-in
+# second dish).
 #
 #
 # KNOWN GAPS, FOR THE OWNER (details in DISH_REVIEW.md)
@@ -138,14 +194,16 @@ dishes:
 
 - id: gorditas_de_picadillo
   name: Gorditas de picadillo
+  cuisine: mexican
   source: "barefoodtim - gorditas de picadillo (Vitamina T)"
   reconstruction: from_source
   components:
-    gordita_shell:         {base_g: 170, min_g: 85, max_g: 340}
-    picadillo:             {base_g: 160, min_g: 80, max_g: 340}
-    charred_salsa_roja:    {base_g: 30,  min_g: 0,  max_g: 100}
-    queso_fresco_crumbled: {base_g: 25,  min_g: 0,  max_g: 80}
-    mexican_crema:         {base_g: 20,  min_g: 0,  max_g: 60}
+    gordita_shell:         {base_g: 170, min_g: 170, max_g: 255}
+    picadillo:             {base_g: 160, min_g: 110, max_g: 210}
+    # accent members (P4): min_g 0 — droppable per person, dish intact without them.
+    charred_salsa_roja:    {base_g: 30, min_g: 0,   max_g: 100}
+    queso_fresco_crumbled: {base_g: 25, min_g: 0,   max_g: 80}
+    mexican_crema:         {base_g: 20, min_g: 0,   max_g: 60}
   accents: [charred_salsa_roja, queso_fresco_crumbled, mexican_crema]
   compatible_sides: [refried_pintos, cilantro_lime_rice]
   meal_affinity: [lunch, dinner]
@@ -158,14 +216,16 @@ dishes:
 
 - id: carnitas_tacos
   name: Carnitas tacos
+  cuisine: mexican
   source: "house recipe (orange-lard carnitas) — taco format inferred, no source document"
   reconstruction: inferred
   components:
-    flour_tortilla:        {base_g: 142, min_g: 71, max_g: 284}
-    carnitas:              {base_g: 140, min_g: 80, max_g: 280}
-    charred_salsa_roja:    {base_g: 30,  min_g: 0,  max_g: 100}
-    guacamole:             {base_g: 40,  min_g: 0,  max_g: 120}
-    queso_fresco_crumbled: {base_g: 20,  min_g: 0,  max_g: 60}
+    flour_tortilla:        {base_g: 142, min_g: 142, max_g: 213}
+    carnitas:              {base_g: 140, min_g: 105, max_g: 180}
+    # accent members (P4): min_g 0 — droppable per person, dish intact without them.
+    charred_salsa_roja:    {base_g: 30, min_g: 0,   max_g: 100}
+    guacamole:             {base_g: 40, min_g: 0,   max_g: 120}
+    queso_fresco_crumbled: {base_g: 20, min_g: 0,   max_g: 60}
   accents: [charred_salsa_roja, guacamole, queso_fresco_crumbled]
   compatible_sides: [refried_pintos, cilantro_lime_rice]
   meal_affinity: [lunch, dinner]
@@ -176,15 +236,17 @@ dishes:
 
 - id: carnitas_bowl
   name: Carnitas rice bowl
+  cuisine: mexican
   source: "house recipe (orange-lard carnitas) — bowl format inferred, no source document"
   reconstruction: inferred
   components:
-    cilantro_lime_rice:  {base_g: 200, min_g: 100, max_g: 400}
-    carnitas:            {base_g: 140, min_g: 80,  max_g: 280}
-    refried_pintos:      {base_g: 100, min_g: 80,  max_g: 250}
-    charred_salsa_roja:  {base_g: 30,  min_g: 0,   max_g: 100}
-    guacamole:           {base_g: 40,  min_g: 0,   max_g: 120}
-    mexican_crema:       {base_g: 20,  min_g: 0,   max_g: 60}
+    cilantro_lime_rice:  {base_g: 200, min_g: 140, max_g: 260}
+    carnitas:            {base_g: 140, min_g: 105, max_g: 180}
+    refried_pintos:      {base_g: 100, min_g: 80, max_g: 130}
+    # accent members (P4): min_g 0 — droppable per person, dish intact without them.
+    charred_salsa_roja: {base_g: 30, min_g: 0,   max_g: 100}
+    guacamole:          {base_g: 40, min_g: 0,   max_g: 120}
+    mexican_crema:      {base_g: 20, min_g: 0,   max_g: 60}
   accents: [charred_salsa_roja, guacamole, mexican_crema]
   compatible_sides: []
   meal_affinity: [lunch, dinner]
@@ -195,13 +257,15 @@ dishes:
 
 - id: birria_tacos
   name: Birria tacos
+  cuisine: mexican
   source: "house recipe (chile-braised chuck) — taco format inferred, no source document"
   reconstruction: inferred
   components:
-    flour_tortilla:        {base_g: 142, min_g: 71, max_g: 284}
-    birria_chuck:          {base_g: 150, min_g: 80, max_g: 300}
-    charred_salsa_roja:    {base_g: 30,  min_g: 0,  max_g: 100}
-    queso_fresco_crumbled: {base_g: 25,  min_g: 0,  max_g: 80}
+    flour_tortilla:        {base_g: 142, min_g: 142, max_g: 213}
+    birria_chuck:          {base_g: 150, min_g: 112, max_g: 195}
+    # accent members (P4): min_g 0 — droppable per person, dish intact without them.
+    charred_salsa_roja:    {base_g: 30, min_g: 0,   max_g: 100}
+    queso_fresco_crumbled: {base_g: 25, min_g: 0,   max_g: 80}
   accents: [charred_salsa_roja, queso_fresco_crumbled]
   compatible_sides: [cilantro_lime_rice, refried_pintos]
   meal_affinity: [lunch, dinner]
@@ -216,15 +280,17 @@ dishes:
 
 - id: birria_bowl
   name: Birria rice bowl
+  cuisine: mexican
   source: "house recipe (chile-braised chuck) — bowl format inferred, no source document"
   reconstruction: inferred
   components:
-    cilantro_lime_rice:    {base_g: 200, min_g: 100, max_g: 400}
-    birria_chuck:          {base_g: 160, min_g: 80,  max_g: 320}
-    refried_pintos:        {base_g: 100, min_g: 80,  max_g: 250}
-    charred_salsa_roja:    {base_g: 30,  min_g: 0,   max_g: 100}
-    mexican_crema:         {base_g: 20,  min_g: 0,   max_g: 60}
-    queso_fresco_crumbled: {base_g: 20,  min_g: 0,   max_g: 60}
+    cilantro_lime_rice:    {base_g: 200, min_g: 140, max_g: 260}
+    birria_chuck:          {base_g: 160, min_g: 120, max_g: 208}
+    refried_pintos:        {base_g: 100, min_g: 80, max_g: 130}
+    # accent members (P4): min_g 0 — droppable per person, dish intact without them.
+    charred_salsa_roja:    {base_g: 30, min_g: 0,   max_g: 100}
+    mexican_crema:         {base_g: 20, min_g: 0,   max_g: 60}
+    queso_fresco_crumbled: {base_g: 20, min_g: 0,   max_g: 60}
   accents: [charred_salsa_roja, mexican_crema, queso_fresco_crumbled]
   compatible_sides: []
   meal_affinity: [lunch, dinner]
@@ -233,13 +299,15 @@ dishes:
 
 - id: shrimp_al_pastor_tacos
   name: Shrimp al pastor tacos
+  cuisine: mexican
   source: "house recipe (achiote-pineapple shrimp) — taco format inferred, no source document"
   reconstruction: inferred
   components:
-    flour_tortilla:     {base_g: 142, min_g: 71, max_g: 284}
-    shrimp_al_pastor:   {base_g: 150, min_g: 80, max_g: 300}
-    guacamole:          {base_g: 40,  min_g: 0,  max_g: 120}
-    charred_salsa_roja: {base_g: 30,  min_g: 0,  max_g: 100}
+    flour_tortilla:     {base_g: 142, min_g: 142, max_g: 213}
+    shrimp_al_pastor:   {base_g: 150, min_g: 112, max_g: 195}
+    # accent members (P4): min_g 0 — droppable per person, dish intact without them.
+    guacamole:          {base_g: 40, min_g: 0,   max_g: 120}
+    charred_salsa_roja: {base_g: 30, min_g: 0,   max_g: 100}
   accents: [guacamole, charred_salsa_roja]
   compatible_sides: [cilantro_lime_rice, refried_pintos]
   meal_affinity: [lunch, dinner]
@@ -250,14 +318,16 @@ dishes:
 
 - id: shrimp_al_pastor_bowl
   name: Shrimp al pastor rice bowl
+  cuisine: mexican
   source: "house recipe (achiote-pineapple shrimp) — bowl format inferred, no source document"
   reconstruction: inferred
   components:
-    cilantro_lime_rice: {base_g: 220, min_g: 100, max_g: 420}
-    shrimp_al_pastor:   {base_g: 160, min_g: 80,  max_g: 320}
-    guacamole:          {base_g: 40,  min_g: 0,   max_g: 120}
-    charred_salsa_roja: {base_g: 30,  min_g: 0,   max_g: 100}
-    mexican_crema:      {base_g: 15,  min_g: 0,   max_g: 50}
+    cilantro_lime_rice: {base_g: 220, min_g: 154, max_g: 286}
+    shrimp_al_pastor:   {base_g: 160, min_g: 120, max_g: 208}
+    # accent members (P4): min_g 0 — droppable per person, dish intact without them.
+    guacamole:          {base_g: 40, min_g: 0,   max_g: 120}
+    charred_salsa_roja: {base_g: 30, min_g: 0,   max_g: 100}
+    mexican_crema:      {base_g: 15, min_g: 0,   max_g: 50}
   accents: [guacamole, charred_salsa_roja, mexican_crema]
   compatible_sides: [refried_pintos]
   meal_affinity: [lunch, dinner]
@@ -267,14 +337,16 @@ dishes:
 
 - id: salsa_verde_chicken_tacos
   name: Salsa verde chicken tacos
+  cuisine: mexican
   source: "house recipe (salsa verde shredded chicken) — taco format inferred, no source document"
   reconstruction: inferred
   components:
-    flour_tortilla:        {base_g: 142, min_g: 71, max_g: 284}
-    salsa_verde_chicken:   {base_g: 150, min_g: 80, max_g: 300}
-    guacamole:             {base_g: 40,  min_g: 0,  max_g: 120}
-    mexican_crema:         {base_g: 20,  min_g: 0,  max_g: 60}
-    queso_fresco_crumbled: {base_g: 20,  min_g: 0,  max_g: 60}
+    flour_tortilla:        {base_g: 142, min_g: 142, max_g: 213}
+    salsa_verde_chicken:   {base_g: 150, min_g: 112, max_g: 195}
+    # accent members (P4): min_g 0 — droppable per person, dish intact without them.
+    guacamole:             {base_g: 40, min_g: 0,   max_g: 120}
+    mexican_crema:         {base_g: 20, min_g: 0,   max_g: 60}
+    queso_fresco_crumbled: {base_g: 20, min_g: 0,   max_g: 60}
   accents: [guacamole, mexican_crema, queso_fresco_crumbled]
   compatible_sides: [refried_pintos, cilantro_lime_rice]
   meal_affinity: [lunch, dinner]
@@ -284,15 +356,17 @@ dishes:
 
 - id: salsa_verde_chicken_bowl
   name: Salsa verde chicken bowl
+  cuisine: mexican
   source: "house recipe (salsa verde shredded chicken) — bowl format inferred, no source document"
   reconstruction: inferred
   components:
-    cilantro_lime_rice:  {base_g: 200, min_g: 100, max_g: 400}
-    salsa_verde_chicken: {base_g: 160, min_g: 80,  max_g: 320}
-    refried_pintos:      {base_g: 100, min_g: 80,  max_g: 250}
-    guacamole:           {base_g: 40,  min_g: 0,   max_g: 120}
-    mexican_crema:       {base_g: 20,  min_g: 0,   max_g: 60}
-    cheddar_shred:       {base_g: 25,  min_g: 0,   max_g: 70}
+    cilantro_lime_rice:  {base_g: 200, min_g: 140, max_g: 260}
+    salsa_verde_chicken: {base_g: 160, min_g: 120, max_g: 208}
+    refried_pintos:      {base_g: 100, min_g: 80, max_g: 130}
+    # accent members (P4): min_g 0 — droppable per person, dish intact without them.
+    guacamole:     {base_g: 40, min_g: 0,   max_g: 120}
+    mexican_crema: {base_g: 20, min_g: 0,   max_g: 60}
+    cheddar_shred: {base_g: 25, min_g: 0,   max_g: 70}
   accents: [guacamole, mexican_crema, cheddar_shred]
   compatible_sides: []
   meal_affinity: [lunch, dinner]
@@ -302,13 +376,15 @@ dishes:
 
 - id: breakfast_burrito
   name: Breakfast burrito
+  cuisine: crossover
   source: "barefoodtim - breakfast burritos"
   reconstruction: from_source
   components:
-    flour_tortilla:      {base_g: 71,  min_g: 71,  max_g: 142}
-    egg_potato_scramble: {base_g: 220, min_g: 100, max_g: 380}
-    cheddar_shred:       {base_g: 30,  min_g: 0,   max_g: 80}
-    charred_salsa_roja:  {base_g: 30,  min_g: 0,   max_g: 100}
+    flour_tortilla:      {base_g: 71, min_g: 71, max_g: 71}
+    egg_potato_scramble: {base_g: 220, min_g: 165, max_g: 275}
+    # accent members (P4): min_g 0 — droppable per person, dish intact without them.
+    cheddar_shred:      {base_g: 30, min_g: 0,   max_g: 80}
+    charred_salsa_roja: {base_g: 30, min_g: 0,   max_g: 100}
   accents: [cheddar_shred, charred_salsa_roja]
   compatible_sides: [refried_pintos]
   meal_affinity: [breakfast, lunch]
@@ -323,13 +399,15 @@ dishes:
 
 - id: bulgogi_rice_bowl
   name: Bulgogi rice bowl
+  cuisine: cn_am
   source: "house recipe (soy-free bulgogi flank) — bowl format inferred, no source document"
   reconstruction: inferred
   components:
-    jasmine_rice:        {base_g: 220, min_g: 100, max_g: 420}
-    bulgogi_flank:       {base_g: 130, min_g: 60,  max_g: 280}
-    smashed_cucumber:    {base_g: 80,  min_g: 50,  max_g: 200}
-    scallion_ginger_oil: {base_g: 15,  min_g: 0,   max_g: 45}
+    jasmine_rice:        {base_g: 220, min_g: 154, max_g: 286}
+    bulgogi_flank:       {base_g: 130, min_g: 98, max_g: 170}
+    smashed_cucumber:    {base_g: 80, min_g: 56, max_g: 104}
+    # accent members (P4): min_g 0 — droppable per person, dish intact without them.
+    scallion_ginger_oil: {base_g: 15, min_g: 0,   max_g: 45}
   accents: [scallion_ginger_oil]
   compatible_sides: []
   meal_affinity: [lunch, dinner]
@@ -341,12 +419,14 @@ dishes:
 
 - id: orange_chicken_rice
   name: Orange chicken over rice
+  cuisine: cn_am
   source: "barefoodtim (orange chicken, soy swapped for coconut aminos) — plate format inferred"
   reconstruction: inferred
   components:
-    jasmine_rice:        {base_g: 220, min_g: 100, max_g: 420}
-    orange_chicken:      {base_g: 180, min_g: 80,  max_g: 360}
-    scallion_ginger_oil: {base_g: 10,  min_g: 0,   max_g: 40}
+    jasmine_rice:        {base_g: 220, min_g: 154, max_g: 286}
+    orange_chicken:      {base_g: 180, min_g: 135, max_g: 234}
+    # accent members (P4): min_g 0 — droppable per person, dish intact without them.
+    scallion_ginger_oil: {base_g: 10, min_g: 0,   max_g: 40}
   accents: [scallion_ginger_oil]
   compatible_sides: [smashed_cucumber]
   meal_affinity: [lunch, dinner]
@@ -359,12 +439,14 @@ dishes:
 
 - id: sausage_fusilli_al_forno
   name: Spicy sausage fusilli al forno
+  cuisine: italian
   source: "barefoodtim 010 - spicy sausage fusilli al forno"
   reconstruction: from_source
   components:
-    fusilli_cooked:   {base_g: 150, min_g: 100, max_g: 300}
-    sausage_sugo:     {base_g: 225, min_g: 80,  max_g: 375}
-    mozzarella_shred: {base_g: 45,  min_g: 0,   max_g: 90}
+    fusilli_cooked:   {base_g: 150, min_g: 112, max_g: 195}
+    sausage_sugo:     {base_g: 225, min_g: 170, max_g: 290}
+    # accent members (P4): min_g 0 — droppable per person, dish intact without them.
+    mozzarella_shred: {base_g: 45, min_g: 0,   max_g: 90}
   accents: [mozzarella_shred]
   compatible_sides: []
   meal_affinity: [lunch, dinner]
@@ -378,13 +460,15 @@ dishes:
 
 - id: turkey_meatballs_al_sugo
   name: Turkey meatballs in sugo, with fusilli
+  cuisine: italian
   source: "no source recipe — house turkey meatballs + barefoodtim 010 sugo, paired here"
   reconstruction: invented
   components:
-    turkey_meatballs: {base_g: 160, min_g: 80,  max_g: 320}
-    sausage_sugo:     {base_g: 180, min_g: 80,  max_g: 360}
-    fusilli_cooked:   {base_g: 150, min_g: 100, max_g: 300}
-    mozzarella_shred: {base_g: 30,  min_g: 0,   max_g: 90}
+    turkey_meatballs: {base_g: 160, min_g: 120, max_g: 200}
+    sausage_sugo:     {base_g: 180, min_g: 135, max_g: 234}
+    fusilli_cooked:   {base_g: 150, min_g: 112, max_g: 195}
+    # accent members (P4): min_g 0 — droppable per person, dish intact without them.
+    mozzarella_shred: {base_g: 30, min_g: 0,   max_g: 90}
   accents: [mozzarella_shred]
   compatible_sides: []
   meal_affinity: [lunch, dinner]
@@ -399,11 +483,12 @@ dishes:
 
 - id: wings_plate
   name: Mango jalapeno wings with rosemary potatoes
+  cuisine: crossover
   source: "no source recipe for the plate — barefoodtim 013 wings + barefoodtim 008 potatoes"
   reconstruction: invented
   components:
-    mango_jalapeno_wings: {base_g: 270, min_g: 90,  max_g: 450}
-    rosemary_potatoes:    {base_g: 200, min_g: 100, max_g: 400}
+    mango_jalapeno_wings: {base_g: 270, min_g: 225, max_g: 315}
+    rosemary_potatoes:    {base_g: 200, min_g: 140, max_g: 260}
   accents: []
   compatible_sides: [smashed_cucumber]
   meal_affinity: [lunch, dinner]
@@ -416,13 +501,15 @@ dishes:
 
 - id: breakfast_scramble_plate
   name: Scramble plate with rosemary potatoes
+  cuisine: crossover
   source: "no source recipe — barefoodtim breakfast-burrito scramble + barefoodtim 008 potatoes"
   reconstruction: invented
   components:
-    egg_potato_scramble: {base_g: 220, min_g: 100, max_g: 400}
-    rosemary_potatoes:   {base_g: 150, min_g: 100, max_g: 350}
-    cheddar_shred:       {base_g: 30,  min_g: 0,   max_g: 80}
-    charred_salsa_roja:  {base_g: 30,  min_g: 0,   max_g: 100}
+    egg_potato_scramble: {base_g: 220, min_g: 165, max_g: 275}
+    rosemary_potatoes:   {base_g: 150, min_g: 105, max_g: 195}
+    # accent members (P4): min_g 0 — droppable per person, dish intact without them.
+    cheddar_shred:      {base_g: 30, min_g: 0,   max_g: 80}
+    charred_salsa_roja: {base_g: 30, min_g: 0,   max_g: 100}
   accents: [cheddar_shred, charred_salsa_roja]
   compatible_sides: []
   meal_affinity: [breakfast]

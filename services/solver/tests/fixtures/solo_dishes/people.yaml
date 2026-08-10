@@ -1,0 +1,31 @@
+schema_version: 1
+# solo_dishes — the DISH-MODE golden fixture (M1.13). solo_lifter's corpus
+# (components.yaml / ingredients.yaml copied verbatim) + one SLOTTED person +
+# three authored dishes in dishes.yaml, whose PRESENCE turns dish mode on
+# through the real default path. Purpose-built for the pinned-reference-env
+# dish golden (tests/golden/README.md): small, feasible, both serving models
+# and the accent/side machinery exercised.
+people:
+  sol:
+    targets: {protein: 150, fat: 65, carb: 250}
+    tolerance: 0.06
+    serving_model: portioned
+    meal_slots:
+      - {name: breakfast, serving_model: family_style}
+      - {name: lunch}
+      - {name: dinner}
+    exclude: []
+    dislikes: []
+settings:
+  days: 7
+  active_min_budget: 400
+  batch_time_factor: 0.45
+  # 3 dishes x 3 slots/day means every dish runs most days BY DESIGN — a
+  # tight variety cap would only manufacture skeleton holes in a fixture
+  # whose job is a byte-stable golden, not variety stress (test_dishes.py
+  # and test_capabilities variety tests cover that behavior).
+  max_days_same_component: 7
+  max_batches_per_component: 4
+  cook_days: [0, 4]
+  shop_days: [0]
+  dish_layer: strict
