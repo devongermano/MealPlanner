@@ -14,11 +14,25 @@ steps:
     duration_min: 5
     operation: blend
   - phase: cook
-    text: Bake the wings on wire racks, flipping once at the halfway mark, until the skin is crisp
+    text: Bake the wings on wire racks
     station: oven
     mode: passive
-    duration_min: 45
+    duration_min: 22
     oven_temp_f: 425
+    operation: bake
+  - phase: cook
+    text: Flip the wings on their racks
+    station: oven
+    mode: active
+    duration_min: 2
+    oven_temp_f: 425
+  - phase: cook
+    text: Bake until the skin is crisp
+    station: oven
+    mode: passive
+    duration_min: 21
+    oven_temp_f: 425
+    operation: bake
     operation: bake
   - phase: cook
     text: Simmer the blended mango sauce until glossy and thickened

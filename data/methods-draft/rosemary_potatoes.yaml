@@ -39,10 +39,15 @@ steps:
     oven_temp_f: 425
     operation: roast
   - phase: finish
-    text: Toss with the minced garlic, rosemary, and salt, then return to the oven briefly
-    station: oven
+    text: Toss the potatoes with the minced garlic, rosemary, and salt
+    station: prep
     mode: active
-    duration_min: 5
+    duration_min: 2
+  - phase: finish
+    text: Return the potatoes to the oven to set the aromatics
+    station: oven
+    mode: passive
+    duration_min: 4
     oven_temp_f: 425
     operation: roast
   - phase: finish
