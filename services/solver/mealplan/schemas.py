@@ -25,7 +25,7 @@ Modeling rules:
   raw pipeline outputs (name-and-map only, no solver math); the service and
   the round-trip test both use it, so they cannot diverge.
 
-This module imports nothing from engine/costing at import time and is only
+This module imports nothing from engine/costing when imported and is only
 importable when the ``service`` extra (pydantic) is installed; the core engine
 never depends on it.
 """
