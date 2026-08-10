@@ -95,6 +95,67 @@ implementer proposal (§12.2, PR-4) and is operationalized at M2/M4, not before.
 
 ## 4. How it works — modes, roles, and the weekly loop
 
+### 4.0 The meal-prep model (owner decision, 2026-08-09 — supersedes daily self-assembly)
+
+Devon, verbatim intent: *"Each person gets n meals a day. You prep on x days of the
+week… I portion the meals for both people on those days. I just don't cook a bunch of
+rice and portion it every day."*
+
+The product's model is **classic meal prep**: on each cook day, dishes are cooked in
+batches and immediately **portioned into per-person, per-meal containers** covering
+the days until the next session. Eaters grab a container; nobody weighs plates daily.
+Consequences:
+- `meals_per_day` is a **live engine input**: each person's solved day is dealt into
+  n composed meals (a main plus sides that read as food — never a bucket of one
+  component), each meal near day÷n macros within a band (provisional).
+- The eat sheet is meal-structured per day for the prepped period.
+- The cook plan carries a **portioning matrix**: per session, per component — which
+  containers (person × day × meal) receive how many grams.
+- Precision/relaxed modes (§4.1) govern how portioning is *measured at packing time*,
+  not a daily weighing ritual. Day-level rebalance (§4.4) remains for mid-week edits.
+
+**Amendment (owner, same day):** both serving models are first-class options —
+`serving_model: portioned | family_style`, set **per person**:
+- **portioned** — the meal-prep model above: per-meal containers packed on cook day
+  (portioning matrix on the cook plan; meal-structured eat sheet).
+- **family_style** — v1's component-cooking heritage as a named mode: batches stay in
+  shared containers; the eat sheet guides how much to take (per meal when
+  `meals_per_day` is set, per day otherwise); precision/relaxed governs measuring at
+  serving time.
+The two models share the entire solve — engine, batching, shopping, shelf life are
+identical; only cook-plan instructions and eat-sheet rendering differ. A household
+may mix models freely.
+
+**The cook-plan bar (owner, 2026-08-09):** *"thoughtless for someone to meal prep in
+the fastest way possible — here's the ingredients, here are the exact steps, and how
+to parallelize it."* The compiled cook script's mature form is a single interleaved
+**timeline** (timestamps, timers for passive waits, "meanwhile" structure, portioning
+injected where hands are free), scheduled greedily over stations and cook-attention
+(passive-first; assemblies topologically first), on provisional durations calibrated
+from real cook days. Zero decisions left to the cook. (Station-grouped blocks are the
+fallback rendering until durations exist.)
+
+**Amendment (owner, same day):** cook-plan style is a preference —
+`cook_plan_style: recipe | timeline`. Recipe style renders classic per-dish blocks;
+timeline renders the interleaved optimized stream; both are views of the same
+compiled session, and the scheduler runs ONLY for timeline users (modular — nobody
+pays for optimization they didn't order). **Shared-prep consolidation** serves both
+styles: identical prep operations merge across dishes at compile time ("dice 380g
+onion — 150g → picadillo, 150g → carnitas, 80g → scramble") — shopping-list-style
+aggregation one layer down. Oven sharing is temperature-keyed in the greedy tier:
+same-temp steps co-reside ("steaks finish at 425 because the veggies already made it
+a 425 oven"); temp transitions and hold-window juggling stay CP-tier, later.
+
+**Amendment 2 (owner, same day):** the serving model is configurable **per meal
+slot**, not just per person — e.g. breakfast `family_style` ("have this much
+cereal"), lunch and dinner `portioned`. Person-level `serving_model` is the default
+slots inherit. Meal variety is an obligation of the meal layer: a day's meals must
+differ from one another where the menu allows (no repeated main across slots), atop
+the no-single-component-meals rule. **Interchangeable containers** (macro-equivalent
+meals within a slot across days, so any container is grabbable) is a named opt-in
+candidate for the meal layer — it trades variety for flexibility, so it is a
+household choice, never a default.
+
 ### 4.1 Precision mode and relaxed mode (per person)
 
 - **Precision** (kitchen scale): portions in grams, tight tolerance. The scale is
@@ -193,11 +254,21 @@ no accounts.)
   Devon: "figure that out later; right now, use my existing corpus." v1 documents the
   format; M3 proposes a Claude-assisted conversion protocol as a stepping stone
   (§12.2, PR-5); automated scraping is post-M4.
-- **Target profiles** — non-static targets (training vs rest days, weekly cycling).
-  v1 targets are static grams/day; that's the simplest common case, not a claim that
-  it's the only one.
+- **Free weekly allocation** — targets as a pure weekly budget with the solver
+  choosing the per-day split within bands (couples days inside one optimization).
+  Opt-in successor to profile-based cycling, which was promoted INTO v1 by owner
+  decision 2026-08-09: *"some people scale macros, more on lifting days, less on
+  weekends — macros are actually a weekly target, not a daily one."* Profile-based
+  cycling (named day-types + week map anchored to the plan date; flat daily grams
+  stay valid as shorthand) ships in M1 (TASKS M1.11).
 - **Liquid-calorie support** — semantics for the `drink` role and effective-mass
   factors for the daily mass cap. Until then `drink` is a reserved enum value.
+- **Component assembly DAG** — components consuming components (`uses:` — a seared
+  base feeding multiple dishes), generalizing the accent model into a dependency
+  graph with transitive macro derivation, batch sizing, shopping rollup, and
+  topological cook order. Flat authoring is the current workaround. Station/attention
+  metadata on method steps (grill/stove/oven, active/passive) ships with the compiled
+  cook script (M1.10); full makespan scheduling of a session is a named someday.
 - Actuals capture / closed-loop planning (§4.4); community recipe sharing;
   micronutrients/fiber; native mobile apps; payments infrastructure (§7).
 
@@ -219,6 +290,13 @@ optimization; medical nutrition claims of any kind.
   tooling that produces documents in the format. Format documents carry
   `schema_version` and validate on every write (§8.1); a malformed recipe cannot
   corrupt a library.
+- **Recipes are ground truth, never rendered** (owner framing, 2026-08-09): library
+  recipes are derivation inputs — ingredients, yields, composable method-step
+  fragments. What users follow is the **compiled cook script** synthesized per plan:
+  aggregate demand across meals/days/people → batches per session → assembled steps
+  + portioning instructions. Method text is therefore stored as composable steps,
+  not prose. Corollary: the product never republishes a source recipe — rendered
+  artifacts are always plan-specific compilations.
 
 ## 7. Business posture
 
@@ -391,7 +469,15 @@ that didn't exist. v2 rules:
   transactional API writes that record an audit trail (who, when, what changed) —
   replacing v1's "git is the audit log," which had no specified committer and never
   actually committed anything.
-- **Web app:** the collaborative loop lives here; responsive.
+- **Web app:** the collaborative loop lives here; responsive; PWA-capable.
+  **Cook mode** (owner, 2026-08-09): full-screen step-at-a-time rendering of the
+  compiled timeline — big type, tap-next, live timers, wake lock, locked plan cached
+  offline (kitchens kill connectivity). Same structured payload as the markdown cook
+  plan — cook mode is a second renderer, not a second pipeline. Step fragments
+  reference *operations* (dice/sear/braise); a technique library maps operations →
+  explanations and, later, owner-recorded videos (owned content, reused across every
+  step naming the operation). Cook-time LLM Q&A ("my braise looks dry") is
+  edge-assistance per the LLM doctrine — premium candidate, never in the solve path.
 - **Operator layer:** MCP server + CLI `--json` over the same engine/API, at
   **capability parity** with the web app from M3 onward (Devon's "both, equal
   weight" decision; the M2 web-only gap and the path to parity are PR-1). Claude can
