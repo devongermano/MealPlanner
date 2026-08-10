@@ -119,7 +119,18 @@ export async function startTestDatabase(): Promise<TestDatabase> {
 
   return {
     // connection_limit=1 because PGlite serves one connection at a time.
-    url: `postgresql://postgres:postgres@127.0.0.1:${port}/postgres?connection_limit=1`,
+    //
+    // The timeouts are raised from Prisma's 5s/10s defaults because these
+    // suites start seven WebAssembly Postgres instances at once, and on a cold
+    // or contended machine — a CI runner, or a laptop mid-`turbo run build` —
+    // the first connect can lose that race. It failed exactly once here, in the
+    // run right after a fresh install, and did not reproduce in seven attempts;
+    // rather than leave a once-seen flake to a slower CI box, the deadline is
+    // set where startup contention cannot reach it. This changes no assertion:
+    // a database that is genuinely unreachable still fails, just later.
+    url:
+      `postgresql://postgres:postgres@127.0.0.1:${port}/postgres` +
+      `?connection_limit=1&connect_timeout=30&pool_timeout=30`,
     id,
     async truncate() {
       await db.exec(
