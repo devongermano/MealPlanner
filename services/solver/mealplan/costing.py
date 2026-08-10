@@ -215,7 +215,8 @@ def session_plan(comps, ing, settings, weeks, leftovers=None):
     Returns::
 
         {"sessions": [{"index", "start", "demand_g", "batches", "made_g",
-                       "minutes", "thaw_notes"}...],
+                       "minutes", "thaw_notes",
+                       "feeds": [{component, day, grams}...]}...],
          "batches": {cid: summed batches},   # feeds purchase() / menu_cost()
          "minutes": total,                   # == sum of session minutes
          "unattributed": [{component, day, grams}...],  # demand no session
@@ -229,6 +230,14 @@ def session_plan(comps, ing, settings, weeks, leftovers=None):
     still within residual life on that day — the economy-over-freshness rule
     extended: leftovers are already paid for, eat them before cooking a
     fresh batch. Only the remainder is attributed to cook sessions.
+
+    ``feeds`` (M1.10): each session records the day-level attribution rows
+    it was assigned — {component, day, grams} sorted by (component, day).
+    This is the SAME attribution loop, exposed (never re-derived, P10): the
+    portioning matrix on the cook plan is a pure reshape of MealDay x these
+    rows (M19_SPEC §1). Freezer-bridged demand appears in the feeding
+    session's feeds too (it is cooked there); the matrix marks those rows
+    pack-at-thaw via the session's freezer_notes (M19_SPEC §11.1).
     """
     ss = sessions_for(settings)
     day_demand = {}
@@ -239,6 +248,7 @@ def session_plan(comps, ing, settings, weeks, leftovers=None):
     cookable = {cid: set(cookable_sessions(comps[cid], settings, ing))
                 for cid in {c for c, _ in day_demand}}
     sess_demand = [{} for _ in ss]
+    sess_feeds = [[] for _ in ss]        # M1.10: day-level attribution rows
     unattributed, freezer_serves = [], []
     remaining = [dict(e) for e in (leftovers or [])]   # never mutate inputs
     leftover_served = []
@@ -282,6 +292,7 @@ def session_plan(comps, ing, settings, weeks, leftovers=None):
             unattributed.append(dict(component=cid, day=d, grams=g))
         else:
             sess_demand[k_fit][cid] = sess_demand[k_fit].get(cid, 0) + g
+            sess_feeds[k_fit].append(dict(component=cid, day=d, grams=g))
     f = settings["batch_time_factor"]
     sessions, total_batches = [], {}
     for k, start in enumerate(ss):
@@ -306,7 +317,9 @@ def session_plan(comps, ing, settings, weeks, leftovers=None):
                     for cid, b in batches.items()},
             minutes=minutes, thaw_notes=thaw,
             freezer_notes=[fs for fs in freezer_serves
-                           if fs["session"] == k]))
+                           if fs["session"] == k],
+            feeds=sorted(sess_feeds[k],
+                         key=lambda r: (r["component"], r["day"]))))
         for cid, b in batches.items():
             total_batches[cid] = total_batches.get(cid, 0) + b
     return dict(sessions=sessions, batches=total_batches,

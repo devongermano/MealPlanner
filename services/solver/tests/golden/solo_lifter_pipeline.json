@@ -111,6 +111,118 @@
      "pork_roast": 986,
      "rice_pot": 5419
     },
+    "feeds": [
+     {
+      "component": "beef_braise",
+      "day": 1,
+      "grams": 400
+     },
+     {
+      "component": "beef_braise",
+      "day": 2,
+      "grams": 400
+     },
+     {
+      "component": "beef_braise",
+      "day": 4,
+      "grams": 400
+     },
+     {
+      "component": "chicken_grill",
+      "day": 0,
+      "grams": 214
+     },
+     {
+      "component": "chicken_grill",
+      "day": 1,
+      "grams": 230
+     },
+     {
+      "component": "chicken_grill",
+      "day": 3,
+      "grams": 545
+     },
+     {
+      "component": "herb_sauce",
+      "day": 1,
+      "grams": 48
+     },
+     {
+      "component": "herb_sauce",
+      "day": 6,
+      "grams": 10
+     },
+     {
+      "component": "oil_drizzle",
+      "day": 0,
+      "grams": 23
+     },
+     {
+      "component": "oil_drizzle",
+      "day": 2,
+      "grams": 5
+     },
+     {
+      "component": "oil_drizzle",
+      "day": 3,
+      "grams": 41
+     },
+     {
+      "component": "oil_drizzle",
+      "day": 5,
+      "grams": 41
+     },
+     {
+      "component": "pork_roast",
+      "day": 0,
+      "grams": 400
+     },
+     {
+      "component": "pork_roast",
+      "day": 2,
+      "grams": 282
+     },
+     {
+      "component": "pork_roast",
+      "day": 4,
+      "grams": 304
+     },
+     {
+      "component": "rice_pot",
+      "day": 0,
+      "grams": 783
+     },
+     {
+      "component": "rice_pot",
+      "day": 1,
+      "grams": 762
+     },
+     {
+      "component": "rice_pot",
+      "day": 2,
+      "grams": 770
+     },
+     {
+      "component": "rice_pot",
+      "day": 3,
+      "grams": 783
+     },
+     {
+      "component": "rice_pot",
+      "day": 4,
+      "grams": 770
+     },
+     {
+      "component": "rice_pot",
+      "day": 5,
+      "grams": 783
+     },
+     {
+      "component": "rice_pot",
+      "day": 6,
+      "grams": 768
+     }
+    ],
     "freezer_notes": [],
     "index": 0,
     "made_g": {
@@ -136,6 +248,23 @@
      "chicken_grill": 545,
      "pork_roast": 281
     },
+    "feeds": [
+     {
+      "component": "beef_braise",
+      "day": 6,
+      "grams": 400
+     },
+     {
+      "component": "chicken_grill",
+      "day": 5,
+      "grams": 545
+     },
+     {
+      "component": "pork_roast",
+      "day": 6,
+      "grams": 281
+     }
+    ],
     "freezer_notes": [],
     "index": 1,
     "made_g": {

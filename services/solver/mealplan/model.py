@@ -59,6 +59,13 @@ PERSON_MODES = ("precision", "relaxed")
 # they change rendering only (PRD §4.0: grams are canonical, P7).
 SERVING_MODELS = ("portioned", "family_style")
 
+# M1.10 (PRD §4.0 amendment): cook-plan style is a preference. "recipe"
+# renders classic per-dish blocks from the compiled session; "timeline" is
+# the interleaved optimized stream — its scheduler is M1.12, so until it
+# lands a timeline setting renders recipe blocks WITH an explicit note
+# (never silently). Both are views of the same compiled session.
+COOK_PLAN_STYLES = ("recipe", "timeline")
+
 
 class _RawView:
     """Dict-style access shim delegating to the raw mapping the object was
@@ -297,6 +304,10 @@ class Pantry(_RawView):
 #   shop_days                  [0]    M0.6: one shopping trip, day 0
 #   max_batches_per_component  3      variety/volume guard
 #   use_freezer                True   M0.5: freezer bridging on by default
+#   cook_plan_style            recipe M1.10: per-dish blocks; "timeline" is
+#                                     the M1.12 interleaved stream (until it
+#                                     lands, timeline renders recipe blocks
+#                                     with an explicit note)
 # No default — REQUIRED:
 #   cook_days                  validated required (io_yaml, M0.17): the
 #                              prototype's silent [0, 3] fallback is gone
@@ -311,6 +322,7 @@ SETTINGS_DEFAULTS = {
     "shop_days": [0],
     "max_batches_per_component": 3,
     "use_freezer": True,
+    "cook_plan_style": "recipe",
 }
 
 
@@ -325,6 +337,7 @@ class Settings(_RawView):
     shop_days: Optional[list] = None      # M0.6: shopping trips are data
     max_batches_per_component: Optional[int] = None
     use_freezer: Optional[bool] = None    # M0.5: freezer bridging, default true
+    cook_plan_style: Optional[str] = None  # M1.10: recipe | timeline
     budget: Any = None
     raw: dict = field(default_factory=dict, repr=False)
 
@@ -351,6 +364,7 @@ class Settings(_RawView):
                    shop_days=raw["shop_days"],
                    max_batches_per_component=raw["max_batches_per_component"],
                    use_freezer=raw["use_freezer"],
+                   cook_plan_style=raw["cook_plan_style"],
                    budget=budget, raw=raw)
 
 

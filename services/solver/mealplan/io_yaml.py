@@ -23,8 +23,9 @@ from typing import Any, Optional
 
 import yaml
 
-from .model import (PERSON_MODES, SERVING_MODELS, Ingredient, Pantry, Person,
-                    Settings, derive_component, resolve_meal_slots)
+from .model import (COOK_PLAN_STYLES, PERSON_MODES, SERVING_MODELS,
+                    Ingredient, Pantry, Person, Settings, derive_component,
+                    resolve_meal_slots)
 
 SCHEMA_VERSION = 1
 KNOWN_SCHEMA_VERSIONS = (1,)
@@ -573,6 +574,15 @@ def validate_people_doc(doc: Any, fname: str = "people.yaml"
             issues.append(ValidationIssue(
                 "bad_use_freezer", f"{fname}: settings, field 'use_freezer'",
                 f"use_freezer must be a boolean (got {uf!r})"))
+        # M1.10 (PRD §4.0 amendment): cook-plan style preference. "timeline"
+        # is accepted (it is a first-class PRD option) but its scheduler is
+        # M1.12 — until then it renders recipe blocks with an explicit note.
+        cps = st.get("cook_plan_style")
+        if cps is not None and cps not in COOK_PLAN_STYLES:
+            issues.append(ValidationIssue(
+                "bad_enum", f"{fname}: settings, field 'cook_plan_style'",
+                f"cook_plan_style must be one of "
+                f"{'|'.join(COOK_PLAN_STYLES)} (got {cps!r})"))
     # budget (optional; defaults to {"mode": "off"} at load). mode is an
     # enum; 'by_consumption' means NO ceiling — cost splits by consumption
     # share (costing.attribute), which render applies to every mode anyway.

@@ -46,6 +46,7 @@ Precision people see exact grams.
 import math
 from pathlib import Path
 
+from . import methods as methods_mod
 from .engine import available_on, from_freezer
 from .units import MACROS, human_pack, kcal_of
 
@@ -236,39 +237,212 @@ def render_shopping_list(ing, purchase_rows, total_cost, pantry=None,
 
 
 # --------------------------------------------------------------------------- #
-#  deliverable 2 — cook_plan.md
+#  deliverable 2 — cook_plan.md: the COMPILED SESSION SCRIPT (M1.10,
+#  PRD §4.0/§6). Recipes are ground truth, never rendered — what the cook
+#  follows is compiled per plan from method-step fragments (methods.py),
+#  batch-scaled, shared-prep-consolidated, with the portioning matrix
+#  attached per session. cook_plan_style "recipe" renders per-dish blocks;
+#  "timeline" (the M1.12 interleaved scheduler) falls back to recipe blocks
+#  WITH an explicit note until it exists — never silently.
 # --------------------------------------------------------------------------- #
-def render_cook_plan(comps, settings, sp, meta=None):
-    """``sp`` is costing.session_plan output — THE canonical session plan
-    (M0.4/P10). This function scales recipe quantities by the session's
-    batch count and formats; it never re-attributes anything."""
-    budget = settings["active_min_budget"]
-    L = ["# Cook plan\n"]
-    over = sp["minutes"] - budget
-    L.append(f"Hands-on total: **{sp['minutes']} min** vs a {budget} min "
-             "weekly budget — "
-             + (f"**OVER budget by {over} min** (never silently fit: cut a "
-                "batch, drop a dish, or raise the budget)" if over > 0
-                else f"{-over} min under budget")
-             + ".\n")
+def build_portioning(sp, weeks, people, meals, comps):
+    """The portioning matrix — a PURE RESHAPE (M19_SPEC §1): join each
+    session's canonical day-level attribution (``session.feeds``, the M0.4
+    function's own rows — never re-derived) against the dealt MealDay
+    structure. Returns ``{session_index: {"portioned": {cid: rows},
+    "shared": {cid: {total_g, takers}}, "leftover_notes": [...]}}`` or None
+    when nobody configured meals (the matrix belongs to the meal-prep
+    model; meal-free plans keep the pre-M1.10 cook plan shape).
+
+    - portioned rows: ``{person, day, slot, grams, pack_at_thaw}`` — one
+      per (person, day, slot) container this session packs. Freezer-bridged
+      days are marked ``pack_at_thaw`` (M19_SPEC §11.1: a batch headed for
+      the freezer cannot be packed into meal containers on cook day —
+      recorded, never silently packed).
+    - shared: family_style slots AND meal-free people pool into shared
+      containers — storage totals with per-taker breakdown ("the eat
+      sheets say who takes how much").
+    """
+    if not meals:
+        return None
+    out = {}
     for s in sp["sessions"]:
-        L.append(f"## Session {s['index']} — cook day {s['start']} — "
+        fed = {}
+        for r in s.get("feeds", []):
+            fed.setdefault(r["component"], set()).add(r["day"])
+        frozen = {(n["component"], n["day"])
+                  for n in s.get("freezer_notes", [])}
+        portioned, shared = {}, {}
+        for pname in sorted(weeks):
+            wk = weeks[pname]
+            mds = (meals or {}).get(pname)
+            for cid in sorted(fed):
+                for d in sorted(fed[cid]):
+                    if d >= len(wk) or not wk[d]:
+                        continue
+                    if mds:
+                        for meal in mds[d]["meals"]:
+                            g = meal["items"].get(cid)
+                            if not g:
+                                continue
+                            row = dict(person=pname, day=d,
+                                       slot=meal["slot"], grams=g,
+                                       pack_at_thaw=(cid, d) in frozen)
+                            if meal["serving_model"] == "portioned":
+                                portioned.setdefault(cid, []).append(row)
+                            else:
+                                e = shared.setdefault(
+                                    cid, dict(total_g=0, takers=[]))
+                                e["total_g"] += g
+                                e["takers"].append(row)
+                    else:
+                        g = wk[d].get(cid)
+                        if not g:
+                            continue
+                        e = shared.setdefault(cid,
+                                              dict(total_g=0, takers=[]))
+                        e["total_g"] += g
+                        e["takers"].append(dict(
+                            person=pname, day=d, slot=None, grams=g,
+                            pack_at_thaw=(cid, d) in frozen))
+        lo_notes = [n for n in sp.get("leftover", [])
+                    if n["day"] in fed.get(n["component"], ())]
+        out[s["index"]] = dict(portioned=portioned, shared=shared,
+                               leftover_notes=lo_notes)
+    return out
+
+
+def _portion_pack_lines(s, matrix, comps, h):
+    """The 'Portion & pack' block for one session (portioning matrix)."""
+    m = (matrix or {}).get(s["index"])
+    if not m or not (m["portioned"] or m["shared"]):
+        return []
+    L = [f"{h}# Portion & pack — session {s['index']}\n"]
+    L.append("Portioned slots pack into per-person, per-meal containers "
+             "(rows match the eat sheets); family-style batches stay in "
+             "shared containers.\n")
+    for cid in sorted(set(m["portioned"]) | set(m["shared"])):
+        name = comps[cid]["name"]
+        rows = m["portioned"].get(cid)
+        if rows:
+            L.append(f"- **{name}** — pack {len(rows)} container"
+                     f"{'s' if len(rows) != 1 else ''}:")
+            for r in rows:
+                thaw = (" — **PACK AT THAW** (freezer-bridged day: portion "
+                        "when it thaws, not on cook day)"
+                        if r["pack_at_thaw"] else "")
+                L.append(f"  - [ ] {r['person']} · eat day {r['day'] + 1} · "
+                         f"{r['slot']} — {r['grams']:g}g{thaw}")
+        e = m["shared"].get(cid)
+        if e:
+            L.append(f"- **{name}** — family style: store "
+                     f"**{e['total_g']:g}g** in a shared container — the "
+                     "eat sheets say who takes how much:")
+            for r in e["takers"]:
+                slot = f" · {r['slot']}" if r["slot"] else ""
+                thaw = " — from freezer on that day" if r["pack_at_thaw"] \
+                    else ""
+                L.append(f"  - {r['person']} · eat day {r['day'] + 1}"
+                         f"{slot} — takes {r['grams']:g}g{thaw}")
+    for n in m["leftover_notes"]:
+        L.append(f"- note: {n['grams']:g}g of '{n['component']}' for eat "
+                 f"day {n['day'] + 1} comes from existing leftovers — pack "
+                 "only the remainder from this batch.")
+    L.append("")
+    return L
+
+
+def _step_lines(cid, b, comps, steps, merged_keys, used_ops):
+    """One dish's method-fragment steps as annotated checkboxes with
+    batch-scaled quantities. Steps consolidated into the session's shared
+    prep render as pointers, not duplicate work."""
+    L = []
+    c = comps[cid]
+    for idx, st in enumerate(steps):
+        if (cid, idx) in merged_keys:
+            L.append(f"- ~~{st['text']}~~ — done in Shared prep above")
+            continue
+        iid, grams = methods_mod.scaled_step_grams(st, c, b)
+        qty = f" ({grams:g}g {iid})" if iid else ""
+        temp = (f" {st['oven_temp_f']}°F" if st.get("oven_temp_f") is not None
+                else "")
+        ann = (f"{st['station']}{temp} · {st['mode']} "
+               f"~{st['duration_min']:g} min")
+        op = st.get("operation")
+        ref = ""
+        if op:
+            used_ops.add(op)
+            ref = f" · [{op}]"
+        L.append(f"- [ ] {st['text']}{qty} — _{ann}{ref}_")
+    return L
+
+
+def cook_script_lines(comps, settings, sp, methods=None, techniques=None,
+                      matrix=None, h="##"):
+    """The compiled session script — THE one renderer behind both
+    cook_plan.md and the plan.md report (no divergence by construction).
+    ``methods`` is methods.load_methods output (None/missing components
+    degrade gracefully to the ingredient-list rendering); ``matrix`` is
+    build_portioning output. Returns ``(lines, used_operations)``."""
+    methods = methods or {}
+    used_ops = set()
+    L = []
+    style = settings.get("cook_plan_style") or "recipe"
+    if style == "timeline":
+        L.append("> **cook_plan_style: timeline** is not compiled yet — the "
+                 "interleaved schedule ships with M1.12. Rendering recipe "
+                 "blocks (per-dish) for now, never silently.\n")
+    for s in sp["sessions"]:
+        L.append(f"{h} Session {s['index']} — cook day {s['start']} — "
                  f"{s['minutes']} min hands-on\n")
         if not s["batches"]:
             L.append("_nothing to cook this session_\n")
             continue
+        summary = methods_mod.station_summary(s["batches"], methods) \
+            if methods else None
+        if summary:
+            L.append(f"Stations (single-batch step estimates, provisional "
+                     f"until cook-day calibration): {summary}\n")
+        merged, merged_keys = (
+            methods_mod.consolidate_shared_prep(s["batches"], s["batches"],
+                                                comps, methods)
+            if methods else ([], set()))
+        if merged:
+            L.append(f"{h}# Shared prep — consolidated across dishes\n")
+            L.append("Identical prep merged once per session "
+                     "(same operation, same ingredient):\n")
+            for mstep in merged:
+                alloc = ", ".join(
+                    f"{p['grams']:g}g {p['component']}"
+                    for p in mstep["parts"])
+                used_ops.add(mstep["operation"])
+                L.append(f"- [ ] {mstep['operation'].capitalize()} "
+                         f"{mstep['total_g']:g}g {mstep['ingredient']} — "
+                         f"{alloc} — _{mstep['station']} · {mstep['mode']} "
+                         f"~{mstep['duration_min']:g} min · "
+                         f"[{mstep['operation']}]_")
+            L.append("")
         for cid in sorted(s["batches"]):
             b = s["batches"][cid]
             c = comps[cid]
-            L.append(f"### {c['name']} × {b} batch{'es' if b != 1 else ''} "
+            L.append(f"{h}# {c['name']} × {b} batch{'es' if b != 1 else ''} "
                      f"(makes {s['made_g'][cid]:g}g, need "
                      f"{s['demand_g'][cid]:g}g)\n")
             L.append(f"Scaled for {b} batch{'es' if b != 1 else ''}:")
             for iname, grams in c["ingredients"].items():
                 L.append(f"- [ ] {iname}: {grams * b:g}g")
-            for step in (c.get("method") or []):
-                L.append(f"1. {step}")
+            steps = methods.get(cid)
+            if steps:
+                L.append("")
+                L.extend(_step_lines(cid, b, comps, steps, merged_keys,
+                                     used_ops))
+            else:
+                # graceful degradation: no fragment -> the pre-M1.10
+                # rendering for this component (legacy inline method prose)
+                for step in (c.get("method") or []):
+                    L.append(f"1. {step}")
             L.append("")
+        L.extend(_portion_pack_lines(s, matrix, comps, h))
         # shortest cooked shelf life in this session — eat it first
         short = min(s["batches"], key=lambda cid: (comps[cid]["keeps_days"],
                                                    cid))
@@ -281,6 +455,44 @@ def render_cook_plan(comps, settings, sp, meta=None):
         for n in s.get("freezer_notes", []):
             L.append(f"- FREEZER: {n['note']}")
         L.append("")
+    return L, used_ops
+
+
+def technique_glossary_lines(used_ops, techniques, h="##"):
+    """Technique footnotes: every [operation] referenced by a rendered step
+    resolves here against data/techniques (PRD §10 — one explanation reused
+    across every step naming the operation)."""
+    if not used_ops or not techniques:
+        return []
+    L = [f"{h} Techniques\n"]
+    for op in sorted(used_ops):
+        t = techniques.get(op)
+        if t:
+            L.append(f"- **[{op}]** {t.get('name', op)} — "
+                     f"{t.get('one_line', '')}")
+    L.append("")
+    return L
+
+
+def render_cook_plan(comps, settings, sp, meta=None, methods=None,
+                     techniques=None, matrix=None):
+    """``sp`` is costing.session_plan output — THE canonical session plan
+    (M0.4/P10). This function compiles and formats (batch-scaling recipe
+    quantities, injecting step quantities, consolidating shared prep,
+    attaching the portioning matrix); it never re-attributes anything."""
+    budget = settings["active_min_budget"]
+    L = ["# Cook plan\n"]
+    over = sp["minutes"] - budget
+    L.append(f"Hands-on total: **{sp['minutes']} min** vs a {budget} min "
+             "weekly budget — "
+             + (f"**OVER budget by {over} min** (never silently fit: cut a "
+                "batch, drop a dish, or raise the budget)" if over > 0
+                else f"{-over} min under budget")
+             + ".\n")
+    lines, used_ops = cook_script_lines(comps, settings, sp, methods=methods,
+                                        techniques=techniques, matrix=matrix,
+                                        h="##")
+    L.extend(lines)
     for n in sp.get("leftover", []):
         L.append(f"- LEFTOVER FIRST: {n['grams']:g}g of "
                  f"'{n['component']}' from the fridge before cooking "
@@ -289,6 +501,7 @@ def render_cook_plan(comps, settings, sp, meta=None):
         L.append(f"- WARNING: {u['grams']}g of `{u['component']}` demanded "
                  f"on day {u['day']} but no cook session can feed that day "
                  "— run `mealplan doctor`.")
+    L.extend(technique_glossary_lines(used_ops, techniques, h="##"))
     L.append(footer(meta))
     return "\n".join(L)
 
@@ -296,6 +509,71 @@ def render_cook_plan(comps, settings, sp, meta=None):
 # --------------------------------------------------------------------------- #
 #  deliverable 3 — eat_<person>.md
 # --------------------------------------------------------------------------- #
+def attach_accents(items, comps):
+    """Group served items into base rows with their accents ATTACHED
+    (M1.10, PRD §4.0: family-style phrasing hangs accents on their base —
+    "Scrambled eggs — take 300g + 40g cheddar on top").
+
+    Affinity mirrors the meal dealer's attachment data (M19_SPEC §3.1.4):
+    ``pairs_with`` match first, else a same-cuisine main, else the largest
+    main, else the largest base. Returns ``(rows, orphans)`` where rows are
+    ``(base_cid, grams, [(accent_cid, grams), ...])`` sorted grams desc
+    then id, and orphans are accents with no base in the item set."""
+    bases = sorted(((c, g) for c, g in items.items()
+                    if comps[c]["role"] != "accent"),
+                   key=lambda x: (-x[1], x[0]))
+    accents = sorted(((c, g) for c, g in items.items()
+                      if comps[c]["role"] == "accent"))
+    attached = {c: [] for c, _ in bases}
+    orphans = []
+    mains = [c for c, _ in bases if comps[c]["role"] == "main"]
+    for c, g in accents:
+        comp = comps[c]
+        pw = comp.get("pairs_with") or []
+        base = next((bc for bc, _ in bases if bc in pw), None)
+        if base is None:
+            base = next((bc for bc in mains
+                         if comps[bc]["cuisine"] == comp["cuisine"]), None)
+        if base is None and mains:
+            base = mains[0]
+        if base is None and bases:
+            base = bases[0][0]
+        if base is None:
+            orphans.append((c, g))
+        else:
+            attached[base].append((c, g))
+    return [(c, g, attached[c]) for c, g in bases], orphans
+
+
+def _family_style_lines(items, comps, mode, entries, day_ix, settings, ing,
+                        shared_note="shared batch"):
+    """Take-amount voice for a family-style pool (a meal's items or a whole
+    day-pool): base lines with attached accents, household units + error-bar
+    entries via the M1.2 machinery."""
+    L = []
+    rows, orphans = attach_accents(items, comps)
+    for c, g, accs in rows:
+        qty, implied = render_portion(comps[c], g, mode)
+        entries.append((c, float(g), implied))
+        extra = ""
+        if from_freezer(comps[c], day_ix, settings, ing):
+            extra = "  — from freezer — thaw ahead"
+        acc_txt = ""
+        for ac, ag in accs:
+            aqty, aimplied = render_portion(comps[ac], ag, mode)
+            entries.append((ac, float(ag), aimplied))
+            acc_txt += f" + {aqty} {comps[ac]['name']}"
+        if acc_txt:
+            acc_txt += " on top"
+        L.append(f"- {comps[c]['name']} ({shared_note}) — take "
+                 f"{qty}{acc_txt}{extra}")
+    for c, g in orphans:
+        qty, implied = render_portion(comps[c], g, mode)
+        entries.append((c, float(g), implied))
+        L.append(f"- {comps[c]['name']} — take {qty}")
+    return L
+
+
 def _macro_status(total, target, tol):
     """Per-macro tolerance status: 'hit' inside the ±tol band, else the
     SIGNED gram delta vs the target ('+Ng over' / '-Ng short')."""
@@ -351,20 +629,33 @@ def render_eat_sheet(pname, person, comps, week, settings, menu, ing=None,
         md = meal_days[d - 1] if meal_days and d - 1 < len(meal_days) \
             else None
         if md and md.get("meals"):
-            # M1.9: meal-sectioned day — every gram below comes from the
-            # dealt MealDay, which conserves the solved plate exactly
+            # M1.9/M1.10: meal-sectioned day — every gram below comes from
+            # the dealt MealDay, which conserves the solved plate exactly.
+            # Per-slot serving-model phrasing (PRD §4.0 amendments):
+            # portioned = packed-plate voice (container framing);
+            # family_style = take-amount voice, accents attached to their
+            # base (attach_accents mirrors the dealer's affinity data).
             for meal in md["meals"]:
                 L.append(f"### {meal['slot']} — {meal['serving_model'].replace('_', ' ')}\n")
                 if not meal["items"]:
                     L.append("_nothing dealt to this meal_")
-                for c, g in sorted(meal["items"].items(),
-                                   key=lambda x: (-x[1], x[0])):
-                    qty, implied = render_portion(comps[c], g, mode)
-                    entries.append((c, float(g), implied))
-                    extra = ""
-                    if from_freezer(comps[c], d - 1, settings, ing):
-                        extra = "  — from freezer — thaw ahead"
-                    L.append(f"- {comps[c]['name']}: {qty}{extra}")
+                elif meal["serving_model"] == "portioned":
+                    parts, extras = [], []
+                    for c, g in sorted(meal["items"].items(),
+                                       key=lambda x: (-x[1], x[0])):
+                        qty, implied = render_portion(comps[c], g, mode)
+                        entries.append((c, float(g), implied))
+                        parts.append(f"{comps[c]['name']} {qty}")
+                        if from_freezer(comps[c], d - 1, settings, ing):
+                            extras.append(comps[c]["name"])
+                    L.append("- packed container: " + " + ".join(parts))
+                    for name in extras:
+                        L.append(f"- {name} is from the freezer that day — "
+                                 "thaw ahead")
+                else:
+                    L.extend(_family_style_lines(meal["items"], comps, mode,
+                                                 entries, d - 1, settings,
+                                                 ing))
                 mm = meal.get("macros") or {}
                 if meal["items"]:
                     L.append(f"- meal subtotal: {mm.get('kcal', 0):.0f} kcal "
@@ -378,6 +669,12 @@ def render_eat_sheet(pname, person, comps, week, settings, menu, ing=None,
                     if f.get("message"):
                         L.append(f"- *{f['message']}*")
                 L.append("")
+        elif (person.get("serving_model") or "portioned") == "family_style":
+            # M1.10: day-pool take-amount voice for a family-style person
+            # with no meal structure (PRD §4.0: per day otherwise)
+            L.extend(_family_style_lines(pl, comps, mode, entries, d - 1,
+                                         settings, ing))
+            L.append("")
         else:
             for c, g in sorted(pl.items(), key=lambda x: (-x[1], x[0])):
                 qty, implied = render_portion(comps[c], g, mode)
@@ -418,17 +715,26 @@ def render_eat_sheet(pname, person, comps, week, settings, menu, ing=None,
 # --------------------------------------------------------------------------- #
 def render_artifacts(comps, ing, people, settings, menu, weeks, sp,
                      purchase_rows, total_cost, pantry=None,
-                     stock_warnings=None, diag=None, meta=None, meals=None):
+                     stock_warnings=None, diag=None, meta=None, meals=None,
+                     methods=None, techniques=None):
     """All three deliverables as ``{filename: markdown}``. Pure composition
     of the renderers above — every input is an already-solved structure.
     ``meals`` (M1.9): meals.deal_week output ({person: [MealDay]}) — eat
-    sheets render meal sections for the people present in it."""
+    sheets render meal sections for the people present in it.
+    ``methods``/``techniques`` (M1.10): methods.load_methods /
+    load_techniques output — the cook plan compiles method-step fragments
+    into the session script; the portioning matrix is built here as a pure
+    reshape of MealDay x the canonical session attribution."""
     relax = (diag or {}).get("relax_tiers", {})
+    matrix = build_portioning(sp, weeks, people, meals, comps)
     files = {
         "shopping_list.md": render_shopping_list(
             ing, purchase_rows, total_cost, pantry=pantry,
             stock_warnings=stock_warnings, meta=meta),
-        "cook_plan.md": render_cook_plan(comps, settings, sp, meta=meta),
+        "cook_plan.md": render_cook_plan(comps, settings, sp, meta=meta,
+                                         methods=methods,
+                                         techniques=techniques,
+                                         matrix=matrix),
     }
     for pname, wk in weeks.items():
         files[f"eat_{pname}.md"] = render_eat_sheet(

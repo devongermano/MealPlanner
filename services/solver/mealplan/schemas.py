@@ -254,6 +254,16 @@ class UnattributedDemand(_Strict):
     grams: float
 
 
+class FeedRow(_Strict):
+    """Day-level attribution row (M1.10): this session feeds ``grams`` of
+    ``component`` on ``day`` — the join input the portioning matrix
+    reshapes against MealDay (M19_SPEC §1)."""
+
+    component: str
+    day: int
+    grams: float
+
+
 class CookSession(_Strict):
     index: int
     start: int                      # cook day (0-indexed)
@@ -263,6 +273,7 @@ class CookSession(_Strict):
     minutes: int
     thaw_notes: list[ThawNote]
     freezer_notes: list[FreezerServe]
+    feeds: list[FeedRow]            # M1.10 day-level attribution
 
 
 class SessionPlan(_Strict):

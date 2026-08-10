@@ -48,6 +48,7 @@ from pathlib import Path
 import yaml
 
 from . import artifacts, instrument, io_yaml, lockplan, meals
+from . import methods as methods_mod
 from .costing import (age_pantry, attribute, budget_ceiling, cooked_leftovers,
                       menu_cost, purchase, session_plan)
 from .engine import (available_on, build_week, choose_menu, from_freezer,
@@ -97,14 +98,20 @@ class _Parser(argparse.ArgumentParser):
 #  report
 # --------------------------------------------------------------------------- #
 def render(comps, ing, people, settings, menu, weeks, demand, docmsg, menuinfo,
-           sp, pantry=None, diag=None):
+           sp, pantry=None, diag=None, meals=None, methods=None,
+           techniques=None):
     """``sp`` is the canonical session plan (costing.session_plan, M0.4/P10):
     the ONE source for the cook plan, minutes, purchasing, and cost below.
     ``pantry`` (M0.12, optional): stock is deducted from the shopping list —
     and therefore the cost — before pack rounding, inside purchase().
     ``diag`` (P8, optional): build_week's diagnostics dict. When present,
     every day the relaxation ladder loosened the variety caps for is flagged
-    inline and summarized up top — no silent caps, drops, or relaxations."""
+    inline and summarized up top — no silent caps, drops, or relaxations.
+    ``meals``/``methods``/``techniques`` (M1.10): the cook-plan section is
+    the SAME compiled session script the cook_plan.md artifact renders
+    (artifacts.cook_script_lines — one renderer, two outputs, no
+    divergence), including shared-prep consolidation and the portioning
+    matrix when meal structure exists."""
     relax = (diag or {}).get("relax_tiers", {})
     L = ["# Week plan\n", docmsg, "\n## Menu\n"]
     for i in menu:
@@ -133,32 +140,16 @@ def render(comps, ing, people, settings, menu, weeks, demand, docmsg, menuinfo,
                  + ". Tier 1 allows +1 repeat day/batch per component, "
                    "tier 2 removes the day cap and allows +2 batches.\n")
 
-    # cook plan — straight from the canonical session plan (M0.4). Each
-    # session lists what IT cooks; purchasing and cost below consume the
-    # summed per-session batches.
+    # cook plan — straight from the canonical session plan (M0.4), compiled
+    # by THE one session-script renderer (M1.10: artifacts.cook_script_lines
+    # — the same code path as cook_plan.md, so the two can never diverge).
     L.append("## Cook plan\n")
     batches = sp["batches"]
-    for s in sp["sessions"]:
-        L.append(f"### Session {s['index']} — cook day {s['start']} — "
-                 f"{s['minutes']} min active\n")
-        if not s["batches"]:
-            L.append("_nothing to cook this session_\n")
-            continue
-        L.append("| component | need | batches | cook | leftover |")
-        L.append("|---|---|---|---|---|")
-        for i in menu:
-            b = s["batches"].get(i, 0)
-            if not b:
-                continue
-            need = s["demand_g"][i]
-            made = s["made_g"][i]
-            L.append(f"| {comps[i]['name']} | {need}g | {b} | {made}g "
-                     f"| {made-need}g |")
-        for n in s["thaw_notes"]:
-            L.append(f"- THAW: {n['note']}")
-        for n in s.get("freezer_notes", []):
-            L.append(f"- FREEZER: {n['note']}")
-        L.append("")
+    matrix = artifacts.build_portioning(sp, weeks, people, meals, comps)
+    script, used_ops = artifacts.cook_script_lines(
+        comps, settings, sp, methods=methods, techniques=techniques,
+        matrix=matrix, h="###")
+    L.extend(script)
     # M1.8: demand fed from cooked pantry leftovers (already paid for —
     # consumed before any fresh batch)
     for n in sp.get("leftover", []):
@@ -167,6 +158,8 @@ def render(comps, ing, people, settings, menu, weeks, demand, docmsg, menuinfo,
         L.append(f"- WARNING: {u['grams']}g of `{u['component']}` demanded on "
                  f"day {u['day']} but no cook session can feed that day — "
                  "run `mealplan doctor`.")
+    L.extend(artifacts.technique_glossary_lines(used_ops, techniques,
+                                                h="###"))
 
     L.append("\n## Custom foods to create in your tracker\n")
     L.append("Create each of these once, per 100g. Then you only ever log a weight.\n")
@@ -357,6 +350,35 @@ def _pantry_effects(pantry, ing, comps, settings, plan_date):
     return pantry, leftovers, stock_warns
 
 
+def _load_methods(methods_arg, comps):
+    """M1.10: resolve + load the method-fragment directory and technique
+    library for the compiled cook script. Explicit ``--methods PATH`` must
+    exist (bad arguments, exit 4); the default (./data/methods-draft
+    relative to the cwd — no hardcoded package paths, P1) applies only when
+    present. Missing/invalid content degrades gracefully: structured
+    warnings on stderr, components without fragments keep ingredient-list
+    rendering. Returns ``(methods, techniques)`` — (None, None) when no
+    directory resolves."""
+    if methods_arg:
+        mdir = Path(methods_arg)
+        if not mdir.is_dir():
+            raise CliError(
+                "missing_methods_dir",
+                f"--methods {methods_arg}: not a directory", EXIT_USAGE)
+    else:
+        mdir = methods_mod.default_methods_dir()
+        if mdir is None:
+            return None, None
+    techniques, twarns = methods_mod.load_techniques(
+        methods_mod.default_techniques_path(mdir))
+    fragments, mwarns = methods_mod.load_methods(
+        mdir, known_components=set(comps),
+        known_operations=set(techniques) if techniques else None)
+    for w in twarns + mwarns:
+        print(f"[warning:{w['code']}] {w['message']}", file=sys.stderr)
+    return fragments, techniques
+
+
 def _apply_overrides(comps, people, settings, budget, mass, exclude, force,
                      bad_args_exit=EXIT_USAGE):
     """Budget/mass/exclude/force overrides, exactly the historical order.
@@ -520,6 +542,15 @@ def main(argv=None):
                     help="week/all only: where the rendered plan is written "
                          "(default: plan.md; ignored with --json — the JSON "
                          "document on stdout IS the output)")
+    ap.add_argument("--methods", default=None, metavar="PATH",
+                    help="method-fragment directory for the compiled cook "
+                         "script (M1.10, PRD §6: recipes are ground truth, "
+                         "never rendered — cook plans compile these step "
+                         "fragments per session). Default: ./data/"
+                         "methods-draft relative to the cwd when it exists; "
+                         "otherwise cook plans render ingredient lists "
+                         "only. Techniques resolve from "
+                         "<PATH>/../techniques/techniques.yaml")
     ap.add_argument("--artifacts", default=None, metavar="DIR",
                     help="week/all only: also write the three human-readable "
                          "deliverables (M1.1, PRD §4.3 step 4) into DIR — "
@@ -592,6 +623,9 @@ def _run(a, timer):
     except io_yaml.ValidationError as e:
         raise CliError("invalid_library", str(e), EXIT_ERROR,
                        issues=_issue_dicts(e.issues))
+    # M1.10: method fragments + techniques for the compiled cook script —
+    # loaded against the FULL library (before --exclude), rendering-only
+    fragments, techniques = _load_methods(a.methods, comps)
     pantry = None
     if a.pantry:
         try:
@@ -680,7 +714,8 @@ def _run(a, timer):
                   comps=comps, ing=ing, people=people, menu=menu,
                   menuinfo=menuinfo, feas=feas, broke=broke, weeks=weeks,
                   sp=sp, diag=diag, pantry=pantry, stock_warns=stock_warns,
-                  rows=rows, total=total, mealdays=mealdays)
+                  rows=rows, total=total, mealdays=mealdays,
+                  fragments=fragments, techniques=techniques)
         return
 
     # M1.1: the three human-readable deliverables (PRD §4.3 step 4).
@@ -692,7 +727,8 @@ def _run(a, timer):
             files = artifacts.render_artifacts(
                 comps, ing, people, settings, menu, weeks, sp, rows, total,
                 pantry=pantry, stock_warnings=stock_warns, diag=diag,
-                meta=meta, meals=mealdays)
+                meta=meta, meals=mealdays, methods=fragments,
+                techniques=techniques)
             written = artifacts.write_artifacts(a.artifacts, files)
         print(f"[artifacts written to {a.artifacts}: "
               + ", ".join(p.name for p in written) + "]", file=sys.stderr)
@@ -722,7 +758,8 @@ def _run(a, timer):
 
     with timer.span("render"):
         out = render(comps, ing, people, settings, menu, weeks, demand, docmsg,
-                     menuinfo, sp, pantry=pantry, diag=diag)
+                     menuinfo, sp, pantry=pantry, diag=diag, meals=mealdays,
+                     methods=fragments, techniques=techniques)
 
     if a.cmd == "shop":
         print(out.split("## Shopping list")[1])
@@ -738,7 +775,8 @@ def _run(a, timer):
 # --------------------------------------------------------------------------- #
 def _cmd_lock(a, timer, *, lib, settings, plan_date, comps, ing, people,
               menu, menuinfo, feas, broke, weeks, sp, diag, pantry,
-              stock_warns, rows, total, mealdays=None):
+              stock_warns, rows, total, mealdays=None, fragments=None,
+              techniques=None):
     """Write the immutable locked plan artifact: plans/<key>/plan.yaml plus
     the three M1.1 deliverables rendered alongside."""
     key = lockplan.primary_trip_date(plan_date, settings)
@@ -768,7 +806,7 @@ def _cmd_lock(a, timer, *, lib, settings, plan_date, comps, ing, people,
         files = artifacts.render_artifacts(
             comps, ing, people, settings, menu, weeks, sp, rows, total,
             pantry=pantry, stock_warnings=stock_warns, diag=diag, meta=meta,
-            meals=mealdays)
+            meals=mealdays, methods=fragments, techniques=techniques)
         written = artifacts.write_artifacts(plan_dir, files)
     result = {
         "key": key.isoformat(), "plan_path": str(path),

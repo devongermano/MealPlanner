@@ -154,6 +154,13 @@
             "title": "Demand G",
             "type": "object"
           },
+          "feeds": {
+            "items": {
+              "$ref": "#/components/schemas/FeedRow"
+            },
+            "title": "Feeds",
+            "type": "array"
+          },
           "freezer_notes": {
             "items": {
               "$ref": "#/components/schemas/FreezerServe"
@@ -196,7 +203,8 @@
           "made_g",
           "minutes",
           "thaw_notes",
-          "freezer_notes"
+          "freezer_notes",
+          "feeds"
         ],
         "title": "CookSession",
         "type": "object"
@@ -367,6 +375,31 @@
           "clears_at_tolerance"
         ],
         "title": "FeasibilityEntry",
+        "type": "object"
+      },
+      "FeedRow": {
+        "additionalProperties": false,
+        "description": "Day-level attribution row (M1.10): this session feeds ``grams`` of\n``component`` on ``day`` — the join input the portioning matrix\nreshapes against MealDay (M19_SPEC §1).",
+        "properties": {
+          "component": {
+            "title": "Component",
+            "type": "string"
+          },
+          "day": {
+            "title": "Day",
+            "type": "integer"
+          },
+          "grams": {
+            "title": "Grams",
+            "type": "number"
+          }
+        },
+        "required": [
+          "component",
+          "day",
+          "grams"
+        ],
+        "title": "FeedRow",
         "type": "object"
       },
       "FreezerServe": {

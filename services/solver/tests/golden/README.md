@@ -21,3 +21,8 @@ change, via:
     python tests/test_capabilities.py regen
 
 Recorded on: macOS arm64, Python 3.14, PuLP 3.3.2 (CBC), 2026-08-09.
+
+Regenerated 2026-08-09 (M1.10): `session_plan` sessions gained `feeds` —
+the day-level attribution rows (component, day, grams) the portioning
+matrix reshapes (M19_SPEC §1). Purely additive: batches, minutes,
+portions, and purchasing are byte-identical to the previous golden.

@@ -117,6 +117,8 @@ export interface components {
             demand_g: {
                 [key: string]: number;
             };
+            /** Feeds */
+            feeds: components["schemas"]["FeedRow"][];
             /** Freezer Notes */
             freezer_notes: components["schemas"]["FreezerServe"][];
             /** Index */
@@ -200,6 +202,20 @@ export interface components {
             ok: boolean;
             /** Total */
             total: number;
+        };
+        /**
+         * FeedRow
+         * @description Day-level attribution row (M1.10): this session feeds ``grams`` of
+         *     ``component`` on ``day`` — the join input the portioning matrix
+         *     reshapes against MealDay (M19_SPEC §1).
+         */
+        FeedRow: {
+            /** Component */
+            component: string;
+            /** Day */
+            day: number;
+            /** Grams */
+            grams: number;
         };
         /**
          * FreezerServe
