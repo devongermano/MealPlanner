@@ -126,6 +126,19 @@ The two models share the entire solve — engine, batching, shopping, shelf life
 identical; only cook-plan instructions and eat-sheet rendering differ. A household
 may mix models freely.
 
+**The dish layer (owner correction, 2026-08-09, late):** *"These aren't meals —
+they're random ingredients served together… how is that following an actual recipe
+I gave you?"* Components are the COOKING decomposition of recipes; the recipes'
+ASSEMBLY is a first-class layer that ingestion must preserve: a **dish** is a named
+combination of components with per-serving ratio bands and optional accents
+(gorditas de picadillo = shells + picadillo + salsa + queso). A meal is **one dish,
+portioned within its bands, plus compatible sides** — never a free mix of the
+week's pool. Menu selection picks dishes; components derive for batching/shopping
+(unchanged — components remain the batch units, shared components consolidate
+across dishes at cook time); the LP portions within-dish per person (same pots,
+different macros — the moat survives, structured). Meal-time affinity (breakfast)
+attaches to dishes. This supersedes any framing of meals as component pools.
+
 **The cook-plan bar (owner, 2026-08-09):** *"thoughtless for someone to meal prep in
 the fastest way possible — here's the ingredients, here are the exact steps, and how
 to parallelize it."* The compiled cook script's mature form is a single interleaved
