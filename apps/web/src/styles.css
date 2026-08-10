@@ -1,1 +1,348 @@
-/* You can add global styles to this file, and also import other style files */
+/* mealplan design tokens + base styles.
+   Restrained, warm, editorial. System fonts only — no webfont payload.
+   Light is the default; dark follows the OS unless [data-theme] overrides it. */
+
+:root {
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-serif: ui-serif, Georgia, 'Iowan Old Style', 'Times New Roman', serif;
+  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.9375rem;
+  --text-md: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.75rem;
+  --text-3xl: 2.25rem;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --space-8: 4rem;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-full: 999px;
+
+  --shell-max: 68rem;
+  --nav-height: 3.5rem;
+
+  /* Light palette — warm paper, deep ink, one green accent. */
+  --bg: #faf8f5;
+  --surface: #ffffff;
+  --sunken: #f2efe9;
+  --border: #e4dfd5;
+  --border-strong: #d2cabb;
+  --ink: #1f1d1a;
+  --ink-muted: #6b655c;
+  --ink-faint: #918a7f;
+  --accent: #3d6b4e;
+  --accent-hover: #33593f;
+  --accent-ink: #ffffff;
+  --accent-soft: #e9f1e9;
+  --danger: #a3392a;
+  --danger-soft: #fbecea;
+  --focus: #3d6b4e;
+  --shadow-sm: 0 1px 2px rgb(31 29 26 / 0.06);
+  --shadow-md: 0 4px 16px -4px rgb(31 29 26 / 0.12);
+  --shadow-lg: 0 16px 40px -12px rgb(31 29 26 / 0.18);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #141413;
+    --surface: #1c1b19;
+    --sunken: #111110;
+    --border: #2f2d2a;
+    --border-strong: #423f3a;
+    --ink: #f0ede7;
+    --ink-muted: #a19b91;
+    --ink-faint: #7d776e;
+    --accent: #86b492;
+    --accent-hover: #9ac5a5;
+    --accent-ink: #122116;
+    --accent-soft: #1e2a21;
+    --danger: #e28271;
+    --danger-soft: #2b1a17;
+    --focus: #86b492;
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow-md: 0 4px 16px -4px rgb(0 0 0 / 0.5);
+    --shadow-lg: 0 16px 40px -12px rgb(0 0 0 / 0.6);
+  }
+}
+
+:root[data-theme='dark'] {
+  --bg: #141413;
+  --surface: #1c1b19;
+  --sunken: #111110;
+  --border: #2f2d2a;
+  --border-strong: #423f3a;
+  --ink: #f0ede7;
+  --ink-muted: #a19b91;
+  --ink-faint: #7d776e;
+  --accent: #86b492;
+  --accent-hover: #9ac5a5;
+  --accent-ink: #122116;
+  --accent-soft: #1e2a21;
+  --danger: #e28271;
+  --danger-soft: #2b1a17;
+  --focus: #86b492;
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-md: 0 4px 16px -4px rgb(0 0 0 / 0.5);
+  --shadow-lg: 0 16px 40px -12px rgb(0 0 0 / 0.6);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  margin: 0;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.011em;
+}
+
+h1 {
+  font-family: var(--font-serif);
+  font-size: var(--text-3xl);
+  letter-spacing: -0.02em;
+}
+
+h2 {
+  font-size: var(--text-xl);
+}
+
+h3 {
+  font-size: var(--text-md);
+}
+
+p {
+  margin: 0;
+}
+
+a {
+  color: var(--accent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* ---- Form primitives ------------------------------------------------- */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.field > label {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.field > .hint {
+  font-size: var(--text-xs);
+  color: var(--ink-muted);
+}
+
+.field > .hint.error {
+  color: var(--danger);
+}
+
+/* Vertical rhythm for a stack of fields ending in a submit button. */
+.form-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-top: var(--space-5);
+}
+
+.form-footnote {
+  margin-top: var(--space-5);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
+input[type='text'],
+input[type='email'],
+input[type='password'],
+select {
+  width: 100%;
+  padding: 0.5rem 0.6875rem;
+  font: inherit;
+  font-size: var(--text-base);
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+input::placeholder {
+  color: var(--ink-faint);
+}
+
+input:focus-visible,
+select:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+input[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+
+select {
+  appearance: none;
+  padding-right: 2rem;
+  background-image: linear-gradient(45deg, transparent 50%, currentcolor 50%),
+    linear-gradient(135deg, currentcolor 50%, transparent 50%);
+  background-position: calc(100% - 1rem) 55%, calc(100% - 0.7rem) 55%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+
+/* ---- Buttons --------------------------------------------------------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 2.375rem;
+  padding: 0 var(--space-4);
+  font: inherit;
+  font-size: var(--text-base);
+  font-weight: 500;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  text-decoration: none;
+  transition: background-color 120ms ease, border-color 120ms ease, opacity 120ms ease;
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--sunken);
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  color: var(--accent-ink);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--ink-muted);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background: var(--sunken);
+  color: var(--ink);
+}
+
+.btn-block {
+  width: 100%;
+}
+
+/* ---- Surfaces -------------------------------------------------------- */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.muted {
+  color: var(--ink-muted);
+}
+
+.eyebrow {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.0625rem var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: var(--sunken);
+  color: var(--ink-muted);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
