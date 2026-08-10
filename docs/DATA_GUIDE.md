@@ -256,13 +256,13 @@ neutral_oil, spices                            =   0
 **Step 2 — divide by the cooked yield, not the raw weight.**
 
 98.6 g of protein in a 1,000 g batch = **9.9 g per 100 g** of finished picadillo. Fat
-and carbs work identically: 10.1 g and 10.0 g per 100 g.
+and carbs work identically: 10.0 g and 10.3 g per 100 g.
 
 **Step 3 — calories are computed, never stored.** 4 calories per gram of protein, 9 per
 gram of fat, 4 per gram of carb — the Atwater factors:
 
 ```
-(4 × 9.9) + (9 × 10.1) + (4 × 10.0) = 170 kcal per 100 g
+(4 × 9.9) + (9 × 10.0) + (4 × 10.3) = 171 kcal per 100 g
 ```
 
 There is no `kcal` field anywhere in the library, on purpose. The first version stored

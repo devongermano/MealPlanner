@@ -58,7 +58,7 @@ This is a real recipe's own assembly — highest confidence in this document.
 
 Sides you may add: refried beans, cilantro-lime rice
 Eaten at: lunch, dinner
-One serving: **27 g protein · 58 g fat · 65 g carb · 890 kcal**
+One serving: **27 g protein · 58 g fat · 66 g carb · 890 kcal**
 
 > Worth knowing: this is the fattiest plate here relative to its protein, because the
 > shells are 70 g of lard in a 425 g batch. That's the recipe, not a mistake — but it
@@ -133,7 +133,7 @@ instructions attached.
 
 Sides you may add: cilantro-lime rice, refried beans
 Eaten at: lunch, dinner
-One serving: **43 g protein · 42 g fat · 81 g carb · 880 kcal**
+One serving: **43 g protein · 42 g fat · 82 g carb · 880 kcal**
 
 > This is plain birria tacos, **not quesabirria** — for two reasons that both come from
 > your own recipe. There's no melting cheese in the library labelled for Mexican food.
@@ -162,7 +162,7 @@ One serving: **43 g protein · 42 g fat · 81 g carb · 880 kcal**
 
 Sides you may add: none
 Eaten at: lunch, dinner
-One serving: **44 g protein · 48 g fat · 81 g carb · 930 kcal**
+One serving: **44 g protein · 48 g fat · 82 g carb · 930 kcal**
 
 `[ ] approve`  `[ ] edit: ______________________________`  `[ ] reject`
 
@@ -182,7 +182,7 @@ signature, and al pastor goes in a tortilla.
 
 Sides you may add: cilantro-lime rice, refried beans
 Eaten at: lunch, dinner
-One serving: **44 g protein · 22 g fat · 87 g carb · 720 kcal**
+One serving: **44 g protein · 22 g fat · 88 g carb · 720 kcal**
 
 > The leanest plate in the corpus: it delivers protein without dragging fat along.
 > Shrimp keeps 3 days and doesn't freeze, so this dish always lands early in the week.
@@ -205,7 +205,7 @@ One serving: **44 g protein · 22 g fat · 87 g carb · 720 kcal**
 
 Sides you may add: refried beans
 Eaten at: lunch, dinner
-One serving: **40 g protein · 19 g fat · 73 g carb · 630 kcal**
+One serving: **40 g protein · 19 g fat · 74 g carb · 630 kcal**
 
 `[ ] approve`  `[ ] edit: ______________________________`  `[ ] reject`
 
