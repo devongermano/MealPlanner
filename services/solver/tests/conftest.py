@@ -32,6 +32,11 @@ SLOW_MODULES = {
                                 # is pure — its unit/property tests are
                                 # FAST-tier in test_schedule.py)
     "test_score_scale",         # frontier points run choose_menu
+    "test_targets_e2e",         # M1.11 day-type cycling: full weeks at two
+                                # anchors, lock/verify round trip, dish-mode
+                                # cycling week (resolution itself is pure —
+                                # its unit tests are FAST-tier in
+                                # test_target_profiles.py by construction)
     "test_plate_bounds_replate",  # 20-seed property over plate solves
     "test_contracts_roundtrip",  # full pipeline + doctor vs pydantic mirrors
     "test_dishes_e2e",          # M1.13 dish-blocked LPs: examples week,

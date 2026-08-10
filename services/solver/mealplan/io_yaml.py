@@ -24,10 +24,10 @@ from typing import Any, Optional
 
 import yaml
 
-from .model import (COOK_PLAN_STYLES, DISH_LAYER_MODES, DISH_RECONSTRUCTIONS,
-                    PERSON_MODES, SERVING_MODELS, STATIONS_DEFAULTS, Dish,
-                    Ingredient, Pantry, Person, Settings, derive_component,
-                    resolve_meal_slots)
+from .model import (COOK_PLAN_STYLES, DAY_KEYS, DISH_LAYER_MODES,
+                    DISH_RECONSTRUCTIONS, PERSON_MODES, SERVING_MODELS,
+                    STATIONS_DEFAULTS, Dish, Ingredient, Pantry, Person,
+                    Settings, derive_component, resolve_meal_slots)
 
 SCHEMA_VERSION = 1
 KNOWN_SCHEMA_VERSIONS = (1,)
@@ -363,6 +363,115 @@ def validate_components_doc(doc: Any, known_ingredients: Optional[set] = None,
     return issues
 
 
+def _macro_map_issues(where: str, m: Any) -> list[ValidationIssue]:
+    """The shared macro-map shape check (M1.11): a gram map must carry
+    protein/fat/carb. ``where`` is the full location prefix (e.g.
+    ``person 'x', targets`` or ``person 'x', target_profiles.lift``);
+    issue locations append ``.<macro>``. Extracted VERBATIM from the M0
+    inline ``targets`` check — codes, where strings and messages are
+    byte-identical for the targets call site (M111_SPEC §6, T-V9)."""
+    out = []
+    if isinstance(m, dict):
+        for mac in ("protein", "fat", "carb"):
+            if mac not in m:
+                out.append(ValidationIssue(
+                    "missing_field", f"{where}.{mac}",
+                    f"daily target for '{mac}' is missing"))
+    return out
+
+
+def _target_profile_issues(where: str, p: dict) -> list[ValidationIssue]:
+    """M1.11 target-profile validation (M111_SPEC §6) — all rules run in
+    one pass, each appended to the one issues list (never
+    first-error-wins). ``target_profiles`` and ``week`` come together or
+    not at all; week keys are the fixed ``mon..sun`` enum; week values
+    must name defined profiles; a profile no week entry references is
+    dead config (M0.5 posture: authored, never consumed → error)."""
+    issues = []
+    profs = p.get("target_profiles")
+    week = p.get("week")
+    if profs is not None and week is None:
+        issues.append(ValidationIssue(
+            "profiles_without_week", f"{where}, field 'target_profiles'",
+            "target_profiles is authored but 'week' is absent — no day can "
+            "ever resolve to a profile (dead config, M0.5 posture); add a "
+            "week map (mon..sun -> profile name) or delete the profiles"))
+    if week is not None and profs is None:
+        issues.append(ValidationIssue(
+            "week_without_profiles", f"{where}, field 'week'",
+            "week is authored but 'target_profiles' is absent — the week "
+            "map's labels are undefined; add target_profiles or delete "
+            "the week map"))
+    prof_names = set()
+    if profs is not None:
+        pwhere = f"{where}, field 'target_profiles'"
+        if not isinstance(profs, dict) or not profs:
+            issues.append(ValidationIssue(
+                "bad_target_profiles", pwhere,
+                f"target_profiles must be a non-empty mapping of profile "
+                f"name -> {{protein, fat, carb}} gram map (got {profs!r})"))
+        else:
+            for nm, body in profs.items():
+                if not isinstance(nm, str) or not nm.strip():
+                    issues.append(ValidationIssue(
+                        "bad_target_profiles", pwhere,
+                        f"profile name must be a non-empty string "
+                        f"(got {nm!r})"))
+                    continue
+                prof_names.add(nm)
+                bwhere = f"{where}, target_profiles.{nm}"
+                if not isinstance(body, dict):
+                    issues.append(ValidationIssue(
+                        "bad_target_profiles", bwhere,
+                        f"profile body must be a mapping "
+                        f"{{protein, fat, carb}} (got {body!r})"))
+                    continue
+                issues += _macro_map_issues(bwhere, body)
+                extra = sorted(set(body) - {"protein", "fat", "carb"})
+                if extra:
+                    issues.append(ValidationIssue(
+                        "unknown_field", bwhere,
+                        f"unexpected profile field(s) {extra}; a profile "
+                        "carries exactly protein/fat/carb gram targets"))
+    if week is not None:
+        wwhere = f"{where}, field 'week'"
+        if not isinstance(week, dict) or not week:
+            issues.append(ValidationIssue(
+                "bad_week", wwhere,
+                f"week must be a non-empty mapping of weekday "
+                f"({'|'.join(DAY_KEYS)}) -> profile name (got {week!r})"))
+        else:
+            for k, v in week.items():
+                if k not in DAY_KEYS:
+                    issues.append(ValidationIssue(
+                        "bad_week_day", f"{where}, week key {k!r}",
+                        f"week keys must be one of {'|'.join(DAY_KEYS)} "
+                        f"(got {k!r} — full names, capitals and day "
+                        "numbers are not accepted)"))
+                if not isinstance(v, str):
+                    issues.append(ValidationIssue(
+                        "unknown_profile", f"{where}, week.{k}",
+                        f"week value must name a defined profile "
+                        f"(got {v!r})"))
+                elif prof_names and v not in prof_names:
+                    issues.append(ValidationIssue(
+                        "unknown_profile", f"{where}, week.{k}",
+                        f"week references undefined profile '{v}'; "
+                        f"defined: {sorted(prof_names)}"))
+            if prof_names:
+                used = {v for v in week.values() if isinstance(v, str)}
+                for nm in profs:
+                    if nm in prof_names and nm not in used:
+                        issues.append(ValidationIssue(
+                            "dead_profile",
+                            f"{where}, target_profiles.{nm}",
+                            f"profile '{nm}' is referenced by no week "
+                            "entry — authored but never consumed (M0.5 "
+                            "dead-config posture); reference it or "
+                            "delete it"))
+    return issues
+
+
 def validate_people_doc(doc: Any, fname: str = "people.yaml"
                         ) -> list[ValidationIssue]:
     issues = _check_schema_version(doc, fname)
@@ -396,13 +505,12 @@ def validate_people_doc(doc: Any, fname: str = "people.yaml"
                     "bad_enum", f"{where}, field 'mode'",
                     f"mode must be one of {'|'.join(PERSON_MODES)} "
                     f"(got {pm!r})"))
-            tgt = p.get("targets")
-            if isinstance(tgt, dict):
-                for mac in ("protein", "fat", "carb"):
-                    if mac not in tgt:
-                        issues.append(ValidationIssue(
-                            "missing_field", f"{where}, targets.{mac}",
-                            f"daily target for '{mac}' is missing"))
+            issues += _macro_map_issues(f"{where}, targets",
+                                        p.get("targets"))
+            # M1.11 (M111_SPEC §6): day-type profiles + week map — the
+            # base targets stay required; profiles are the same macro
+            # shape via the same shared check.
+            issues += _target_profile_issues(where, p)
             # M1.0: tolerance must be a number in (0, 0.5] — the elastic
             # macro band is a fraction of the target; 0 or negative makes
             # the LP band degenerate/inverted, and anything past 50% is a

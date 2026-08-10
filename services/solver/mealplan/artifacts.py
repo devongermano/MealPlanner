@@ -49,6 +49,8 @@ from pathlib import Path
 from . import methods as methods_mod
 from . import schedule as schedule_mod
 from .engine import available_on, from_freezer
+from .model import (DAY_KEYS, resolve_targets, week_day_key, week_day_label,
+                    weekly_targets)
 from .units import MACROS, human_pack, kcal_of
 
 # Friendly fraction grid for batch-fraction rendering (M1.2). 0 is
@@ -762,7 +764,8 @@ def _macro_status(total, target, tol):
 
 
 def render_eat_sheet(pname, person, comps, week, settings, menu, ing=None,
-                     relax_tiers=None, meta=None, meal_days=None):
+                     relax_tiers=None, meta=None, meal_days=None,
+                     anchor=None):
     """One person's per-day assembly sheet. ``week`` is that person's list
     of solved day plates ({cid: grams}); empty/None days are EXPLAINED
     holes, never silent. ``relax_tiers`` is diag["relax_tiers"][pname].
@@ -772,23 +775,64 @@ def render_eat_sheet(pname, person, comps, week, settings, menu, ing=None,
     heading (slot + serving model), items, per-meal macro subtotal — the
     clean minimal meal-structured sheet; the full sheet rework (portioning
     matrix, family_style vs portioned phrasing) is M1.10. When None the
-    sheet is byte-identical to pre-M1.9 (the layer is inert)."""
+    sheet is byte-identical to pre-M1.9 (the layer is inert).
+
+    ``anchor`` (M1.11, M111_SPEC §9): plan-date weekday anchor. For a
+    person WITH target_profiles the header gains one line per profile plus
+    the emergent weekly total, day headings carry ``(wed — lift)`` tags
+    (base days show the weekday only) and per-day macro status evaluates
+    against the RESOLVED day targets. Every new line is profile-gated —
+    a no-profile sheet is byte-identical (weekday derives from the
+    anchor: data, never a clock)."""
     mode = person.get("mode") or "precision"
     tol = person["tolerance"]
     t = person["targets"]
+    profs = person.get("target_profiles")
     L = [f"# Eat sheet — {pname}\n"]
     L.append(f"Mode: **{mode}**"
              + (" — household units with honest error bars; the plan is "
                 "solved in grams underneath" if mode == "relaxed"
                 else " — grams; a kitchen scale is strongly preferred")
              + f". Tolerance ±{tol:.0%}.")
-    L.append(f"Daily targets: {t['protein']}g protein / {t['fat']}g fat / "
-             f"{t['carb']}g carb ({kcal_of(t):.0f} kcal).\n")
+    if profs:
+        week_map = person.get("week") or {}
+        L.append(f"Daily targets: {t['protein']}g protein / {t['fat']}g fat "
+                 f"/ {t['carb']}g carb ({kcal_of(t):.0f} kcal).")
+        for nm, pt in profs.items():
+            day_lbl = ", ".join(k for k in DAY_KEYS
+                                if week_map.get(k) == nm)
+            L.append(f"- {nm} ({day_lbl}): {pt['protein']}g protein / "
+                     f"{pt['fat']}g fat / {pt['carb']}g carb "
+                     f"({kcal_of(pt):.0f} kcal)")
+        # ONE denominator for the emergent weekly (P10): the plan's day
+        # count, exactly as cli.render's person header and calorie-share
+        # table use it. `len(week)` would be a SECOND source for the same
+        # reported quantity — identical today (build_week always emits
+        # settings["days"] entries, explained holes included) but it would
+        # silently split plan.md from the eat sheet the day any path
+        # returns a short week.
+        wt = weekly_targets(person, settings["days"], anchor)
+        L.append(f"Weekly total (emergent): {wt['protein']:g}g protein / "
+                 f"{wt['fat']:g}g fat / {wt['carb']:g}g carb "
+                 f"({kcal_of(wt):.0f} kcal) — days are solved "
+                 "independently.\n")
+    else:
+        L.append(f"Daily targets: {t['protein']}g protein / {t['fat']}g fat / "
+                 f"{t['carb']}g carb ({kcal_of(t):.0f} kcal).\n")
+
+    def _day_tag(day_ix):
+        """`` (wed — lift)`` / `` (tue)`` heading tag — profile-gated."""
+        if not profs:
+            return ""
+        lbl = week_day_label(person, day_ix, anchor)
+        wd = week_day_key(day_ix, anchor)
+        return f" ({wd} — {lbl})" if lbl else f" ({wd})"
+
     for d, pl in enumerate(week, 1):
         if not pl:
             gone = [comps[i]["name"] for i in menu
                     if not available_on(comps[i], d - 1, settings, ing)]
-            L.append(f"## Day {d} — NO FEASIBLE PLATE\n")
+            L.append(f"## Day {d}{_day_tag(d - 1)} — NO FEASIBLE PLATE\n")
             L.append("- past shelf life by this day: "
                      + (", ".join(gone) if gone else "nothing"))
             L.append("- fix one of: move the 2nd cook day later, swap in a "
@@ -799,7 +843,7 @@ def render_eat_sheet(pname, person, comps, week, settings, menu, ing=None,
                for m in MACROS}
         tiers = relax_tiers or []
         tier = tiers[d - 1] if d - 1 < len(tiers) else None
-        L.append(f"## Day {d} — {kcal_of(tot):.0f} kcal"
+        L.append(f"## Day {d}{_day_tag(d - 1)} — {kcal_of(tot):.0f} kcal"
                  + (f" — *variety caps relaxed (tier {tier})*" if tier
                     else "") + "\n")
         entries = []
@@ -886,10 +930,14 @@ def render_eat_sheet(pname, person, comps, week, settings, menu, ing=None,
         # otherwise render the same grams with different statuses. Status
         # is a pure function of (shown, target, tol), so equal-looking
         # lines are equal.
+        # M1.11: status evaluates against THE resolved day targets
+        # (model.resolve_targets — identity for a no-profile person, so
+        # the no-profile bytes are unchanged)
+        td = resolve_targets(person, d - 1, anchor)
         for m in MACROS:
             shown = round(tot[m], 1)
-            L.append(f"- {m}: {shown:.1f}g of {t[m]}g target — "
-                     f"{_macro_status(shown, t[m], tol)}")
+            L.append(f"- {m}: {shown:.1f}g of {td[m]}g target — "
+                     f"{_macro_status(shown, td[m], tol)}")
         if mode == "relaxed":
             bars = day_error_bars(entries, comps)
             L.append("\n> If you eyeball it: "
@@ -910,7 +958,7 @@ def render_eat_sheet(pname, person, comps, week, settings, menu, ing=None,
 def render_artifacts(comps, ing, people, settings, menu, weeks, sp,
                      purchase_rows, total_cost, pantry=None,
                      stock_warnings=None, diag=None, meta=None, meals=None,
-                     methods=None, techniques=None):
+                     methods=None, techniques=None, anchor=None):
     """All three deliverables as ``{filename: markdown}``. Pure composition
     of the renderers above — every input is an already-solved structure.
     ``meals`` (M1.9): meals.deal_week output ({person: [MealDay]}) — eat
@@ -918,7 +966,9 @@ def render_artifacts(comps, ing, people, settings, menu, weeks, sp,
     ``methods``/``techniques`` (M1.10): methods.load_methods /
     load_techniques output — the cook plan compiles method-step fragments
     into the session script; the portioning matrix is built here as a pure
-    reshape of MealDay x the canonical session attribution."""
+    reshape of MealDay x the canonical session attribution.
+    ``anchor`` (M1.11): plan-date weekday anchor, threaded to the eat
+    sheets' profile-gated rendering — inert without profiles."""
     relax = (diag or {}).get("relax_tiers", {})
     matrix = build_portioning(sp, weeks, people, meals, comps)
     files = {
@@ -934,7 +984,7 @@ def render_artifacts(comps, ing, people, settings, menu, weeks, sp,
         files[f"eat_{pname}.md"] = render_eat_sheet(
             pname, people[pname], comps, wk, settings, menu, ing=ing,
             relax_tiers=relax.get(pname), meta=meta,
-            meal_days=(meals or {}).get(pname))
+            meal_days=(meals or {}).get(pname), anchor=anchor)
     return files
 
 

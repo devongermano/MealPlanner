@@ -48,10 +48,11 @@ import math
 
 import pulp
 
-from .engine import (SCORE_WEIGHTS, _count_solve, available_on,
-                     effective_serve_bounds, eligible, solve_stage)
+from .engine import (SCORE_WEIGHTS, _count_solve, _day_type_views,
+                     available_on, effective_serve_bounds, eligible,
+                     solve_stage)
 from .meals import MEAL_WEIGHTS
-from .model import resolve_meal_slots
+from .model import person_for_day, resolve_meal_slots
 from .units import MACROS, kcal_of
 
 # --------------------------------------------------------------------------- #
@@ -1127,7 +1128,7 @@ def _heaviest_slot(assignments, dishes):
 #  week assembly (dish mode) — the §1 pipeline steps 2–4
 # --------------------------------------------------------------------------- #
 def build_week_dishes(comps, people, settings, dishes, menu, seed=0,
-                      ing=None, diag=None, leftovers=None):
+                      ing=None, diag=None, leftovers=None, anchor=None):
     """Dish-mode week assembly: per person-day, skeleton → plate_dishes →
     MealDay emitted DIRECTLY from the solve; the day plate is the derived
     Σ over meals (an arithmetic identity, asserted); ``demand[c] +=
@@ -1140,7 +1141,13 @@ def build_week_dishes(comps, people, settings, dishes, menu, seed=0,
     (person-days carrying the code — the measure §13's
     BAND_ESCALATION_THRESHOLD compares against), and
     ``no_dish_assignable`` — the §13 pre-M1.6 escalation
-    instrumentation."""
+    instrumentation.
+
+    ``anchor`` (M1.11, M111_SPEC §5 injection point #12 — the mirror of
+    build_week's): every person-day runs on the DAY-VIEW person
+    (``model.person_for_day``), so skeleton capacity arithmetic, the
+    dish-blocked LP's day tolerance and per-slot shares all see the
+    resolved day-type targets. Identity when nobody authors profiles."""
     W = _weights()
     days = settings["days"]
     leftover_days = {}
@@ -1160,18 +1167,21 @@ def build_week_dishes(comps, people, settings, dishes, menu, seed=0,
         week_demand = set()
         wk, mds, retries_by_day = [], [], []
         for d in range(days):
+            # M1.11 injection point (#12): the day-view person feeds the
+            # skeleton and the dish LP — identity when the layer is inert
+            p_day = person_for_day(person, d, anchor)
             day_slots = slots if not slotless \
-                else _slotless_blocks(person, dishes, comps, menu, d,
+                else _slotless_blocks(p_day, dishes, comps, menu, d,
                                       settings, ing, leftover_days, W)
             bumps, attempts = {}, 0
             res = None
             asn = notes = None
             while True:
                 asn, notes = skeleton_day(
-                    person, dishes, comps, settings, d, day_slots, menu,
+                    p_day, dishes, comps, settings, d, day_slots, menu,
                     ing=ing, extra_days=leftover_days, used_days=used_days,
                     week_demand=week_demand, rank_bump=bumps)
-                res = plate_dishes(person, comps, dishes, asn, settings,
+                res = plate_dishes(p_day, comps, dishes, asn, settings,
                                    seed=seed, meal_bands=not slotless)
                 if res["status"] != "infeasible" \
                         or attempts >= W["ASSIGN_RETRIES"]:
@@ -1207,7 +1217,7 @@ def build_week_dishes(comps, people, settings, dishes, menu, seed=0,
                                   macros={m: 0.0 for m in MACROS}
                                   | {"kcal": 0.0},
                                   target={m: round(
-                                      person["targets"][m]
+                                      p_day["targets"][m]
                                       / max(len(asn), 1), 1)
                                       for m in MACROS},
                                   flags=[dict(hole)]) for a in asn]
@@ -1293,13 +1303,16 @@ def _slotless_blocks(person, dishes, comps, menu, day, settings, ing,
 # --------------------------------------------------------------------------- #
 def replate_dishes(person, dishes, comps, menu, day, settings, *,
                    locked=None, veto=None, seed=0, ing=None,
-                   used_days=None, leftovers=None):
+                   used_days=None, leftovers=None, anchor=None):
     """Re-solve ONE person's ONE day in dish mode. ``locked``: pins —
     ``{(slot_name, cid): g}`` (slot-qualified pins become natural in dish
     mode; M19's slot_pin_unsupported restriction lifts) or ``{cid: g}``.
     ``veto``: dish ids banned for this day — the skeleton re-runs without
     them; no alternative → ``no_alternative_dish`` explained. Returns the
-    plate_dishes result dict (+ a day_flags entry on veto exhaustion)."""
+    plate_dishes result dict (+ a day_flags entry on veto exhaustion).
+    ``anchor`` (M1.11): the day re-solves against the person's resolved
+    day-type targets (day-view injection; identity when inert)."""
+    person = person_for_day(person, day, anchor)
     leftover_days = {}
     for e in (leftovers or []):
         leftover_days.setdefault(e["component"], set()).update(e["days"])
@@ -1592,6 +1605,11 @@ def doctor_dish_section(comps, people, settings, dishes, ing=None):
                              f"{j} (killed by {k})" for j, k in dead))
     data["availability"] = per_day
     data["per_person"] = {}
+    # M1.11 (M111_SPEC §7): the targets-bearing reachability checks run
+    # once per DISTINCT day-type (engine._day_type_views — anchor-free);
+    # eligibility kills are targets-independent and computed once per
+    # person. A no-profile person degenerates to one unlabeled pass —
+    # byte-identical; multi-type mirrors key by the rendered label.
     for pn, p in people.items():
         elig, killed = [], {}
         for j in ids:
@@ -1600,83 +1618,93 @@ def doctor_dish_section(comps, people, settings, dishes, ing=None):
                 elig.append(j)
             else:
                 killed[j] = dict(component=hit[0], tag=hit[1])
-        need_ratio = p["targets"]["protein"] / max(p["targets"]["fat"], 1)
-        lean = [j for j in elig
-                if dish_macro_ratio_max(dishes[j], comps, p)
-                >= need_ratio * 1.25]
-        uncovered = [dd for dd in range(days)
-                     if not any(j in per_day[dd]["available"]
-                                for j in lean)]
-        worst = None
-        for dd in range(days):
-            h = sum(
-                t_max(dishes[j], comps, p)
-                * sum(b["max_g"] * comps[c]["per100"]["carb"] / 100
-                      for c, b in dishes[j]["components"].items()
-                      if c in comps and eligible(comps[c], p))
-                for j in elig if j in per_day[dd]["available"])
-            for j in elig:
-                if j not in per_day[dd]["available"]:
-                    continue
-                for s in dishes[j]["compatible_sides"]:
-                    if s in comps and eligible(comps[s], p) \
-                            and available_on(comps[s], dd, settings, ing):
-                        h += effective_serve_bounds(comps[s], p)[1] \
-                            * comps[s]["per100"]["carb"] / 100
-            if worst is None or h < worst[1]:
-                worst = (dd, h)
-        # slot_target_unreachable (graft, P3/Judge 1): per slot, max
-        # achievable kcal from eligible dishes at T_MAX + side maxima
-        slots = resolve_meal_slots(p)
-        unreachable = []
-        if slots:
-            n = len(slots)
-            share = kcal_of(p["targets"]) / n
-            for s in slots:
-                best = 0.0
+        for suffix, pv in _day_type_views(p):
+            label = pn + suffix
+            need_ratio = pv["targets"]["protein"] / max(pv["targets"]["fat"],
+                                                        1)
+            lean = [j for j in elig
+                    if dish_macro_ratio_max(dishes[j], comps, pv)
+                    >= need_ratio * 1.25]
+            uncovered = [dd for dd in range(days)
+                         if not any(j in per_day[dd]["available"]
+                                    for j in lean)]
+            worst = None
+            for dd in range(days):
+                h = sum(
+                    t_max(dishes[j], comps, pv)
+                    * sum(b["max_g"] * comps[c]["per100"]["carb"] / 100
+                          for c, b in dishes[j]["components"].items()
+                          if c in comps and eligible(comps[c], pv))
+                    for j in elig if j in per_day[dd]["available"])
                 for j in elig:
-                    hi = dish_kcal_range(dishes[j], comps, p, W)[1]
-                    side_kcal = sorted(
-                        (effective_serve_bounds(comps[sd], p)[1]
-                         * comps[sd]["per100"]["kcal"] / 100
-                         for sd in dishes[j]["compatible_sides"]
-                         if sd in comps and eligible(comps[sd], p)),
-                        reverse=True)[:W["SIDES_PER_SLOT_MAX"]]
-                    reach = (hi + sum(side_kcal)) \
-                        * slot_max_dishes(p, s["name"])
-                    best = max(best, reach)
-                if best < share:
-                    unreachable.append(dict(
-                        code="slot_target_unreachable", person=pn,
-                        slot=s["name"], achievable_kcal=round(best, 1),
-                        target_kcal=round(share, 1)))
-        data["per_person"][pn] = dict(
-            eligible=len(elig), killed=killed, lean_dishes=lean,
-            uncovered_lean_days=uncovered,
-            carb_headroom=dict(worst_day=worst[0] if worst else None,
-                               worst_headroom_g=round(worst[1], 1)
-                               if worst else 0.0,
-                               target_g=p["targets"]["carb"],
-                               ok=bool(worst)
-                               and worst[1] >= p["targets"]["carb"]),
-            slot_target_unreachable=unreachable)
-        lines.append(
-            f"- **{pn}**: {len(elig)}/{len(ids)} dishes eligible"
-            + ("; killed: " + ", ".join(
-                f"{j} ({v['component']}: {v['tag']})"
-                for j, v in sorted(killed.items())) if killed else "")
-            + f"; lean dishes: {', '.join(lean) or 'NONE'}"
-            + (f"; **zero lean-dish days: {uncovered}**" if uncovered
-               else ""))
-        ch = data["per_person"][pn]["carb_headroom"]
-        lines.append(
-            f"  - carb headroom: worst day {ch['worst_day']} — "
-            f"{ch['worst_headroom_g']:.0f}g vs {ch['target_g']}g target: "
-            + ("OK" if ch["ok"] else "**SHORT**"))
-        for u in unreachable:
+                    if j not in per_day[dd]["available"]:
+                        continue
+                    for s in dishes[j]["compatible_sides"]:
+                        if s in comps and eligible(comps[s], pv) \
+                                and available_on(comps[s], dd, settings,
+                                                 ing):
+                            h += effective_serve_bounds(comps[s], pv)[1] \
+                                * comps[s]["per100"]["carb"] / 100
+                if worst is None or h < worst[1]:
+                    worst = (dd, h)
+            # slot_target_unreachable (graft, P3/Judge 1): per slot, max
+            # achievable kcal from eligible dishes at T_MAX + side maxima
+            slots = resolve_meal_slots(pv)
+            unreachable = []
+            if slots:
+                n = len(slots)
+                share = kcal_of(pv["targets"]) / n
+                for s in slots:
+                    best = 0.0
+                    for j in elig:
+                        hi = dish_kcal_range(dishes[j], comps, pv, W)[1]
+                        side_kcal = sorted(
+                            (effective_serve_bounds(comps[sd], pv)[1]
+                             * comps[sd]["per100"]["kcal"] / 100
+                             for sd in dishes[j]["compatible_sides"]
+                             if sd in comps and eligible(comps[sd], pv)),
+                            reverse=True)[:W["SIDES_PER_SLOT_MAX"]]
+                        reach = (hi + sum(side_kcal)) \
+                            * slot_max_dishes(pv, s["name"])
+                        best = max(best, reach)
+                    if best < share:
+                        # `person` carries the SAME label the mirror is
+                        # keyed by (M1.11): the check ran against THIS
+                        # day-type's targets, so an entry that named the
+                        # bare person would be indistinguishable from the
+                        # base day's. Byte-identical for a no-profile
+                        # person — their suffix is "" and label IS pn.
+                        unreachable.append(dict(
+                            code="slot_target_unreachable", person=label,
+                            slot=s["name"], achievable_kcal=round(best, 1),
+                            target_kcal=round(share, 1)))
+            data["per_person"][label] = dict(
+                eligible=len(elig), killed=killed, lean_dishes=lean,
+                uncovered_lean_days=uncovered,
+                carb_headroom=dict(worst_day=worst[0] if worst else None,
+                                   worst_headroom_g=round(worst[1], 1)
+                                   if worst else 0.0,
+                                   target_g=pv["targets"]["carb"],
+                                   ok=bool(worst)
+                                   and worst[1] >= pv["targets"]["carb"]),
+                slot_target_unreachable=unreachable)
             lines.append(
-                f"  - **slot_target_unreachable**: '{u['slot']}' max "
-                f"achievable {u['achievable_kcal']:.0f} kcal vs "
-                f"{u['target_kcal']:.0f} share — widen bands, author "
-                "heartier sides, or opt in max_dishes_per_slot: 2")
+                f"- **{label}**: {len(elig)}/{len(ids)} dishes eligible"
+                + ("; killed: " + ", ".join(
+                    f"{j} ({v['component']}: {v['tag']})"
+                    for j, v in sorted(killed.items())) if killed else "")
+                + f"; lean dishes: {', '.join(lean) or 'NONE'}"
+                + (f"; **zero lean-dish days: {uncovered}**" if uncovered
+                   else ""))
+            ch = data["per_person"][label]["carb_headroom"]
+            lines.append(
+                f"  - carb headroom: worst day {ch['worst_day']} — "
+                f"{ch['worst_headroom_g']:.0f}g vs {ch['target_g']}g target: "
+                + ("OK" if ch["ok"] else "**SHORT**"))
+            for u in unreachable:
+                lines.append(
+                    f"  - **slot_target_unreachable**: '{u['slot']}' max "
+                    f"achievable {u['achievable_kcal']:.0f} kcal vs "
+                    f"{u['target_kcal']:.0f} share — widen bands, author "
+                    "heartier sides, or opt in max_dishes_per_slot: 2")
     return lines, data

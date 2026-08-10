@@ -78,6 +78,14 @@ DISH_LAYER_MODES = ("permissive", "strict")
 # field that tells the reviewer how hard to look (data steward's schema).
 DISH_RECONSTRUCTIONS = ("from_source", "inferred", "invented")
 
+# M1.11 (PRD §5.2): weekday keys for per-person target-profile week maps —
+# ISO order, Monday first, matching datetime.date.weekday() == 0. The week
+# map is keyed by CALENDAR weekday (start-day invariant), never by plan-day
+# position; plan day d has weekday DAY_KEYS[(anchor + d) % 7] where
+# ``anchor = plan_date.weekday()`` is derived ONCE at the CLI boundary —
+# dates come IN as data, the engine reads no wall clock.
+DAY_KEYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
+
 # M1.12: the household station inventory the timeline scheduler respects.
 # PROVISIONAL defaults (P9) — a typical apartment kitchen; override any
 # subset in settings.stations. `prep` is simultaneous prep workspaces
@@ -202,6 +210,14 @@ class Person(_RawView):
     relaxed person with no explicit tolerance gets RELAXED_TOLERANCE; the
     default is applied HERE (the one schema-defaults layer) so the engine
     keeps reading person["tolerance"] by plain indexing.
+
+    target_profiles / week (M1.11, PRD §5.2): named day-type macro maps +
+    a partial CALENDAR-weekday map (``mon..sun`` → profile name). A weekday
+    absent from ``week`` resolves to ``targets`` — the base day. The two
+    come together or not at all (validated in io_yaml); ``targets`` stays
+    REQUIRED for everyone (flat daily grams remain valid shorthand). THE
+    canonical per-day resolution is ``resolve_targets`` below (P10) — no
+    other code may do weekday math on these fields.
     """
 
     name: str
@@ -217,6 +233,8 @@ class Person(_RawView):
     max_dishes_per_slot: Optional[int] = None  # LIVE (M1.13): big-eater
     #                       ladder rung 3 — explicit opt-in, default 1,
     #                       per person with per-slot overrides (M113_SPEC §7)
+    target_profiles: Optional[dict] = None  # LIVE (M1.11): day-type macros
+    week: Optional[dict] = None             # LIVE (M1.11): weekday → profile
     raw: dict = field(default_factory=dict, repr=False)
 
     @classmethod
@@ -237,6 +255,8 @@ class Person(_RawView):
                    serving_model=sm,
                    meal_slots=raw.get("meal_slots"),
                    max_dishes_per_slot=raw.get("max_dishes_per_slot"),
+                   target_profiles=raw.get("target_profiles"),
+                   week=raw.get("week"),
                    raw=raw)
 
 
@@ -272,6 +292,120 @@ def resolve_meal_slots(person) -> Optional[list]:
         return [dict(name=f"meal_{k + 1}", serving_model=sm,
                      interchangeable=False) for k in range(n)]
     return None
+
+
+# --------------------------------------------------------------------------- #
+#  M1.11 target-profile resolution (M111_SPEC §5) — THE one resolution point
+#  (P10), beside resolve_meal_slots on purpose: schema semantics live in the
+#  model layer; engine/dishes/meals/doctor/renderers all consume THESE
+#  functions and never do weekday math of their own.
+# --------------------------------------------------------------------------- #
+def week_day_key(day_index, anchor) -> str:
+    """Plan day ``day_index`` (0-indexed) has this calendar weekday key.
+    THE one weekday-math site — ``(anchor + day_index) % 7`` appears
+    exactly here; ``anchor = plan_date.weekday()`` (int 0-6, Monday=0) is
+    derived once at the CLI boundary. Any day count works: resolution is
+    mod-7 for ``days != 7`` too (M111_SPEC §13)."""
+    return DAY_KEYS[(anchor + day_index) % 7]
+
+
+def week_day_label(person, day_index, anchor) -> Optional[str]:
+    """The day-type NAME plan day ``day_index`` resolves to, or None for
+    the base day (drives the §9 rendering branch: base days show the
+    weekday only). A person without a week map is always base — no anchor
+    needed, so the inert path never demands one."""
+    week = person.get("week")
+    if not week:
+        return None
+    if day_index is None or anchor is None:
+        raise ValueError(
+            "person authors a target-profile week map but no plan-day/"
+            "anchor was supplied — the CLI derives anchor = "
+            "plan_date.weekday() and its date_required check fires first "
+            "for real users (M1.11)")
+    return week.get(week_day_key(day_index, anchor))
+
+
+def resolve_targets(person, day_index=None, anchor=None) -> dict:
+    """THE canonical per-day target resolution (M1.11, P10).
+
+    No profiles → returns ``person["targets"]`` — the SAME object
+    (identity), which is the inertness proof (M111_SPEC §8 link 1).
+    Profiles present and no day/anchor → ValueError: an engine-side bug
+    guard, never a user-facing path (cli's structured ``date_required``
+    fires pre-solve). A weekday absent from ``week`` resolves to the base
+    ``targets`` — explicit documented absence semantics, not inference.
+    """
+    profs = person.get("target_profiles")
+    if not profs:
+        return person["targets"]
+    if day_index is None or anchor is None:
+        raise ValueError(
+            "person authors target_profiles but resolve_targets was "
+            "called without day_index/anchor — thread anchor from the "
+            "plan date (M1.11)")
+    label = week_day_label(person, day_index, anchor)
+    if label is None:
+        return person["targets"]
+    return profs[label]
+
+
+def person_for_day(person, day_index=None, anchor=None):
+    """Day-view person (M111_SPEC §5 injection strategy): the IDENTICAL
+    person object when resolution returns the base map (object identity —
+    zero churn, byte-identical downstream behavior); otherwise a copy
+    whose ``targets`` is the resolved day map (``Person.from_raw`` for
+    Person inputs, dict copy for plain mappings). Never mutates the
+    input. The week-loop layer (build_week / build_week_dishes /
+    deal_week / replate*) injects this view so every inner
+    ``person["targets"]`` read is day-correct with zero diff."""
+    resolved = resolve_targets(person, day_index, anchor)
+    if resolved is person["targets"]:
+        return person
+    if isinstance(person, Person):
+        raw = dict(person.raw)
+        raw["targets"] = resolved
+        return Person.from_raw(person.name, raw)
+    view = {k: v for k, v in person.items()}
+    view["targets"] = resolved
+    return view
+
+
+def weekly_targets(person, days, anchor=None) -> dict:
+    """The emergent weekly sum (M111_SPEC §4): Σ over plan days of
+    ``resolve_targets``. REPORTING ONLY (plan.md person header, eat-sheet
+    header, calorie-share table) — no LP constraint spans days; free
+    weekly allocation is the declared PRD §5.2 successor. A no-profile
+    person needs no anchor and sums to ``days × targets``."""
+    out = {m: 0.0 for m in MACROS}
+    for d in range(days):
+        t = resolve_targets(person, d, anchor)
+        for m in MACROS:
+            out[m] += t[m]
+    return out
+
+
+def distinct_day_types(person) -> list:
+    """Ordered ``(label, targets, weekdays)`` triples — one per DISTINCT
+    day-type (M111_SPEC §7): ``("base", targets, <weekdays not in week>)``
+    first, included iff any weekday resolves to base (always, for a
+    no-profile person: one entry covering all seven), then one entry per
+    profile in authoring order with the weekday keys mapping to it. The
+    doctor loops THESE — feasibility is per day-type, a set of macro maps,
+    anchor-free by construction — so it stays O(distinct types), never
+    O(7), and needs no date."""
+    profs = person.get("target_profiles")
+    if not profs:
+        return [("base", person["targets"], DAY_KEYS)]
+    week = person.get("week") or {}
+    out = []
+    base_days = tuple(k for k in DAY_KEYS if k not in week)
+    if base_days:
+        out.append(("base", person["targets"], base_days))
+    for name in profs:
+        days = tuple(k for k in DAY_KEYS if week.get(k) == name)
+        out.append((name, profs[name], days))
+    return out
 
 
 @dataclass

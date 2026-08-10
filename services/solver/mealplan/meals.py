@@ -30,7 +30,7 @@ decision to escalate is data-forced (flag counts as receipts), never vibes.
 """
 
 from .engine import effective_serve_bounds
-from .model import resolve_meal_slots
+from .model import person_for_day, resolve_meal_slots
 from .units import MACROS, kcal_of
 
 # --------------------------------------------------------------------------- #
@@ -628,20 +628,25 @@ def _swap_slot_positions(meals, a, b):
 # --------------------------------------------------------------------------- #
 #  week-level driver (P10: the ONE place meal structure is derived)
 # --------------------------------------------------------------------------- #
-def deal_week(people, comps, weeks, *, config=None):
+def deal_week(people, comps, weeks, *, config=None, anchor=None):
     """Deal every configured person-day of a solved week. Returns
     ``{person: [MealDay per day]}`` covering ONLY the people with a meal
     structure — an empty dict when nobody configures meals (the layer is
     inert; the pipeline stays byte-identical, M19_SPEC §1). Called by the
     week pipeline after build_week; rebalance re-deals through the same
-    path (re-solve the day, then re-deal it)."""
+    path (re-solve the day, then re-deal it).
+
+    ``anchor`` (M1.11): each day deals against the DAY-VIEW person
+    (``model.person_for_day``), so per-meal slot targets are the resolved
+    day-type targets over n. Identity when nobody authors profiles."""
     out = {}
     for pname in sorted(weeks):
         person = people[pname]
         slots = resolve_meal_slots(person)
         if not slots:
             continue
-        days = [deal_day(person, comps, pl, slots, config=config, day=d)
+        days = [deal_day(person_for_day(person, d, anchor), comps, pl,
+                         slots, config=config, day=d)
                 for d, pl in enumerate(weeks[pname])]
         if any(s.get("interchangeable") for s in slots):
             days = equalize_interchangeable(days, slots, config=config)

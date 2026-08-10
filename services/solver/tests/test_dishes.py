@@ -534,6 +534,40 @@ def test_doctor_dish_section_names_killers_and_unreachable_slots():
     assert unreach and "slot_target_unreachable" in text
     # provenance: the invented dish is called out
     assert any(x["reconstruction"] == "invented" for x in data["dishes"])
+    # M1.11 inertness: a no-profile person's entry names the bare person,
+    # exactly as pre-M1.11 (their label IS their name)
+    assert {x["person"] for x in unreach} == {"j"}
+
+
+def test_doctor_dish_slot_unreachable_names_its_day_type():
+    """M1.11 mirror fidelity: the reachability checks run once per
+    DISTINCT day-type, so a `slot_target_unreachable` entry has to name
+    the type it was computed against — the labeled key it is filed under.
+    A bare person name would make a lift-day-only miss indistinguishable
+    from a base-day one to anything reading the structured mirror (the
+    rendered line is unambiguous only because it sits under the labeled
+    block)."""
+    base_t = {"protein": 500, "fat": 250, "carb": 900}
+    jimbo = dict(name="j", targets=base_t, tolerance=0.05,
+                 exclude=["dairy"], dislikes=[],
+                 target_profiles={"lift": {"protein": 700, "fat": 300,
+                                           "carb": 1200}},
+                 week={"mon": "lift", "wed": "lift"},
+                 meal_slots=[{"name": "lunch"}, {"name": "dinner"},
+                             {"name": "third"}])
+    _, data = D.doctor_dish_section(COMPS, {"j": jimbo}, SETTINGS, DISHES)
+    base_lbl = "j — day-type 'base' (tue, thu, fri, sat, sun)"
+    lift_lbl = "j — day-type 'lift' (mon, wed)"
+    assert set(data["per_person"]) == {base_lbl, lift_lbl}
+    per_type = {}
+    for lbl in (base_lbl, lift_lbl):
+        entries = data["per_person"][lbl]["slot_target_unreachable"]
+        assert entries, lbl
+        assert {e["person"] for e in entries} == {lbl}, lbl
+        per_type[lbl] = {e["target_kcal"] for e in entries}
+    # non-vacuous: the two day-types really were checked against DIFFERENT
+    # slot targets, so the labels are carrying information
+    assert per_type[base_lbl] != per_type[lift_lbl], per_type
 
 
 def test_engine_doctor_splices_dish_section_only_in_dish_mode():

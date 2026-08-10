@@ -9,7 +9,11 @@ packages/contracts. Deliberately absent, to be built at real M2:
 - no solve lock / queueing (PRD §8.4: solves serialize behind a lock —
   the API's problem; this spike solves synchronously in-request)
 - no pantry/plan-date support in /solve (structurally covered by the
-  session_plan.leftover mirror; wiring is an M2 task)
+  session_plan.leftover mirror; wiring is an M2 task). The plan date is
+  ALSO the M1.11 day-type anchor (M111_SPEC §3: anchor =
+  plan_date.weekday()), so until it is wired a library whose people
+  author `target_profiles` is rejected with a structured 422
+  `date_required` — the same reason the CLI raises, never a 500.
 
 What it DOES honor already:
 - thin orchestration only (P10): every computation below is a call into the
@@ -107,6 +111,37 @@ def solve(req: SolveRequest) -> WeekPlanResult:
             detail=ValidationErrorResponse(
                 issues=[dict(code=i.code, where=i.where, message=i.message,
                              severity=i.severity) for i in e.issues]
+            ).model_dump())
+
+    # M1.11: /solve carries no plan date, so there is no anchor to resolve
+    # day-types against (M111_SPEC §3) — and `build_week` would raise the
+    # engine-side ValueError guard, which FastAPI turns into a 500 on
+    # input that is perfectly VALID YAML. Mirror the CLI's `date_required`
+    # instead: a structured 422, all-errors (one issue per profiled
+    # person), same as every other bad input on this endpoint. The real
+    # wiring (a plan_date on SolveOptions, threaded to the anchor) is the
+    # M2 task named in the module docstring.
+    profiled = sorted(pn for pn, p in people.items()
+                      if p.get("target_profiles"))
+    if profiled:
+        raise HTTPException(
+            status_code=422,
+            detail=ValidationErrorResponse(
+                detail="target_profiles need a plan date this spike cannot "
+                       "take",
+                issues=[dict(
+                    code="date_required",
+                    # io_yaml's `where` shape verbatim (_load_inline
+                    # materializes the inline doc as people.yaml), so an
+                    # API consumer parses one convention, not two
+                    where=(f"people.yaml: person '{pn}', "
+                           "field 'target_profiles'"),
+                    message="day-type cycling is anchored to the plan "
+                            "start date's weekday, and /solve takes no "
+                            "plan date yet (M2 wiring). Use the CLI "
+                            "(`mealplan week --date YYYY-MM-DD`) or drop "
+                            "target_profiles/week from this person",
+                    severity="error") for pn in profiled]
             ).model_dump())
 
     opts = req.options

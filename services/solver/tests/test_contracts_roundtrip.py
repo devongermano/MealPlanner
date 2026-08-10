@@ -18,6 +18,7 @@ pytest.importorskip("pydantic", reason="[service] extra not installed")
 pytest.importorskip("fastapi", reason="[service] extra not installed")
 
 import yaml  # noqa: E402
+from fastapi import HTTPException  # noqa: E402
 
 from mealplan import costing, engine, io_yaml, schemas  # noqa: E402
 from mealplan.service import SolveOptions, SolveRequest, solve  # noqa: E402
@@ -141,3 +142,31 @@ def test_service_solve_end_to_end_matches_direct_pipeline(pipeline):
     # (service uses engine defaults), so compare structure, not the menu.
     assert res.session_plan.sessions
     assert res.shopping and res.volume
+
+
+def test_service_solve_rejects_target_profiles_with_422():
+    """M1.11: /solve carries no plan date, hence no day-type anchor. The
+    spike must say so in the SAME structured 422 shape every other bad
+    input gets — not leak the engine's ValueError guard as a 500 on a
+    document that is perfectly valid YAML. All-errors: one issue per
+    profiled person, not first-error-wins."""
+    lib = FIXTURES / "solo_lifter"
+    docs = {n: yaml.safe_load((lib / f"{n}.yaml").read_text())
+            for n in ("ingredients", "components", "people")}
+    base = docs["people"]["people"]["sol"]["targets"]
+    docs["people"]["people"]["sol"]["target_profiles"] = {
+        "lift": dict(base, protein=base["protein"] + 40)}
+    docs["people"]["people"]["sol"]["week"] = {"mon": "lift", "wed": "lift"}
+    with pytest.raises(HTTPException) as e:
+        solve(SolveRequest(
+            ingredients=docs["ingredients"], components=docs["components"],
+            people=docs["people"], library_name="solo_lifter",
+            options=SolveOptions(seed=GOLDEN_SEED)))
+    assert e.value.status_code == 422
+    issues = e.value.detail["issues"]
+    assert [i["code"] for i in issues] == ["date_required"]
+    assert "sol" in issues[0]["where"]
+    assert "target_profiles" in issues[0]["where"]
+    # the message points at the fix, and the mirror still validates
+    assert "plan" in issues[0]["message"] and "date" in issues[0]["message"]
+    schemas.ValidationErrorResponse.model_validate(e.value.detail)

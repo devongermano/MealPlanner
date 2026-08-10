@@ -371,6 +371,14 @@ def _engine_side_source():
                       schedule)]
     srcs.append(inspect.getsource(model.derive_component))
     srcs.append(inspect.getsource(model.resolve_meal_slots))
+    # M1.11: target-profile resolution is consumption — the ONE resolution
+    # point (model.resolve_targets + friends, P10) is what makes
+    # Person.target_profiles / Person.week LIVE, same posture as
+    # resolve_meal_slots above.
+    for fn in (model.resolve_targets, model.week_day_label,
+               model.person_for_day, model.weekly_targets,
+               model.distinct_day_types):
+        srcs.append(inspect.getsource(fn))
     return "".join(strip_comments_and_docstrings(s) for s in srcs)
 
 
@@ -383,6 +391,26 @@ VALIDATION_CONSUMED = {"negligible"}
 
 def _referenced(name, src):
     return f'"{name}"' in src or f"'{name}'" in src
+
+
+def test_target_profiles_and_week_are_live():
+    """M1.11 T-D1: Person.target_profiles / Person.week register LIVE —
+    consumed by the model resolution point (resolve_targets et al., which
+    _engine_side_source includes) AND by engine-side callers; neither may
+    ever sit in RESERVED_FIELDS."""
+    src = _engine_side_source()
+    for name in ("target_profiles", "week"):
+        assert name not in model.RESERVED_FIELDS
+        assert _referenced(name, src), \
+            f"Person.{name} must be consumed engine-side (M1.11)"
+    # and the resolution point itself names both fields (the consumption
+    # is real resolution, not a stray string in an unrelated module)
+    import inspect as _i
+    resolver_src = strip_comments_and_docstrings(
+        _i.getsource(model.resolve_targets)
+        + _i.getsource(model.week_day_label))
+    assert _referenced("target_profiles", resolver_src)
+    assert _referenced("week", resolver_src)
 
 
 def test_no_dead_config_gate():

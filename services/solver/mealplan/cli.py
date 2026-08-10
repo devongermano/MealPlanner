@@ -54,7 +54,8 @@ from .costing import (age_pantry, attribute, budget_ceiling, cooked_leftovers,
                       menu_cost, purchase, session_plan)
 from .engine import (available_on, build_week, choose_menu, from_freezer,
                      reset_solve_counts, score_menu, solve_counts)
-from .model import Pantry
+from .model import (DAY_KEYS, Pantry, week_day_key, week_day_label,
+                    weekly_targets)
 from .serialize import canonical_json, jsonable
 from .units import MACROS, fmt_miss, kcal_of
 
@@ -100,7 +101,7 @@ class _Parser(argparse.ArgumentParser):
 # --------------------------------------------------------------------------- #
 def render(comps, ing, people, settings, menu, weeks, demand, docmsg, menuinfo,
            sp, pantry=None, diag=None, meals=None, methods=None,
-           techniques=None, dish_menu=None, dishes=None):
+           techniques=None, dish_menu=None, dishes=None, anchor=None):
     """``sp`` is the canonical session plan (costing.session_plan, M0.4/P10):
     the ONE source for the cook plan, minutes, purchasing, and cost below.
     ``pantry`` (M0.12, optional): stock is deducted from the shopping list —
@@ -112,7 +113,13 @@ def render(comps, ing, people, settings, menu, weeks, demand, docmsg, menuinfo,
     the SAME compiled session script the cook_plan.md artifact renders
     (artifacts.cook_script_lines — one renderer, two outputs, no
     divergence), including shared-prep consolidation and the portioning
-    matrix when meal structure exists."""
+    matrix when meal structure exists.
+    ``anchor`` (M1.11, M111_SPEC §9): plan-date weekday anchor. For people
+    WITH target_profiles the person header gains per-profile lines + the
+    emergent weekly total, day lines carry ``(wed — lift)`` tags, and the
+    calorie-share table divides by the emergent WEEKLY kcal (the honest
+    denominator once days differ). Every new line is profile-gated so a
+    no-profile plan renders byte-identically."""
     relax = (diag or {}).get("relax_tiers", {})
     L = ["# Week plan\n", docmsg]
     # M1.13: in dish mode the menu IS dishes — say so first (the sheet
@@ -194,8 +201,34 @@ def render(comps, ing, people, settings, menu, weeks, demand, docmsg, menuinfo,
     for pname, wk in weeks.items():
         p = people[pname]
         t = p["targets"]
+        profs = p.get("target_profiles")
         L.append(f"\n## {pname} — target {t['carb']}c / {t['fat']}f / {t['protein']}p "
                  f"({kcal_of(t):.0f} kcal)\n")
+        if profs:
+            # M1.11 (M111_SPEC §9): profile lines + the emergent weekly
+            # total — REPORTED, never an LP constraint (days are solved
+            # independently; free weekly allocation is the PRD §5.2
+            # successor)
+            week_map = p.get("week") or {}
+            for nm, pt in profs.items():
+                day_lbl = ", ".join(k for k in DAY_KEYS
+                                    if week_map.get(k) == nm)
+                L.append(f"- day-type {nm} ({day_lbl}): {pt['carb']}c / "
+                         f"{pt['fat']}f / {pt['protein']}p "
+                         f"({kcal_of(pt):.0f} kcal)")
+            wt = weekly_targets(p, settings["days"], anchor)
+            L.append(f"\nWeekly total (emergent): {wt['carb']:g}c / "
+                     f"{wt['fat']:g}f / {wt['protein']:g}p "
+                     f"({kcal_of(wt):.0f} kcal) — days are solved "
+                     "independently.\n")
+
+        def _day_tag(day_ix, profs=profs, p=p):
+            if not profs:
+                return ""
+            lbl = week_day_label(p, day_ix, anchor)
+            wd = week_day_key(day_ix, anchor)
+            return f" ({wd} — {lbl})" if lbl else f" ({wd})"
+
         if not wk:
             L.append("_no feasible plate found — run `mealplan doctor`_")
             continue
@@ -203,7 +236,8 @@ def render(comps, ing, people, settings, menu, weeks, demand, docmsg, menuinfo,
             if not pl:
                 gone = [comps[i]["name"] for i in menu
                         if not available_on(comps[i], d - 1, settings, ing)]
-                L.append(f"**Day {d}** — NO FEASIBLE PLATE.")
+                L.append(f"**Day {d}**{_day_tag(d - 1)} — NO FEASIBLE "
+                         "PLATE.")
                 L.append(f"  - past shelf life by day {d}: "
                          + (", ".join(gone) if gone else "nothing"))
                 L.append("  - fix one of: move the 2nd cook day later (`cook_days` in "
@@ -214,7 +248,7 @@ def render(comps, ing, people, settings, menu, weeks, demand, docmsg, menuinfo,
                    for m in MACROS}
             tiers = relax.get(pname) or []
             tier = tiers[d - 1] if d - 1 < len(tiers) else None
-            L.append(f"**Day {d}** — {kcal_of(tot):.0f} kcal, "
+            L.append(f"**Day {d}**{_day_tag(d - 1)} — {kcal_of(tot):.0f} kcal, "
                      f"{tot['protein']:.0f}p / {tot['fat']:.0f}f / {tot['carb']:.0f}c"
                      + (f" — *variety caps relaxed (tier {tier})*"
                         if tier else ""))
@@ -242,9 +276,21 @@ def render(comps, ing, people, settings, menu, weeks, demand, docmsg, menuinfo,
     L.append("")
     L.append("| person | share of groceries | % of cost | % of calories |")
     L.append("|---|---|---|---|")
-    tk = sum(kcal_of(people[pn]["targets"]) for pn in weeks)
+    # M1.11 (M111_SPEC §9): once ANY person cycles day-types, the honest
+    # calorie denominator is the emergent WEEKLY kcal (weekly_targets) for
+    # everyone — a flat person's weekly is days × daily, so the ratios are
+    # the same quantity. Profile-gated: the no-profile expression below is
+    # today's bytes verbatim (inertness link 4).
+    if any(people[pn].get("target_profiles") for pn in weeks):
+        wt = {pn: weekly_targets(people[pn], settings["days"], anchor)
+              for pn in weeks}
+        tk = sum(kcal_of(wt[pn]) for pn in weeks)
+        pk_of = lambda pn: kcal_of(wt[pn])
+    else:
+        tk = sum(kcal_of(people[pn]["targets"]) for pn in weeks)
+        pk_of = lambda pn: kcal_of(people[pn]["targets"])
     for pn in weeks:
-        pk = kcal_of(people[pn]["targets"])
+        pk = pk_of(pn)
         line = (f"| {pn} | ${shares[pn]:,.2f} | {shares[pn]/max(bought,.01)*100:.1f}% "
                 f"| {pk/tk*100:.1f}% |")
         L.append(line)
@@ -537,33 +583,36 @@ def _resolve_menu_dishes(comps, ing, people, settings, dishes_map, menu_arg,
 
 
 def _assemble_dishes(comps, people, settings, dishes_map, menu, seed, ing,
-                     leftovers, timer):
+                     leftovers, timer, anchor=None):
     """Dish-mode assembly (M113_SPEC §1 steps 2–4): skeleton + one
     dish-blocked LP per person-day; MealDay emitted directly from the
     solve — no dealer pass. Session plan runs on the derived component
-    demand unchanged (downstream blindness)."""
+    demand unchanged (downstream blindness). ``anchor`` (M1.11): plan-date
+    weekday anchor for day-type target resolution."""
     diag = {}
     with timer.span("build_week"):
         weeks, demand, mealdays = dishes_mod.build_week_dishes(
             comps, people, settings, dishes_map, menu, seed=seed, ing=ing,
-            diag=diag, leftovers=leftovers)
+            diag=diag, leftovers=leftovers, anchor=anchor)
     with timer.span("session_plan"):
         sp = session_plan(comps, ing, settings, weeks, leftovers=leftovers)
     return weeks, demand, sp, diag, mealdays
 
 
-def _assemble(comps, people, settings, menu, seed, ing, leftovers, timer):
+def _assemble(comps, people, settings, menu, seed, ing, leftovers, timer,
+              anchor=None):
     diag = {}      # P8: relaxation-ladder tiers surface in the rendered plan
     with timer.span("build_week"):
         weeks, demand = build_week(comps, people, settings, menu, seed=seed,
-                                   ing=ing, diag=diag, leftovers=leftovers)
+                                   ing=ing, diag=diag, leftovers=leftovers,
+                                   anchor=anchor)
     with timer.span("session_plan"):
         sp = session_plan(comps, ing, settings, weeks, leftovers=leftovers)
     # M1.9: deal each configured person-day into composed meals — zero LP
     # solves (the meal-alloc stage is timing only). Empty dict when nobody
     # configures meals: the layer is inert, pipeline byte-identical.
     with timer.span("meal-alloc"):
-        mealdays = meals.deal_week(people, comps, weeks)
+        mealdays = meals.deal_week(people, comps, weeks, anchor=anchor)
     return weeks, demand, sp, diag, mealdays
 
 
@@ -592,6 +641,9 @@ def _solve_from_snapshot(snap, timer):
                            EXIT_ERROR, issues=_issue_dicts(issues))
         pantry = Pantry.from_raw(snap["pantry"])
     plan_date = datetime.date.fromisoformat(snap["plan_date"])
+    # M1.11: the anchor round-trips through the snapshot's plan_date —
+    # zero new snapshot fields, same derivation as cli._run (§3)
+    anchor = plan_date.weekday()
     seed = snap["seed"]
     ov = snap.get("overrides") or {}
     # M1.13: a snapshot carrying a dishes document re-solves in dish mode —
@@ -623,14 +675,15 @@ def _solve_from_snapshot(snap, timer):
             ov.get("n"), seed, force, timer, bad_args_exit=EXIT_ERROR)
         weeks, demand, sp, diag, mealdays = _assemble_dishes(
             comps, people, settings, dishes_map, menu, seed, ing,
-            leftovers, timer)
+            leftovers, timer, anchor=anchor)
     else:
         menu, menuinfo, feas, broke = _resolve_menu(
             comps, ing, people, settings, ov.get("menu"), ov.get("n"),
             seed, force, timer, bad_args_exit=EXIT_ERROR)
         weeks, demand, sp, diag, mealdays = _assemble(comps, people,
                                                       settings, menu, seed,
-                                                      ing, leftovers, timer)
+                                                      ing, leftovers, timer,
+                                                      anchor=anchor)
     return dict(menu=menu, menuinfo=menuinfo, feasible=feas, misses=broke,
                 weeks=weeks, demand=demand, sp=sp, diag=diag,
                 meals=mealdays)
@@ -797,6 +850,26 @@ def _run(a, timer):
             "the primary trip date — the plan start date advanced by "
             "sorted(shop_days)[0] days (PRD §8.2) — and the engine reads "
             "no wall clock", EXIT_USAGE)
+    # M1.11 (M111_SPEC §3): day-type cycling is anchored to the plan
+    # date's weekday — a silent "assume Monday" default would rotate which
+    # REAL weekday gets lift macros (deterministic but wrong). Mirrors the
+    # M1.8 dated-pantry precedent: a missing date cannot crash anyone it
+    # doesn't concern (no-profile libraries see no new requirement).
+    # doctor alone stays anchor-free BY CONSTRUCTION — its checks run per
+    # distinct day-type, never per calendar day (§7).
+    profiled = sorted(pn for pn, p in people.items()
+                      if p.get("target_profiles"))
+    if profiled and plan_date is None and a.cmd != "doctor":
+        raise CliError(
+            "date_required",
+            "--date YYYY-MM-DD is required when any person authors "
+            f"target_profiles ({', '.join(profiled)}): the week map is "
+            "anchored to the plan start date's weekday and the engine "
+            "reads no wall clock (M1.11). `mealplan doctor` runs without "
+            "a date — feasibility is checked per day-type", EXIT_USAGE)
+    # THE one anchor derivation (M111_SPEC §3): weekday of the plan date —
+    # data in, never a clock. None only when nobody needs one.
+    anchor = plan_date.weekday() if plan_date is not None else None
     pantry, leftovers, stock_warns = _pantry_effects(pantry, ing, comps,
                                                      settings, plan_date)
     # M1.13: dish mode is keyed on the PRESENCE of dishes.yaml — loaded
@@ -882,12 +955,13 @@ def _run(a, timer):
     if dishes_map:
         weeks, demand, sp, diag, mealdays = _assemble_dishes(
             comps, people, settings, dishes_map, menu, a.seed, ing,
-            leftovers, timer)
+            leftovers, timer, anchor=anchor)
     else:
         weeks, demand, sp, diag, mealdays = _assemble(comps, people,
                                                       settings, menu,
                                                       a.seed, ing,
-                                                      leftovers, timer)
+                                                      leftovers, timer,
+                                                      anchor=anchor)
     batches = sp["batches"]
     chosen = [i for i in comp_menu if batches.get(i)]
     rows, wp, wt = purchase(comps, ing, chosen, batches, pantry=pantry)
@@ -895,6 +969,7 @@ def _run(a, timer):
 
     if a.cmd == "lock":
         _cmd_lock(a, timer, lib=lib, settings=settings, plan_date=plan_date,
+                  anchor=anchor,
                   comps=comps, ing=ing, people=people, menu=menu,
                   menuinfo=menuinfo, feas=feas, broke=broke, weeks=weeks,
                   sp=sp, diag=diag, pantry=pantry, stock_warns=stock_warns,
@@ -913,7 +988,7 @@ def _run(a, timer):
                 comps, ing, people, settings, comp_menu, weeks, sp, rows,
                 total, pantry=pantry, stock_warnings=stock_warns, diag=diag,
                 meta=meta, meals=mealdays, methods=fragments,
-                techniques=techniques)
+                techniques=techniques, anchor=anchor)
             written = artifacts.write_artifacts(a.artifacts, files)
         print(f"[artifacts written to {a.artifacts}: "
               + ", ".join(p.name for p in written) + "]", file=sys.stderr)
@@ -959,7 +1034,7 @@ def _run(a, timer):
                      docmsg, menuinfo, sp, pantry=pantry, diag=diag,
                      meals=mealdays, methods=fragments,
                      techniques=techniques, dish_menu=menu if dishes_map
-                     else None, dishes=dishes_map)
+                     else None, dishes=dishes_map, anchor=anchor)
 
     if a.cmd == "shop":
         print(out.split("## Shopping list")[1])
@@ -976,12 +1051,18 @@ def _run(a, timer):
 def _cmd_lock(a, timer, *, lib, settings, plan_date, comps, ing, people,
               menu, menuinfo, feas, broke, weeks, sp, diag, pantry,
               stock_warns, rows, total, mealdays=None, fragments=None,
-              techniques=None, dishes_map=None, comp_menu=None):
+              techniques=None, dishes_map=None, comp_menu=None,
+              anchor=None):
     """Write the immutable locked plan artifact: plans/<key>/plan.yaml plus
     the three M1.1 deliverables rendered alongside. M1.13: in dish mode
     the dishes.yaml document joins the verbatim inputs snapshot (so the
     inputs hash covers it automatically) and ``menu`` locks as dish ids;
-    a heritage lock document is byte-identical to pre-M1.13."""
+    a heritage lock document is byte-identical to pre-M1.13.
+
+    ``anchor`` (M1.11): the plan-date weekday, PASSED IN from the single
+    ``cli._run`` derivation (M111_SPEC §3 sanctions exactly two derivation
+    sites — ``_run`` and ``_solve_from_snapshot``). Re-deriving it here
+    would be a second computation of the same quantity (P10)."""
     key = lockplan.primary_trip_date(plan_date, settings)
     raw_docs = io_yaml.load_raw_docs(lib)
     if dishes_map and not a.implicit_dishes:
@@ -1023,7 +1104,7 @@ def _cmd_lock(a, timer, *, lib, settings, plan_date, comps, ing, people,
             comps, ing, people, settings, comp_menu or menu, weeks, sp,
             rows, total, pantry=pantry, stock_warnings=stock_warns,
             diag=diag, meta=meta, meals=mealdays, methods=fragments,
-            techniques=techniques)
+            techniques=techniques, anchor=anchor)
         written = artifacts.write_artifacts(plan_dir, files)
     result = {
         "key": key.isoformat(), "plan_path": str(path),

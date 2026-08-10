@@ -38,7 +38,7 @@ import pulp
 from .costing import (budget_ceiling, cook_minutes, cookable_sessions,
                       estimate_batches, freezer_bridges, menu_cost, purchase,
                       raw_freshness, sessions_for, shop_days_for)
-from .model import resolve_meal_slots
+from .model import distinct_day_types, person_for_day, resolve_meal_slots
 from .units import MACROS, fmt_miss, kcal_of
 
 
@@ -377,6 +377,34 @@ def plate(person, comps, ids, weights=None, tol=None, locked=None,
 # --------------------------------------------------------------------------- #
 #  doctor — why is it infeasible, and what class of thing is missing
 # --------------------------------------------------------------------------- #
+def _day_type_views(person):
+    """M1.11 (M111_SPEC §7): ``(label_suffix, person_view)`` per DISTINCT
+    day-type. A person WITHOUT profiles yields exactly ``[("", person)]``
+    — the SAME object and an empty suffix, so the degenerate doctor report
+    is byte-identical to pre-M1.11. Every PROFILED person gets one view
+    per day-type (the volume_floor dict-copy house pattern) labeled
+    ``" — day-type 'lift' (mon, wed, fri)"`` — named gaps, anchor-free by
+    construction (per type, not per calendar day).
+
+    The inert branch is gated on the ABSENCE of profiles, never on
+    ``len(types) == 1``: a full 7-day week map naming exactly one profile
+    (§13/P-3 anticipates authors writing full coverage) also yields a
+    single type, but that type is the PROFILE — short-circuiting to
+    ``person`` there would diagnose base targets no plan day ever uses and
+    silently skip the only day-type the household eats, gutting the §12
+    P-1 safety net. A profile may even be *named* "base"; profile presence
+    is the only sound gate."""
+    if not person.get("target_profiles"):
+        return [("", person)]
+    out = []
+    types = distinct_day_types(person)
+    for label, tgts, days in types:
+        view = {k: v for k, v in person.items()}
+        view["targets"] = tgts
+        out.append((f" — day-type '{label}' ({', '.join(days)})", view))
+    return out
+
+
 def binding_macro(person, comps, ids=None, steps=10):
     """WHICH macro binds for THIS person on this library (M0.11, PRD §8.3) —
     the generic capability behind the prototype's household-specific
@@ -507,7 +535,16 @@ def doctor(comps, people, settings, ing=None, dishes=None):
     eligibility kills, per-day dish availability with killers named,
     lean-dish coverage, dish carb headroom, slot_target_unreachable. With
     ``dishes=None`` (no dishes.yaml — heritage mode) the output is
-    byte-identical to pre-M1.13."""
+    byte-identical to pre-M1.13.
+
+    M1.11 (M111_SPEC §7): the per-person targets-bearing checks
+    (feasibility, binding macro, volume floor, carb headroom, and the
+    targets-bearing dish reachability checks) run once per DISTINCT
+    day-type via ``_day_type_views`` — anchor-free (per type, never per
+    calendar day; the doctor needs NO date). Rendered lines and the
+    structured-mirror keys carry ``pname — day-type 'lift' (mon, wed,
+    fri)`` labels; a no-profile person degenerates to one unlabeled pass,
+    byte-identical to pre-M1.11."""
     lines = []
     ids = list(comps)
     data = {}
@@ -544,76 +581,89 @@ def doctor(comps, people, settings, ing=None, dishes=None):
         data["raw_freshness"] = rf
     lines.append("## Feasibility\n")
     data["feasibility"] = {}
+    # M1.11 (M111_SPEC §7): every per-person targets-bearing check below
+    # runs once per DISTINCT day-type via _day_type_views — named gaps
+    # ("day-type 'lift' (mon, wed, fri)"), anchor-free, O(distinct types).
+    # A single-type person degenerates to today's one pass, byte-identical
+    # (the view IS the person and the label suffix is empty). Structured
+    # mirrors key by the same label, so single-type keys stay the bare
+    # person name and every value keeps its historical shape.
     for pname, p in people.items():
-        with solve_stage("doctor-feasibility"):
-            ok, pl, miss = plate(p, comps, ids)
-        elig = [i for i in ids if eligible(comps[i], p)]
-        blocked = [i for i in ids if not eligible(comps[i], p)]
-        entry = dict(ok=bool(ok), miss=dict(miss), eligible=len(elig),
-                     total=len(ids), blocked=blocked,
-                     clears_at_tolerance=None)
-        t = p["targets"]
-        lines.append(
-            f"**{pname}** — {t['carb']}c / {t['fat']}f / {t['protein']}p "
-            f"({kcal_of(t):.0f} kcal), excludes {p.get('exclude') or 'nothing'}"
-        )
-        lines.append(f"- {len(elig)}/{len(ids)} components eligible"
-                     + (f"; blocked: {', '.join(blocked)}" if blocked else ""))
-        if ok:
-            lines.append(f"- **feasible** on the full library (±{p['tolerance']:.0%})")
-        else:
-            lines.append(f"- **INFEASIBLE** — misses "
-                         + fmt_miss(miss))
-            for t2 in (0.08, 0.10, 0.15):
-                with solve_stage("doctor-feasibility"):
-                    cleared = plate(p, comps, ids, tol=t2)[0]
-                if cleared:
-                    lines.append(f"  - would clear at ±{t2:.0%} tolerance")
-                    entry["clears_at_tolerance"] = t2
-                    break
+        for suffix, pv in _day_type_views(p):
+            label = pname + suffix
+            with solve_stage("doctor-feasibility"):
+                ok, pl, miss = plate(pv, comps, ids)
+            elig = [i for i in ids if eligible(comps[i], pv)]
+            blocked = [i for i in ids if not eligible(comps[i], pv)]
+            entry = dict(ok=bool(ok), miss=dict(miss), eligible=len(elig),
+                         total=len(ids), blocked=blocked,
+                         clears_at_tolerance=None)
+            t = pv["targets"]
+            lines.append(
+                f"**{label}** — {t['carb']}c / {t['fat']}f / {t['protein']}p "
+                f"({kcal_of(t):.0f} kcal), excludes {pv.get('exclude') or 'nothing'}"
+            )
+            lines.append(f"- {len(elig)}/{len(ids)} components eligible"
+                         + (f"; blocked: {', '.join(blocked)}" if blocked else ""))
+            if ok:
+                lines.append(f"- **feasible** on the full library (±{pv['tolerance']:.0%})")
             else:
-                lines.append("  - does not clear even at ±15%. This is a library gap, "
-                             "not a tolerance problem.")
-        lines.append("")
-        data["feasibility"][pname] = entry
+                lines.append(f"- **INFEASIBLE** — misses "
+                             + fmt_miss(miss))
+                for t2 in (0.08, 0.10, 0.15):
+                    with solve_stage("doctor-feasibility"):
+                        cleared = plate(pv, comps, ids, tol=t2)[0]
+                    if cleared:
+                        lines.append(f"  - would clear at ±{t2:.0%} tolerance")
+                        entry["clears_at_tolerance"] = t2
+                        break
+                else:
+                    lines.append("  - does not clear even at ±15%. This is a library gap, "
+                                 "not a tolerance problem.")
+            lines.append("")
+            data["feasibility"][label] = entry
 
-    # ---- M0.11: which macro binds, per person ------------------------------
+    # ---- M0.11: which macro binds, per person (per day-type, M1.11) --------
     lines.append("## Binding macro\n")
     data["binding_macro"] = {}
     for pname, p in people.items():
-        bm = binding_macro(p, comps, ids)
-        data["binding_macro"][pname] = bm
-        if bm is None:
-            lines.append(f"- **{pname}**: no macro binds — targets are met "
-                         "even at ±0% tolerance")
-        else:
-            word = "forced OVER target" if bm["signed_miss_g"] > 0 \
-                else "unreachable (SHORT)"
-            lines.append(
-                f"- **{pname}**: **{bm['macro']}** binds — tightening "
-                f"tolerance to ±{bm['at_tolerance']:.1%} first makes "
-                f"{bm['macro']} {word} by {abs(bm['signed_miss_g'])}g")
+        for suffix, pv in _day_type_views(p):
+            label = pname + suffix
+            bm = binding_macro(pv, comps, ids)
+            data["binding_macro"][label] = bm
+            if bm is None:
+                lines.append(f"- **{label}**: no macro binds — targets are met "
+                             "even at ±0% tolerance")
+            else:
+                word = "forced OVER target" if bm["signed_miss_g"] > 0 \
+                    else "unreachable (SHORT)"
+                lines.append(
+                    f"- **{label}**: **{bm['macro']}** binds — tightening "
+                    f"tolerance to ±{bm['at_tolerance']:.1%} first makes "
+                    f"{bm['macro']} {word} by {abs(bm['signed_miss_g'])}g")
     lines.append("")
 
-    # ---- M0.11: volume floor -----------------------------------------------
+    # ---- M0.11: volume floor (per day-type, M1.11) -------------------------
     lines.append("## Volume floor\n")
     data["volume_floor"] = {}
     for pname, p in people.items():
-        vf = volume_floor(p, comps, ids)
-        data["volume_floor"][pname] = vf
-        if vf["floor_g"] is None:
-            lines.append(f"- **{pname}**: {vf['note']}")
-            continue
-        msg = (f"- **{pname}**: minimum daily food mass ≈ "
-               f"**{vf['floor_g']}g** ({vf['floor_g'] / 453.6:.1f} lb)")
-        b = vf["binding"]
-        if b:
-            msg += (f" — just below the floor, {b['macro']} goes "
-                    f"{abs(b['signed_miss_g'])}g "
-                    + ("OVER" if b["signed_miss_g"] > 0 else "SHORT"))
-        if vf["note"]:
-            msg += f" ({vf['note']})"
-        lines.append(msg)
+        for suffix, pv in _day_type_views(p):
+            label = pname + suffix
+            vf = volume_floor(pv, comps, ids)
+            data["volume_floor"][label] = vf
+            if vf["floor_g"] is None:
+                lines.append(f"- **{label}**: {vf['note']}")
+                continue
+            msg = (f"- **{label}**: minimum daily food mass ≈ "
+                   f"**{vf['floor_g']}g** ({vf['floor_g'] / 453.6:.1f} lb)")
+            b = vf["binding"]
+            if b:
+                msg += (f" — just below the floor, {b['macro']} goes "
+                        f"{abs(b['signed_miss_g'])}g "
+                        + ("OVER" if b["signed_miss_g"] > 0 else "SHORT"))
+            if vf["note"]:
+                msg += f" ({vf['note']})"
+            lines.append(msg)
     lines.append("")
 
     # the structural check that actually matters
@@ -674,17 +724,19 @@ def doctor(comps, people, settings, ing=None, dishes=None):
     else:
         lines.append("- every day has at least one lean anchor available")
 
-    # ---- M0.11: carb headroom from availability ----------------------------
+    # ---- M0.11: carb headroom from availability (per day-type, M1.11) ------
     lines.append("\n## Carb headroom\n")
     data["carb_headroom"] = {}
     for pname, p in people.items():
-        ch = carb_headroom(p, comps, settings, ids=ids, ing=ing)
-        data["carb_headroom"][pname] = ch
-        flag = "OK" if ch["ok"] else "**SHORT** — add a longer-keeping " \
-                                     "starch or move a cook day"
-        lines.append(f"- **{pname}**: worst day is day {ch['worst_day']} — "
-                     f"{ch['worst_headroom_g']:.0f}g carb available vs "
-                     f"{ch['target_g']}g target: {flag}")
+        for suffix, pv in _day_type_views(p):
+            label = pname + suffix
+            ch = carb_headroom(pv, comps, settings, ids=ids, ing=ing)
+            data["carb_headroom"][label] = ch
+            flag = "OK" if ch["ok"] else "**SHORT** — add a longer-keeping " \
+                                         "starch or move a cook day"
+            lines.append(f"- **{label}**: worst day is day {ch['worst_day']} — "
+                         f"{ch['worst_headroom_g']:.0f}g carb available vs "
+                         f"{ch['target_g']}g target: {flag}")
 
     # ---- M1.9: meal-layer dealability (arithmetic only, ZERO LP solves) ----
     # Meal-layer infeasibility is explained at the layer it occurs (P6),
@@ -985,8 +1037,12 @@ def from_freezer(comp, day, settings, ing=None):
 
 
 def replate(person, comps, menu, day, settings, locked=None, weights=None,
-            tol=None, allow_out_of_bounds=False, ing=None):
+            tol=None, allow_out_of_bounds=False, ing=None, anchor=None):
     """Re-solve ONE person's ONE day, day-correctly (M0.13).
+
+    ``anchor`` (M1.11): plan-date weekday anchor — the day re-solves
+    against the person's RESOLVED day targets (``model.person_for_day``,
+    identity for a no-profile person).
 
     The menu is filtered by ``available_on(comp, day, settings)`` BEFORE
     solving — the v1 prototype's ``serve.py`` replate ignored availability
@@ -1001,6 +1057,7 @@ def replate(person, comps, menu, day, settings, locked=None, weights=None,
     Returns PlateResult; ``.warnings`` carries both the dropped-lock warnings
     and any pin warnings from the underlying plate solve.
     """
+    person = person_for_day(person, day, anchor)   # M1.11: day-view person
     warnings = []
     avail = [i for i in menu
              if i in comps and available_on(comps[i], day, settings, ing)]
@@ -1020,7 +1077,7 @@ def replate(person, comps, menu, day, settings, locked=None, weights=None,
 
 
 def build_week(comps, people, settings, menu, seed=0, ing=None, diag=None,
-               leftovers=None):
+               leftovers=None, anchor=None):
     """Day by day, because a component's eligibility depends on WHICH day it is.
     Guacamole keeps 2 days; it cannot be on the day-7 plate no matter how well
     the macros work out.
@@ -1045,7 +1102,13 @@ def build_week(comps, people, settings, menu, seed=0, ing=None, diag=None,
     ``costing.cooked_leftovers`` computes from the pantry's cooked list —
     and each component is ALSO available on the plan days its leftover's
     residual life covers; session_plan then consumes those grams before any
-    fresh batch (economy: leftovers are already paid for)."""
+    fresh batch (economy: leftovers are already paid for).
+
+    ``anchor`` (M1.11, M111_SPEC §5): plan-date weekday anchor. Each day's
+    plate solves against the DAY-VIEW person (``model.person_for_day`` —
+    the injection point), so every inner ``person["targets"]`` read is
+    the resolved day-type map. Identity for a no-profile person: the
+    pipeline stays byte-identical."""
     # M1.9 §3.5 picker nudge: for a person WITH a meal structure, candidate
     # plates that deal well (enough distinct mains, enough splittable side
     # mass) are preferred among the already-solved candidates. Zero-LP —
@@ -1065,6 +1128,9 @@ def build_week(comps, people, settings, menu, seed=0, ing=None, diag=None,
         slots_n = len(slots) if slots else 0
         wk, used_days, used_g = [], {}, {}
         for d in range(days):
+            # M1.11 injection point (#8): the day-view person feeds
+            # diverse_plates/plate — identity when the layer is inert
+            p_day = person_for_day(p, d, anchor)
             fresh = [i for i in menu
                      if available_on(comps[i], d, settings, ing)
                      or d in leftover_days.get(i, ())]
@@ -1088,7 +1154,7 @@ def build_week(comps, people, settings, menu, seed=0, ing=None, diag=None,
                                    if comps[i]["role"] == "main"}) \
                     if slots_n else 0
                 bestsc = None
-                for pl in diverse_plates(p, comps, avail, k=10,
+                for pl in diverse_plates(p_day, comps, avail, k=10,
                                          seed=(seed * 1009 + porder[pname] * 101
                                                + d * 31) % 9973):
                     sc = sum(used_days.get(c, 0) ** 2 for c in pl)

@@ -43,6 +43,28 @@ ratify MEAL_BAND (flag semantics tighten, shapes stay).
 - **web-steward** (Opus): apps/web. Queue: shell + auth + onboarding behind mock
   seams awaiting contracts-api.
 
+### The kitchen sim gate (`gates/kitchen-sim/`, added 2026-08-10)
+
+A simulated store and kitchen, and a cook that has never seen this repo, sent to
+shop and cook a week from the planner's own sheets. Exists because every other
+gate here checks the engine against its own idea of correctness — the PRD names
+the hole at §11: *"solver-side validation alone is no longer called validation."*
+
+- **Two drivers bracket the answer.** A deterministic robot with no judgment
+  (the floor — free, instant, run on every plan) and an LLM cook with real
+  kitchen knowledge (the ceiling — run at milestones). The gap between them is
+  *how much human judgment the plan requires*, and the cook's **assumption
+  count is the metric to drive toward zero**.
+- **The store is authored independently of `examples/ingredients.yaml`** — the
+  engine's own `pack_g` values are the claim under test, so deriving the store
+  from them would make the gate unable to find anything.
+- **`PREDICTIONS.md` is written before each run and scored after.** First run:
+  4/4 must-hit, after two false-positive rounds that had to be fixed first.
+- This is an **M1.6 pre-gate, not per-PR CI**. Deterministic checks that fall
+  out of it graduate into the normal suite.
+
+First run: 52 findings, 18 assumptions, 1 blocker — see `KITCHEN_SIM_FINDINGS.md`.
+
 ### Owner inputs on the critical path
 
 - 🧠 **Dish braindump** (answer key for DISH_REVIEW.md) — highest leverage

@@ -1,0 +1,30 @@
+schema_version: 1
+# cycling_lifter — M1.11 target-profile fixture (M111_SPEC §8): solo_lifter's
+# corpus (components.yaml / ingredients.yaml copied verbatim) + one person who
+# cycles day-types. Lift protein sits strictly ABOVE base and weekend strictly
+# BELOW — day-type effects are sign-testable, never tolerance noise. tue/thu
+# are deliberately ABSENT from the week map: they exercise the partial-map
+# base fallback (absence-means-base is documented semantics, not inference).
+people:
+  sol:
+    targets: {protein: 150, fat: 65, carb: 250}
+    target_profiles:
+      lift:    {protein: 190, fat: 60, carb: 280}
+      weekend: {protein: 110, fat: 75, carb: 180}
+    week:
+      mon: lift
+      wed: lift
+      fri: lift
+      sat: weekend
+      sun: weekend
+    tolerance: 0.06
+    exclude: []
+    dislikes: []
+settings:
+  days: 7
+  active_min_budget: 400
+  batch_time_factor: 0.45
+  max_days_same_component: 4
+  max_batches_per_component: 4
+  cook_days: [0, 4]
+  shop_days: [0]

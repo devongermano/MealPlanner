@@ -236,3 +236,110 @@ def test_doctor_returns_structured_data_and_new_sections():
         # not pinned — PRD §9)
         assert data["volume_floor"][pname]["floor_g"] is not None
     assert data["lean_coverage"]["lean_anchors"]
+
+
+# --------------------------------------------------------------------------- #
+#  6. M1.11 T-D2: doctor per DISTINCT day-type — labeled, anchor-free,
+#     O(distinct types) solve growth, degenerate case unlabeled
+# --------------------------------------------------------------------------- #
+FIXTURES = Path(__file__).resolve().parent / "fixtures"
+
+CYCLE_WEEK = {"mon": "lift", "wed": "lift", "fri": "lift",
+              "sat": "weekend", "sun": "weekend"}
+
+
+def test_doctor_day_type_sections():
+    """doctor on cycling_lifter, NO date: one labeled block per distinct
+    day-type carrying the weekday lists, in every per-person section —
+    the doctor stays anchor-free (per type, never per calendar day)."""
+    ing, comps, people, settings = io_yaml.load(FIXTURES / "cycling_lifter")
+    text, data = engine.doctor(comps, people, settings, ing=ing)
+    for lbl in ("sol — day-type 'base' (tue, thu)",
+                "sol — day-type 'lift' (mon, wed, fri)",
+                "sol — day-type 'weekend' (sat, sun)"):
+        assert lbl in text, lbl
+        assert lbl in data["feasibility"], lbl
+        assert lbl in data["binding_macro"], lbl
+        assert lbl in data["volume_floor"], lbl
+        assert lbl in data["carb_headroom"], lbl
+    # ablation stays per person on base targets (library-structure check)
+    assert list(data["structural"]["ablation"]) == ["sol"]
+
+
+def test_doctor_diagnoses_a_full_coverage_single_profile_week():
+    """Regression (M111_SPEC §7 + §12 P-1): solo_lifter plus ONE profile
+    over a FULL 7-day week map — validation-clean, and §13/P-3 explicitly
+    anticipates authors writing full coverage. It collapses to a SINGLE
+    distinct day-type, but that type is the PROFILE. The doctor must
+    diagnose the day-type every plan day actually eats; certifying the
+    base targets instead (which the solve path never uses) would leave the
+    real menu unchecked while the report reads clean."""
+    import copy
+
+    from mealplan.model import DAY_KEYS
+    docs = io_yaml.load_raw_docs(FIXTURES / "solo_lifter")
+    ppl = copy.deepcopy(docs["people"])
+    base = ppl["people"]["sol"]["targets"]
+    cut = {"protein": base["protein"] + 40, "fat": base["fat"] - 15,
+           "carb": base["carb"] - 60}
+    ppl["people"]["sol"]["target_profiles"] = {"cut": cut}
+    ppl["people"]["sol"]["week"] = {k: "cut" for k in DAY_KEYS}
+    assert io_yaml.validate_people_doc(ppl) == []      # reachable, clean
+    ing, comps, people, settings = io_yaml.load_docs(
+        docs["ingredients"], docs["components"], ppl)
+    text, data = engine.doctor(comps, people, settings, ing=ing)
+    lbl = "sol — day-type 'cut' (mon, tue, wed, thu, fri, sat, sun)"
+    for key in ("feasibility", "binding_macro", "volume_floor",
+                "carb_headroom"):
+        assert list(data[key]) == [lbl], (key, list(data[key]))
+    # the rendered feasibility line carries the PROFILE grams, not base
+    assert (f"**{lbl}** — {cut['carb']}c / {cut['fat']}f / "
+            f"{cut['protein']}p") in text
+    assert "**sol** —" not in text          # the base line is never emitted
+
+
+def _equal_profile_pair():
+    """(no-profile people, equal-profiles people) over the same corpus —
+    per-type checks then produce IDENTICAL per-view solve traces, so the
+    growth factor is exactly the number of distinct types."""
+    import copy
+    docs = io_yaml.load_raw_docs(FIXTURES / "solo_lifter")
+    plain = io_yaml.load_docs(docs["ingredients"], docs["components"],
+                              copy.deepcopy(docs["people"]))
+    ppl = copy.deepcopy(docs["people"])
+    base = ppl["people"]["sol"]["targets"]
+    ppl["people"]["sol"]["target_profiles"] = {"lift": dict(base),
+                                               "weekend": dict(base)}
+    ppl["people"]["sol"]["week"] = dict(CYCLE_WEEK)
+    eq = io_yaml.load_docs(docs["ingredients"], docs["components"], ppl)
+    return plain, eq
+
+
+def test_doctor_solve_count_grows_by_distinct_types():
+    """Solve budget (never wall clock): with 3 day-types of EQUAL targets
+    the per-person doctor check stages (feasibility, binding, volume) run
+    exactly 3x their single-type counts; the ablation stage — per person,
+    base targets — is unchanged. Growth is (distinct_types - 1) x the
+    per-person checks, nothing else."""
+    plain, eq = _equal_profile_pair()
+    counts = []
+    for ing, comps, people, settings in (plain, eq):
+        engine.reset_solve_counts()
+        engine.doctor(comps, people, settings, ing=ing)
+        counts.append(engine.solve_counts())
+    one, three = counts
+    for stage in ("doctor-feasibility", "doctor-binding", "doctor-volume"):
+        assert three[stage] == 3 * one[stage], (stage, one, three)
+    assert three["doctor-ablation"] == one["doctor-ablation"]
+
+
+def test_doctor_no_profiles_report_carries_no_day_type_labels():
+    """Degenerate case: a single-type person's report renders through the
+    SAME loop with the person object itself and an empty label suffix —
+    no 'day-type' phrase anywhere (the byte-identity of the whole report
+    is carried by this plus the unregenerated goldens + the pinned
+    section assertions above)."""
+    ing, comps, people, settings = io_yaml.load(FIXTURES / "solo_lifter")
+    text, data = engine.doctor(comps, people, settings, ing=ing)
+    assert "day-type" not in text
+    assert list(data["feasibility"]) == ["sol"]
