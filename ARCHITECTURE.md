@@ -98,6 +98,24 @@ Almost nothing — that's the virtue. The engine is built exactly as TASKS.md M0
 describes, living at `services/solver/` from day one so no later move is needed.
 No Docker, no Node, no Supabase until M2.
 
+## Solver roadmap (recorded 2026-08-09; owner-reviewed analysis)
+
+- **Core portioning LP:** stays PuLP-shaped. The measured cost is ~21ms/solve of
+  CBC *subprocess transport* (BASELINES.md), not solver quality. The earmarked fix
+  is **in-process HiGHS** (`highspy` — smallest dependency that removes exactly the
+  transport overhead; SciPy's default LP engine). It is a pinned-reference-env
+  change (goldens regenerate), so it lands at a milestone boundary as a deliberate
+  migration, not a drive-by. OR-Tools was evaluated and rejected for this job:
+  CP-SAT is integer-only (wrong shape for a continuous LP) and GLOP is just another
+  LP inside a 10× heavier dependency.
+- **Cook-day timeline scheduling (M1.12+):** greedy list scheduling first, on
+  provisional durations. **OR-Tools CP-SAT is the earmarked escalation** once real
+  cook days calibrate durations — the one problem in this product that matches its
+  shape (interval variables, no-overlap cook attention, cumulative stations,
+  temp-conditional oven capacity). Deterministic with fixed seed + single worker.
+- The fuzzy problems (menu selection, meal dealing) stay greedy by design — their
+  objectives are proxies; exact optimizers would be fake precision.
+
 ## Deferred wiring (decided at M2/M3 planning, not before)
 
 - MCP server placement: Node SDK against the Nest API (parity-by-construction) vs
