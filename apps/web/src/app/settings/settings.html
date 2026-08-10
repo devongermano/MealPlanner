@@ -36,7 +36,8 @@
     <h2>Household</h2>
     <p class="muted">
       Roles decide what each person sees: planners configure and approve, cooks get the prep
-      plan, eaters get their sheets and a veto.
+      plan, eaters get their sheets and a veto. Plan identity is who someone is inside the meal
+      plan — clear it for anyone who runs the week without having portions cooked for them.
     </p>
   </div>
 
@@ -51,28 +52,50 @@
           <span class="email muted">{{ member.email ?? 'No email yet' }}</span>
         </div>
 
-        <label class="visually-hidden" [attr.for]="'role-' + member.id">
-          Role for {{ member.displayName }}
-        </label>
-        <select
-          class="role-select"
-          [id]="'role-' + member.id"
-          [disabled]="pending()"
-          (change)="changeRole(member, $event)"
-        >
-          @for (role of roles; track role) {
-            <option [value]="role" [selected]="role === member.role">{{ role }}</option>
-          }
-        </select>
+        <div class="controls">
+          <label class="visually-hidden" [attr.for]="'person-' + member.id">
+            Plan identity for {{ member.displayName }}
+          </label>
+          <input
+            class="person-name"
+            type="text"
+            [id]="'person-' + member.id"
+            [value]="member.personName ?? ''"
+            [disabled]="pending()"
+            [attr.aria-invalid]="invalidPersonName() === member.id"
+            placeholder="does not eat"
+            autocapitalize="off"
+            spellcheck="false"
+            (change)="changePersonName(member, $event)"
+          />
 
-        <button
-          class="btn btn-ghost remove"
-          type="button"
-          [disabled]="pending() || member.isSelf"
-          (click)="removeMember(member)"
-        >
-          Remove<span class="visually-hidden"> {{ member.displayName }}</span>
-        </button>
+          <label class="visually-hidden" [attr.for]="'role-' + member.id">
+            Role for {{ member.displayName }}
+          </label>
+          <select
+            class="role-select"
+            [id]="'role-' + member.id"
+            [disabled]="pending()"
+            (change)="changeRole(member, $event)"
+          >
+            @for (role of roles; track role) {
+              <option [value]="role" [selected]="role === member.role">{{ role }}</option>
+            }
+          </select>
+
+          <button
+            class="btn btn-ghost remove"
+            type="button"
+            [disabled]="pending() || member.isSelf"
+            (click)="removeMember(member)"
+          >
+            Remove<span class="visually-hidden"> {{ member.displayName }}</span>
+          </button>
+        </div>
+
+        @if (invalidPersonName() === member.id) {
+          <p class="row-error">{{ personNameRule }}</p>
+        }
       </li>
     } @empty {
       <li class="empty muted">

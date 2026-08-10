@@ -5,6 +5,7 @@ import type {
   HouseholdApi,
   HouseholdMember,
   HouseholdRole,
+  UpdateMemberInput,
 } from '../app/household/household-api';
 
 export function fakeHousehold(id: string, name: string): Household {
@@ -18,7 +19,16 @@ export function fakeMember(
   role: HouseholdRole = 'eater',
   isSelf = false,
 ): HouseholdMember {
-  return { id, householdId, displayName, role, email: null, isSelf };
+  return {
+    id,
+    householdId,
+    displayName,
+    role,
+    userId: isSelf ? 'user-1' : null,
+    personName: displayName.toLowerCase(),
+    email: null,
+    isSelf,
+  };
 }
 
 /** Test double for HOUSEHOLD_API seeded with fixed data — no storage, no Auth dependency. */
@@ -53,12 +63,17 @@ export class FakeHouseholdApi implements HouseholdApi {
     return member;
   }
 
-  async updateMemberRole(
+  async updateMember(
     householdId: string,
     memberId: string,
-    role: HouseholdRole,
+    patch: UpdateMemberInput,
   ): Promise<HouseholdMember> {
-    const updated = { ...this.requireMember(householdId, memberId), role };
+    const target = this.requireMember(householdId, memberId);
+    const updated: HouseholdMember = {
+      ...target,
+      role: patch.role ?? target.role,
+      personName: patch.personName === undefined ? target.personName : patch.personName,
+    };
     this.members = this.members.map((member) => (member.id === memberId ? updated : member));
     return updated;
   }

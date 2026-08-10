@@ -100,12 +100,36 @@ dd {
   font-size: var(--text-sm);
 }
 
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Monospaced because it is a slug the engine keys on, not prose. */
+.person-name {
+  width: auto;
+  min-width: 8rem;
+  max-width: 11rem;
+  padding-block: 0.25rem;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
 .role-select {
   width: auto;
   min-width: 7.5rem;
   padding-block: 0.25rem;
   font-size: var(--text-sm);
   text-transform: capitalize;
+}
+
+.row-error {
+  flex-basis: 100%;
+  margin-top: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--danger);
 }
 
 .remove {

@@ -4,6 +4,7 @@ import { FakeAuthBackend, fakeSession } from '../../testing/fake-auth-backend';
 import { AUTH_BACKEND } from '../auth/auth-backend';
 import { HOUSEHOLD_API } from '../household/household-api';
 import { HouseholdApiMock } from '../household/household-api-mock';
+import { HouseholdStore } from '../household/household-store';
 import { Onboarding } from './onboarding';
 
 async function settle(fixture: ComponentFixture<unknown>): Promise<void> {
@@ -99,6 +100,22 @@ describe('Onboarding', () => {
 
     expect(element(fixture).querySelector('h1')?.textContent).toContain('The Germanos is set up');
     expect(element(fixture).textContent).toContain('2 people on the plan');
+  });
+
+  it('derives a plan identity, and adds people as placeholders with no account', async () => {
+    type(fixture, '#householdName', 'The Germanos');
+    await submit(fixture, 'form.form-stack');
+    type(fixture, '#memberName', 'Alex Smith');
+    await submit(fixture, 'form.member-form');
+
+    const [devon, alex] = TestBed.inject(HouseholdStore).members();
+
+    expect(devon.personName).toBe('devon');
+    expect(devon.userId).toBe('user-1');
+
+    // Someone the plan cooks for who has not signed up — the ratified model.
+    expect(alex.personName).toBe('alex_smith');
+    expect(alex.userId).toBeNull();
   });
 
   it('removes an added member but never the account itself', async () => {

@@ -6,8 +6,9 @@ import {
   type Household,
   type HouseholdApi,
   type HouseholdMember,
-  type HouseholdRole,
+  type UpdateMemberInput,
 } from './household-api';
+import { slugifyPersonName } from './person-name';
 
 /*
  * REGENERATE-FROM-CONTRACTS-API — throwaway by design.
@@ -33,11 +34,14 @@ export class HouseholdApiMock implements HouseholdApi {
       name: input.name.trim(),
       createdAt: new Date().toISOString(),
     };
+    const displayName = input.creatorDisplayName.trim();
     const self: HouseholdMember = {
       id: `mem-${crypto.randomUUID()}`,
       householdId: household.id,
-      displayName: input.creatorDisplayName.trim(),
+      displayName,
       role: input.creatorRole,
+      userId: this.auth.user()?.id ?? null,
+      personName: resolvePersonName(input.creatorPersonName, displayName),
       email: this.auth.user()?.email ?? null,
       isSelf: true,
     };
@@ -54,11 +58,15 @@ export class HouseholdApiMock implements HouseholdApi {
 
   async addMember(householdId: string, input: AddMemberInput): Promise<HouseholdMember> {
     const state = this.read();
+    const displayName = input.displayName.trim();
     const member: HouseholdMember = {
       id: `mem-${crypto.randomUUID()}`,
       householdId,
-      displayName: input.displayName.trim(),
+      displayName,
       role: input.role,
+      // A placeholder member: someone the plan cooks for who has not signed up.
+      userId: null,
+      personName: resolvePersonName(input.personName, displayName),
       email: input.email?.trim() || null,
       isSelf: false,
     };
@@ -66,10 +74,10 @@ export class HouseholdApiMock implements HouseholdApi {
     return member;
   }
 
-  async updateMemberRole(
+  async updateMember(
     householdId: string,
     memberId: string,
-    role: HouseholdRole,
+    patch: UpdateMemberInput,
   ): Promise<HouseholdMember> {
     const state = this.read();
     const target = state.members.find(
@@ -78,7 +86,11 @@ export class HouseholdApiMock implements HouseholdApi {
     if (!target) {
       throw new Error(`No member ${memberId} in household ${householdId}`);
     }
-    const updated: HouseholdMember = { ...target, role };
+    const updated: HouseholdMember = {
+      ...target,
+      role: patch.role ?? target.role,
+      personName: patch.personName === undefined ? target.personName : patch.personName,
+    };
     this.write({
       ...state,
       members: state.members.map((member) => (member.id === memberId ? updated : member)),
@@ -96,8 +108,13 @@ export class HouseholdApiMock implements HouseholdApi {
     });
   }
 
+  /**
+   * Versioned so a payload written under an older member shape is ignored rather
+   * than rendered with missing fields. Bump it whenever the shape changes — this
+   * is throwaway state, so dropping it beats migrating it.
+   */
   private storageKey(): string {
-    return `mealplan.mock.households.${this.auth.user()?.id ?? 'anonymous'}`;
+    return `mealplan.mock.households.v2.${this.auth.user()?.id ?? 'anonymous'}`;
   }
 
   private read(): MockState {
@@ -112,6 +129,20 @@ export class HouseholdApiMock implements HouseholdApi {
   private write(state: MockState): void {
     sessionStorage.setItem(this.storageKey(), JSON.stringify(state));
   }
+}
+
+/**
+ * An omitted plan identity is derived from the display name; an explicit null is
+ * the caller saying this person holds a role but does not eat, and is preserved.
+ */
+function resolvePersonName(
+  requested: string | null | undefined,
+  displayName: string,
+): string | null {
+  if (requested === undefined) {
+    return slugifyPersonName(displayName);
+  }
+  return requested?.trim() || null;
 }
 
 interface MockState {
