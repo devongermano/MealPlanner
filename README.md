@@ -17,6 +17,7 @@ Layout (per ARCHITECTURE.md):
 | `apps/web/` | Angular web app | M2 |
 | `packages/contracts/` | generated TS types + JSON schemas | M2 |
 | `mealplan/` | **v1 prototype — untouched reference implementation** until the M0 parity gate | frozen |
+| `tools/fdc/` + `data/fdc/` | vendored USDA FDC raw-ingredient macro corpus (Track D) | done |
 
 Dev (M0/M1 needs only a Python venv):
 
@@ -25,3 +26,14 @@ Dev (M0/M1 needs only a Python venv):
 make test
 .venv/bin/mealplan doctor --library examples
 ```
+
+## Track D — USDA FDC macro corpus
+
+`data/fdc/extract.json` vendors per-100g protein/fat/carb for ~2.9k plausibly-raw
+single ingredients from USDA FoodData Central (SR Legacy + Foundation Foods,
+public domain), with full source provenance in `data/fdc/MANIFEST.yaml`.
+Tooling in `tools/fdc/`: offline candidate search for ingestion-time
+disambiguation (`index.py`), a standalone `ingredients.yaml` plausibility +
+FDC-deviation linter (`lint_ingredients.py`), and the reproducible
+download/transform pipeline. Provenance grammar: `usda_fdc:<fdc_id>@<snapshot>`.
+See [tools/fdc/README.md](tools/fdc/README.md).

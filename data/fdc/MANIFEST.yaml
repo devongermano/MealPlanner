@@ -1,0 +1,18 @@
+# USDA FoodData Central source manifest — written by tools/fdc/download.py.
+# Raw archives are cached outside the repo and never committed; this file
+# plus tools/fdc/transform.py reproduce data/fdc/extract.json exactly.
+# License: USDA FDC data is public domain (U.S. government work / CC0).
+snapshot: sr2018-04+fnd2025-12-18
+sources:
+  - name: sr_legacy
+    release: '2018-04'
+    url: https://fdc.nal.usda.gov/fdc-datasets/FoodData_Central_sr_legacy_food_csv_2018-04.zip
+    sha256: b80817294b8850530aaedf2e515c02593b1824f763a0ff356e5c2081643e6fd0
+    size_bytes: 6074592
+    retrieved: '2026-08-09'
+  - name: foundation
+    release: '2025-12-18'
+    url: https://fdc.nal.usda.gov/fdc-datasets/FoodData_Central_foundation_food_csv_2025-12-18.zip
+    sha256: 3850de85effd6d9aa471f48aab2a76c20f9bc5feb3f2f52c8ce693f9cf75d52b
+    size_bytes: 3559820
+    retrieved: '2026-08-09'
