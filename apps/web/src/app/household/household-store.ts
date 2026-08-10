@@ -1,37 +1,55 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
+import { describeApiError } from '../errors/api-error';
 import {
   HOUSEHOLD_API,
-  type AddMemberInput,
-  type CreateHouseholdInput,
-  type Household,
-  type HouseholdMember,
-  type HouseholdRole,
-  type UpdateMemberInput,
+  type AddHouseholdMemberRequest,
+  type CreateHouseholdRequest,
+  type HouseholdMemberView,
+  type HouseholdSummary,
+  type UpdateHouseholdMemberRequest,
+  type UpdateOwnMembershipRequest,
 } from './household-api';
 
 const ACTIVE_KEY = 'mealplan.activeHouseholdId';
 
 type LoadStatus = 'idle' | 'loading' | 'ready' | 'error';
 
+/** A member plus whether it is you — derived, because the API has no such field. */
+export interface HouseholdMemberRow extends HouseholdMemberView {
+  readonly isSelf: boolean;
+}
+
 /**
  * Single source of household state for the shell, the wizard and settings.
- * Talks only to HOUSEHOLD_API, so it survives the mock being replaced by the
- * real endpoints untouched.
+ * Talks only to HOUSEHOLD_API.
  */
 @Injectable({ providedIn: 'root' })
 export class HouseholdStore {
   private readonly api = inject(HOUSEHOLD_API);
 
-  private readonly householdList = signal<readonly Household[]>([]);
-  private readonly memberList = signal<readonly HouseholdMember[]>([]);
+  private readonly householdList = signal<readonly HouseholdSummary[]>([]);
+  private readonly memberList = signal<readonly HouseholdMemberView[]>([]);
   private readonly activeId = signal<string | null>(readActiveId());
   private readonly loadStatus = signal<LoadStatus>('idle');
   private readonly loadError = signal<string | null>(null);
+  private readonly currentUserId = signal<string | null>(null);
 
   readonly households = this.householdList.asReadonly();
-  readonly members = this.memberList.asReadonly();
   readonly status = this.loadStatus.asReadonly();
   readonly error = this.loadError.asReadonly();
+  readonly userId = this.currentUserId.asReadonly();
+
+  /**
+   * A placeholder member has no userId at all, so it can never be you — the
+   * null check matters as much as the comparison.
+   */
+  readonly members = computed<readonly HouseholdMemberRow[]>(() => {
+    const me = this.currentUserId();
+    return this.memberList().map((member) => ({
+      ...member,
+      isSelf: member.userId !== null && member.userId === me,
+    }));
+  });
 
   readonly active = computed(() => {
     const households = this.householdList();
@@ -51,41 +69,35 @@ export class HouseholdStore {
     return this.inFlight;
   }
 
-  /** Forces a refetch — used after a mutation that the API is authoritative for. */
   async reload(): Promise<void> {
     this.loadStatus.set('idle');
     await this.load();
   }
 
-  async createHousehold(input: CreateHouseholdInput): Promise<Household> {
-    const household = await this.api.create(input);
+  async createHousehold(input: CreateHouseholdRequest): Promise<HouseholdSummary> {
+    const household = await this.api.createHousehold(input);
     this.householdList.update((list) => [...list, household]);
     this.setActive(household.id);
     this.memberList.set(await this.api.listMembers(household.id));
     return household;
   }
 
-  async addMember(input: AddMemberInput): Promise<void> {
+  async addMember(input: AddHouseholdMemberRequest): Promise<void> {
     const household = this.requireActive();
     const member = await this.api.addMember(household.id, input);
     this.memberList.update((list) => [...list, member]);
   }
 
-  updateMemberRole(memberId: string, role: HouseholdRole): Promise<void> {
-    return this.patchMember(memberId, { role });
-  }
-
-  /** Null unlinks: the member keeps their role and stops being an eater in the plan. */
-  updateMemberPersonName(memberId: string, personName: string | null): Promise<void> {
-    return this.patchMember(memberId, { personName });
-  }
-
-  private async patchMember(memberId: string, patch: UpdateMemberInput): Promise<void> {
+  /** Planner route: role and personName on anyone, profile fields on placeholders only. */
+  async updateMember(memberId: string, patch: UpdateHouseholdMemberRequest): Promise<void> {
     const household = this.requireActive();
-    const updated = await this.api.updateMember(household.id, memberId, patch);
-    this.memberList.update((list) =>
-      list.map((member) => (member.id === memberId ? updated : member)),
-    );
+    this.replace(memberId, await this.api.updateMember(household.id, memberId, patch));
+  }
+
+  /** Self route: your own profile, never your role. */
+  async updateSelf(memberId: string, patch: UpdateOwnMembershipRequest): Promise<void> {
+    const household = this.requireActive();
+    this.replace(memberId, await this.api.updateSelf(household.id, patch));
   }
 
   async removeMember(memberId: string): Promise<void> {
@@ -108,6 +120,7 @@ export class HouseholdStore {
     this.householdList.set([]);
     this.memberList.set([]);
     this.activeId.set(null);
+    this.currentUserId.set(null);
     this.loadStatus.set('idle');
     this.loadError.set(null);
   }
@@ -119,18 +132,26 @@ export class HouseholdStore {
     this.loadStatus.set('loading');
     this.loadError.set(null);
     try {
-      const households = await this.api.listMine();
-      this.householdList.set(households);
+      // One call for identity and every household — GET /me exists for this.
+      const me = await this.api.me();
+      this.currentUserId.set(me.userId);
+      this.householdList.set(me.households);
       const active = this.active();
       this.memberList.set(active ? await this.api.listMembers(active.id) : []);
       this.loadStatus.set('ready');
     } catch (cause) {
-      this.loadError.set(cause instanceof Error ? cause.message : 'Could not load your household.');
+      this.loadError.set(describeApiError(cause, 'Could not load your household.'));
       this.loadStatus.set('error');
     }
   }
 
-  private requireActive(): Household {
+  private replace(memberId: string, updated: HouseholdMemberView): void {
+    this.memberList.update((list) =>
+      list.map((member) => (member.id === memberId ? updated : member)),
+    );
+  }
+
+  private requireActive(): HouseholdSummary {
     const household = this.active();
     if (!household) {
       throw new Error('No active household');

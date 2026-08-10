@@ -2,12 +2,14 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Auth } from '../auth/auth';
+import { describeApiError } from '../errors/api-error';
 import {
   HOUSEHOLD_ROLES,
   ROLE_DESCRIPTIONS,
   type HouseholdRole,
 } from '../household/household-api';
 import { HouseholdStore } from '../household/household-store';
+import { slugifyPersonName } from '../household/person-name';
 import { Alert } from '../ui/alert';
 
 type Step = 'household' | 'members' | 'done';
@@ -46,9 +48,10 @@ export class Onboarding {
     STEPS.findIndex((step) => step.id === this.step()),
   );
 
+  // No role picker: whoever creates a household is its planner, by construction —
+  // the API creates the founding membership that way so it is never unadministrable.
   protected readonly householdForm = this.formBuilder.nonNullable.group({
-    name: ['', [Validators.required, Validators.maxLength(80)]],
-    creatorRole: ['planner' as HouseholdRole, Validators.required],
+    name: ['', [Validators.required, Validators.maxLength(120)]],
   });
 
   protected readonly memberForm = this.formBuilder.nonNullable.group({
@@ -63,11 +66,15 @@ export class Onboarding {
       return;
     }
     await this.guard(async () => {
-      const { name, creatorRole } = this.householdForm.getRawValue();
+      const { name } = this.householdForm.getRawValue();
+      // Inherited from the account rather than asked again: a second name question
+      // at household creation buys nothing and costs the first run.
+      const displayName = this.auth.displayName();
+      const personName = slugifyPersonName(displayName);
       await this.store.createHousehold({
         name,
-        creatorRole,
-        creatorDisplayName: this.auth.displayName(),
+        displayName,
+        ...(personName ? { personName } : {}),
       });
       this.step.set('members');
     });
@@ -80,7 +87,16 @@ export class Onboarding {
     }
     await this.guard(async () => {
       const { displayName, role, email } = this.memberForm.getRawValue();
-      await this.store.addMember({ displayName, role, email: email || null });
+      const personName = slugifyPersonName(displayName);
+      // userId is deliberately never sent: everyone added here is a placeholder,
+      // someone the plan cooks for who has not signed up. inviteEmail is intent
+      // only — the API stores it and sends nothing until invitations exist.
+      await this.store.addMember({
+        displayName,
+        role,
+        ...(personName ? { personName } : {}),
+        ...(email ? { inviteEmail: email } : {}),
+      });
       this.memberForm.reset({ displayName: '', role: 'eater', email: '' });
     });
   }
@@ -107,9 +123,7 @@ export class Onboarding {
     try {
       await work();
     } catch (cause) {
-      this.failure.set(
-        cause instanceof Error ? cause.message : 'That did not save. Try again in a moment.',
-      );
+      this.failure.set(describeApiError(cause, 'That did not save. Try again in a moment.'));
     } finally {
       this.pending.set(false);
     }

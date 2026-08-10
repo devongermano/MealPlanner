@@ -41,16 +41,10 @@
             }
           </div>
 
-          <fieldset class="roles">
-            <legend>Your role</legend>
-            @for (role of roles; track role) {
-              <label class="role" [class.selected]="householdForm.controls.creatorRole.value === role">
-                <input type="radio" formControlName="creatorRole" [value]="role" />
-                <span class="role-name">{{ role }}</span>
-                <span class="role-detail muted">{{ roleDescriptions[role] }}</span>
-              </label>
-            }
-          </fieldset>
+          <p class="founder-note muted">
+            You will be its planner: {{ roleDescriptions['planner'].toLowerCase() }} You can
+            hand that job to someone else, or share it, once everyone is added.
+          </p>
 
           <button class="btn btn-primary" type="submit" [disabled]="pending()">
             {{ pending() ? 'Creating…' : 'Create household' }}

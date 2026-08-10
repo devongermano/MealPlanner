@@ -2,13 +2,14 @@ import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/c
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { Auth } from '../auth/auth';
 import { HouseholdStore } from '../household/household-store';
+import { Alert } from '../ui/alert';
 import { Theme } from '../ui/theme';
 
 /** Authenticated layout: identity, household context, navigation, outlet. */
 @Component({
   selector: 'app-shell',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterOutlet, RouterLink, RouterLinkActive],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, Alert],
   templateUrl: './shell.html',
   styleUrl: './shell.css',
 })
@@ -22,6 +23,8 @@ export class Shell {
   protected readonly household = this.store.active;
   protected readonly households = this.store.households;
   protected readonly memberCount = computed(() => this.store.members().length);
+  /** Set when the household load failed; the outlet is replaced by the reason. */
+  protected readonly loadError = this.store.error;
 
   /** Multiple households are a later feature; until then the switcher shows context only. */
   protected readonly canSwitch = computed(() => this.households().length > 1);
@@ -44,6 +47,10 @@ export class Shell {
     const main = document.getElementById('main');
     main?.focus();
     main?.scrollIntoView();
+  }
+
+  protected retry(): void {
+    void this.store.reload();
   }
 
   protected switchHousehold(event: Event): void {

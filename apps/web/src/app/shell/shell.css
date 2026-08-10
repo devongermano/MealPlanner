@@ -154,6 +154,13 @@ main:focus {
   outline: none;
 }
 
+.retry {
+  display: block;
+  min-height: 2rem;
+  margin-top: var(--space-3);
+  font-size: var(--text-sm);
+}
+
 @media (min-width: 40rem) {
   .who {
     display: inline;
