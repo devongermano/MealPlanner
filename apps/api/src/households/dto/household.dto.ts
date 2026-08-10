@@ -174,6 +174,7 @@ export class UpdateHouseholdMemberRequest {
   displayName?: string;
 
   @ApiPropertyOptional({
+    type: String,
     nullable: true,
     description:
       'Accepted on ANY member, placeholder or not: the library link is planning data, and the planner runs the plan. Send null to unlink the member from it.',
@@ -191,6 +192,7 @@ export class UpdateHouseholdMemberRequest {
   personName?: string | null;
 
   @ApiPropertyOptional({
+    type: String,
     format: 'email',
     maxLength: 320,
     nullable: true,
@@ -221,6 +223,7 @@ export class UpdateOwnMembershipRequest {
   displayName?: string;
 
   @ApiPropertyOptional({
+    type: String,
     nullable: true,
     description:
       'The library person you eat as. Send null to stop eating in this plan.',
@@ -251,6 +254,7 @@ export class HouseholdMemberView {
   role!: HouseholdRoleName;
 
   @ApiProperty({
+    type: String,
     format: 'uuid',
     nullable: true,
     description:
@@ -259,12 +263,14 @@ export class HouseholdMemberView {
   userId!: string | null;
 
   @ApiProperty({
+    type: String,
     nullable: true,
     description: 'Library person key, or null if this member does not eat.',
   })
   personName!: string | null;
 
   @ApiProperty({
+    type: String,
     nullable: true,
     description:
       'Invite intent for a placeholder. Always null once the member has an account.',
@@ -293,6 +299,7 @@ export class HouseholdSummary {
   displayName!: string;
 
   @ApiProperty({
+    type: String,
     nullable: true,
     description: "The CALLER's library person key here.",
   })
@@ -332,7 +339,7 @@ export class MeResponse {
   })
   userId!: string;
 
-  @ApiProperty({ nullable: true })
+  @ApiProperty({ type: String, nullable: true })
   email!: string | null;
 
   @ApiProperty()

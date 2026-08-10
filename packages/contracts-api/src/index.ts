@@ -230,11 +230,11 @@ export interface components {
              * Format: uuid
              * @description auth.users id, or null when this member is a PLACEHOLDER — a real member with no account yet. Null here is the one flag that distinguishes the two kinds of member; a placeholder can never be a caller.
              */
-            userId: Record<string, never> | null;
+            userId: string | null;
             /** @description Library person key, or null if this member does not eat. */
-            personName: Record<string, never> | null;
+            personName: string | null;
             /** @description Invite intent for a placeholder. Always null once the member has an account. */
-            inviteEmail: Record<string, never> | null;
+            inviteEmail: string | null;
             /** Format: date-time */
             createdAt: string;
         };
@@ -288,7 +288,7 @@ export interface components {
             /** @description The CALLER's display name here. */
             displayName: string;
             /** @description The CALLER's library person key here. */
-            personName: Record<string, never> | null;
+            personName: string | null;
             /** @description Members in this household, including placeholders and the caller. */
             memberCount: number;
             /** Format: date-time */
@@ -327,7 +327,7 @@ export interface components {
              * @description The library person you eat as. Send null to stop eating in this plan.
              * @example devon
              */
-            personName?: Record<string, never> | null;
+            personName?: string | null;
         };
         UpdateHouseholdMemberRequest: {
             /** @enum {string} */
@@ -338,12 +338,12 @@ export interface components {
              * @description Accepted on ANY member, placeholder or not: the library link is planning data, and the planner runs the plan. Send null to unlink the member from it.
              * @example alex
              */
-            personName?: Record<string, never> | null;
+            personName?: string | null;
             /**
              * Format: email
              * @description Placeholder members only. Send null to clear.
              */
-            inviteEmail?: Record<string, never> | null;
+            inviteEmail?: string | null;
         };
         MeResponse: {
             /**
@@ -351,7 +351,7 @@ export interface components {
              * @description auth.users id of the verified caller.
              */
             userId: string;
-            email: Record<string, never> | null;
+            email: string | null;
             isAnonymous: boolean;
             /** @description Every household the caller belongs to. */
             households: components["schemas"]["HouseholdSummary"][];
