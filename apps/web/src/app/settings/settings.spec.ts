@@ -1,16 +1,21 @@
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { FakeAuthBackend, fakeSession } from '../../testing/fake-auth-backend';
-import { FakeHouseholdApi, fakeHousehold, fakeMember } from '../../testing/fake-household-api';
+import {
+  FAKE_USER_ID,
+  FakeHouseholdApi,
+  fakeHousehold,
+  fakeMember,
+} from '../../testing/fake-household-api';
 import { AUTH_BACKEND } from '../auth/auth-backend';
-import { HOUSEHOLD_API, type HouseholdMember } from '../household/household-api';
+import { HOUSEHOLD_API } from '../household/household-api';
 import { HouseholdStore } from '../household/household-store';
 import { Settings } from './settings';
 
 const HOME = fakeHousehold('hh-1', 'The Germanos');
 /** Row 0: you. Row 1: a placeholder with no account. Row 2: someone who signed up. */
-const DEVON = fakeMember('mem-1', 'hh-1', 'Devon', 'planner', true);
-const ALEX = fakeMember('mem-2', 'hh-1', 'Alex', 'eater');
-const SAM: HouseholdMember = { ...fakeMember('mem-3', 'hh-1', 'Sam', 'cook'), userId: 'user-9' };
+const DEVON = fakeMember('mem-1', 'Devon', 'planner', FAKE_USER_ID);
+const ALEX = fakeMember('mem-2', 'Alex', 'eater');
+const SAM = fakeMember('mem-3', 'Sam', 'cook', 'user-9');
 
 async function mount(): Promise<ComponentFixture<Settings>> {
   TestBed.configureTestingModule({
@@ -84,10 +89,24 @@ describe('Settings', () => {
     expect(store.members().find((member) => member.id === 'mem-2')?.role).toBe('cook');
   });
 
-  it("shows each member's plan identity", async () => {
+  it("shows every member's plan identity, editable on all of them", async () => {
     const fixture = await mount();
 
-    expect(personNameInputs(fixture).map((input) => input.value)).toEqual(['devon', 'alex']);
+    // Sam has an account and still gets a field: the library link is planning data.
+    expect(personNameInputs(fixture).map((input) => input.value)).toEqual([
+      'devon',
+      'alex',
+      'sam',
+    ]);
+  });
+
+  it('lets a planner set the plan identity of a member who has an account', async () => {
+    const fixture = await mount();
+    const store = TestBed.inject(HouseholdStore);
+
+    await editPersonName(fixture, 2, 'samuel');
+
+    expect(store.members().find((member) => member.id === 'mem-3')?.personName).toBe('samuel');
   });
 
   it('saves an edited plan identity', async () => {
@@ -139,14 +158,15 @@ describe('Settings', () => {
     expect(placeholder.textContent).toContain('no account yet');
   });
 
-  it("offers only a role control for a member who has an account", async () => {
+  it('withholds only the display name from a member who has an account', async () => {
     const fixture = await mount();
     const claimed = rows(fixture)[2];
 
-    // Their profile is theirs — the API answers 403, so we never offer the field.
+    // Their NAME is theirs — the API answers 403 for it, so we never offer it.
     expect(claimed.querySelector('.display-name')).toBeNull();
-    expect(claimed.querySelector('.person-name')).toBeNull();
+    // Their role and plan identity are the planner's to set.
     expect(claimed.querySelector('.role-select')).not.toBeNull();
+    expect(claimed.querySelector('.person-name')).not.toBeNull();
   });
 
   it('saves your own name through the self route', async () => {

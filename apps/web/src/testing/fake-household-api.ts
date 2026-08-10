@@ -1,117 +1,170 @@
+import { toApiError } from '../app/errors/api-error';
 import type {
-  AddMemberInput,
-  CreateHouseholdInput,
-  Household,
+  AddHouseholdMemberRequest,
+  CreateHouseholdRequest,
   HouseholdApi,
-  HouseholdMember,
+  HouseholdMemberView,
   HouseholdRole,
-  UpdateMemberInput,
-  UpdateSelfInput,
+  HouseholdSummary,
+  MeResponse,
+  UpdateHouseholdMemberRequest,
+  UpdateOwnMembershipRequest,
 } from '../app/household/household-api';
 
-export function fakeHousehold(id: string, name: string): Household {
-  return { id, name, createdAt: '2026-08-09T00:00:00.000Z' };
-}
+export const FAKE_USER_ID = 'user-1';
 
-export function fakeMember(
+export function fakeHousehold(
   id: string,
-  householdId: string,
-  displayName: string,
-  role: HouseholdRole = 'eater',
-  isSelf = false,
-): HouseholdMember {
+  name: string,
+  overrides: Partial<HouseholdSummary> = {},
+): HouseholdSummary {
   return {
     id,
-    householdId,
-    displayName,
-    role,
-    userId: isSelf ? 'user-1' : null,
-    personName: displayName.toLowerCase(),
-    email: null,
-    isSelf,
+    name,
+    role: 'planner',
+    displayName: 'Devon',
+    personName: 'devon',
+    memberCount: 1,
+    createdAt: '2026-08-09T00:00:00.000Z',
+    ...overrides,
   };
 }
 
-/** Test double for HOUSEHOLD_API seeded with fixed data — no storage, no Auth dependency. */
+/** Defaults to a placeholder member; pass a userId to make it a claimed one. */
+export function fakeMember(
+  id: string,
+  displayName: string,
+  role: HouseholdRole = 'eater',
+  userId: string | null = null,
+): HouseholdMemberView {
+  return {
+    id,
+    displayName,
+    role,
+    userId,
+    personName: displayName.toLowerCase(),
+    inviteEmail: null,
+    createdAt: '2026-08-09T00:00:00.000Z',
+  };
+}
+
+/**
+ * Test double for HOUSEHOLD_API. Enforces the same authorization rules as the real
+ * service, because a double that is more permissive than the API teaches the UI a
+ * habit that breaks in production.
+ */
 export class FakeHouseholdApi implements HouseholdApi {
   constructor(
-    private households: Household[] = [],
-    private members: HouseholdMember[] = [],
+    private households: HouseholdSummary[] = [],
+    private members: HouseholdMemberView[] = [],
+    private readonly userId = FAKE_USER_ID,
   ) {}
 
-  async listMine(): Promise<readonly Household[]> {
-    return this.households;
+  async me(): Promise<MeResponse> {
+    return {
+      userId: this.userId,
+      email: 'devon@example.com',
+      isAnonymous: false,
+      households: this.households,
+    };
   }
 
-  async create(input: CreateHouseholdInput): Promise<Household> {
-    const household = fakeHousehold(`hh-${this.households.length + 1}`, input.name);
+  async createHousehold(input: CreateHouseholdRequest): Promise<HouseholdSummary> {
+    const household = fakeHousehold(`hh-${this.households.length + 1}`, input.name, {
+      displayName: input.displayName,
+      personName: input.personName ?? null,
+    });
     this.households = [...this.households, household];
+    this.members = [
+      ...this.members,
+      {
+        ...fakeMember(`mem-${this.members.length + 1}`, input.displayName, 'planner', this.userId),
+        personName: input.personName ?? null,
+      },
+    ];
     return household;
   }
 
-  async listMembers(householdId: string): Promise<readonly HouseholdMember[]> {
-    return this.members.filter((member) => member.householdId === householdId);
+  async listMembers(): Promise<readonly HouseholdMemberView[]> {
+    return this.members;
   }
 
-  async addMember(householdId: string, input: AddMemberInput): Promise<HouseholdMember> {
-    const member = fakeMember(
-      `mem-${this.members.length + 1}`,
-      householdId,
-      input.displayName,
-      input.role,
-    );
+  async addMember(
+    _householdId: string,
+    input: AddHouseholdMemberRequest,
+  ): Promise<HouseholdMemberView> {
+    const member: HouseholdMemberView = {
+      ...fakeMember(
+        `mem-${this.members.length + 1}`,
+        input.displayName,
+        input.role,
+        input.userId ?? null,
+      ),
+      personName: input.personName ?? null,
+      inviteEmail: input.inviteEmail ?? null,
+    };
     this.members = [...this.members, member];
     return member;
   }
 
   async updateMember(
-    householdId: string,
+    _householdId: string,
     memberId: string,
-    patch: UpdateMemberInput,
-  ): Promise<HouseholdMember> {
-    const target = this.requireMember(householdId, memberId);
-    // Mirrors the API's 403: a claimed member's profile is theirs, so role only.
-    if (
-      target.userId !== null &&
-      (patch.displayName !== undefined || patch.personName !== undefined)
-    ) {
-      throw new Error('Role only: that member has an account.');
+    patch: UpdateHouseholdMemberRequest,
+  ): Promise<HouseholdMemberView> {
+    const target = this.requireMember(memberId);
+    // Mirrors assertPlannerMayEdit: displayName and inviteEmail belong to the
+    // account. personName does not — the library link is planning data. The whole
+    // patch is refused rather than partially applied.
+    if (target.userId !== null) {
+      const owned = (['displayName', 'inviteEmail'] as const).filter(
+        (field) => patch[field] !== undefined,
+      );
+      if (owned.length > 0) {
+        throw toApiError(
+          'forbidden',
+          `${owned.join(' and ')} belong to that member's own account.`,
+        );
+      }
     }
     return this.apply(target, patch);
   }
 
-  async updateSelf(householdId: string, patch: UpdateSelfInput): Promise<HouseholdMember> {
-    const target = this.members.find(
-      (member) => member.householdId === householdId && member.isSelf,
-    );
+  async updateSelf(
+    _householdId: string,
+    patch: UpdateOwnMembershipRequest,
+  ): Promise<HouseholdMemberView> {
+    const target = this.members.find((member) => member.userId === this.userId);
     if (!target) {
-      throw new Error(`Not a member of household ${householdId}`);
+      throw toApiError('not_found', 'You are not a member of that household.');
     }
     return this.apply(target, patch);
   }
 
-  private apply(target: HouseholdMember, patch: UpdateMemberInput): HouseholdMember {
-    const updated: HouseholdMember = {
+  async removeMember(_householdId: string, memberId: string): Promise<void> {
+    this.requireMember(memberId);
+    this.members = this.members.filter((member) => member.id !== memberId);
+  }
+
+  private apply(
+    target: HouseholdMemberView,
+    patch: UpdateHouseholdMemberRequest,
+  ): HouseholdMemberView {
+    const updated: HouseholdMemberView = {
       ...target,
       role: patch.role ?? target.role,
       displayName: patch.displayName?.trim() || target.displayName,
       personName: patch.personName === undefined ? target.personName : patch.personName,
+      inviteEmail: patch.inviteEmail === undefined ? target.inviteEmail : patch.inviteEmail,
     };
     this.members = this.members.map((member) => (member.id === target.id ? updated : member));
     return updated;
   }
 
-  async removeMember(householdId: string, memberId: string): Promise<void> {
-    this.requireMember(householdId, memberId);
-    this.members = this.members.filter((member) => member.id !== memberId);
-  }
-
-  private requireMember(householdId: string, memberId: string): HouseholdMember {
-    const member = this.members.find(
-      (candidate) => candidate.id === memberId && candidate.householdId === householdId,
-    );
+  private requireMember(memberId: string): HouseholdMemberView {
+    const member = this.members.find((candidate) => candidate.id === memberId);
     if (!member) {
-      throw new Error(`No member ${memberId} in household ${householdId}`);
+      throw toApiError('not_found', `No member ${memberId}.`);
     }
     return member;
   }

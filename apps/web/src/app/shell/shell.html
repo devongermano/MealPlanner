@@ -45,5 +45,12 @@
 </header>
 
 <main id="main" tabindex="-1">
-  <router-outlet />
+  @if (loadError(); as message) {
+    <app-alert tone="error">
+      {{ message }}
+      <button class="btn retry" type="button" (click)="retry()">Try again</button>
+    </app-alert>
+  } @else {
+    <router-outlet />
+  }
 </main>

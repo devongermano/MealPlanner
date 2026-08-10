@@ -2,8 +2,8 @@ import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { FakeAuthBackend, fakeSession } from '../../testing/fake-auth-backend';
 import { AUTH_BACKEND } from '../auth/auth-backend';
+import { FakeHouseholdApi, FAKE_USER_ID } from '../../testing/fake-household-api';
 import { HOUSEHOLD_API } from '../household/household-api';
-import { HouseholdApiMock } from '../household/household-api-mock';
 import { HouseholdStore } from '../household/household-store';
 import { Onboarding } from './onboarding';
 
@@ -65,10 +65,13 @@ describe('Onboarding', () => {
       providers: [
         provideRouter([]),
         { provide: AUTH_BACKEND, useValue: new FakeAuthBackend(fakeSession()) },
-        { provide: HOUSEHOLD_API, useClass: HouseholdApiMock },
+        { provide: HOUSEHOLD_API, useValue: new FakeHouseholdApi() },
       ],
     }).compileComponents();
 
+    // The guard loads the store before this route renders; mirror that so the
+    // component knows which member is you.
+    await TestBed.inject(HouseholdStore).load();
     fixture = TestBed.createComponent(Onboarding);
     await settle(fixture);
   });
@@ -111,7 +114,7 @@ describe('Onboarding', () => {
     const [devon, alex] = TestBed.inject(HouseholdStore).members();
 
     expect(devon.personName).toBe('devon');
-    expect(devon.userId).toBe('user-1');
+    expect(devon.userId).toBe(FAKE_USER_ID);
 
     // Someone the plan cooks for who has not signed up — the ratified model.
     expect(alex.personName).toBe('alex_smith');

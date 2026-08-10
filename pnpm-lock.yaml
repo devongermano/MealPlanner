@@ -150,6 +150,9 @@ importers:
       '@mealplan/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@mealplan/contracts-api':
+        specifier: workspace:^
+        version: link:../../packages/contracts-api
       '@supabase/supabase-js':
         specifier: '2'
         version: 2.112.2

@@ -1,3 +1,5 @@
+import type { ApiErrorBody, ApiErrorResponse } from '../household/contracts';
+
 /**
  * The single place an API failure becomes text a person reads. Every view routes
  * through it so the rules below are inherited rather than re-litigated per screen.
@@ -9,30 +11,13 @@
  * "forbidden" from "missing" hands that oracle back. When you cannot tell the
  * difference, say the neutral thing: it could not be found.
  *
- * RULE — switch on `code`, never on `message`. Messages are for humans and change
- * without notice; codes are the contract.
+ * RULE — switch on `code`, never on `message`. The generated contract calls the
+ * message "not a stable contract" in as many words; codes are the contract.
  */
 
-/** Mirrors the API's ApiErrorResponse envelope. REGENERATE-FROM-CONTRACTS-API. */
-export type ApiErrorCode =
-  | 'unauthenticated'
-  | 'forbidden'
-  | 'not_found'
-  | 'validation_failed'
-  | 'conflict'
-  | 'internal';
+export type ApiErrorCode = ApiErrorBody['code'];
 
-export interface ApiErrorBody {
-  readonly error: {
-    readonly code: ApiErrorCode;
-    readonly message: string;
-    /** Per-field on validation_failed, listing every failing field rather than the first. */
-    readonly details?: Readonly<Record<string, readonly string[]>>;
-  };
-  readonly requestId: string;
-}
-
-function isApiErrorBody(value: unknown): value is ApiErrorBody {
+export function isApiErrorResponse(value: unknown): value is ApiErrorResponse {
   if (value === null || typeof value !== 'object') {
     return false;
   }
@@ -42,6 +27,18 @@ function isApiErrorBody(value: unknown): value is ApiErrorBody {
     typeof error === 'object' &&
     typeof (error as { code?: unknown }).code === 'string'
   );
+}
+
+/**
+ * Marks an envelope this app authored rather than received. Those carry copy we
+ * already wrote for a person, so describeApiError shows it verbatim instead of
+ * substituting the generic line for the code.
+ */
+export const CLIENT_ORIGIN = 'client';
+
+/** Builds the API's envelope for failures that never reached it, like a dead network. */
+export function toApiError(code: ApiErrorCode, message: string): ApiErrorResponse {
+  return { error: { code, message }, requestId: CLIENT_ORIGIN };
 }
 
 const BY_CODE: Readonly<Record<ApiErrorCode, string>> = {
@@ -59,14 +56,25 @@ const BY_CODE: Readonly<Record<ApiErrorCode, string>> = {
  * a plain Error, or anything else, because a rendering layer that can itself throw
  * is worse than a generic message.
  */
-export function describeApiError(cause: unknown, fallback = 'That did not save. Try again.'): string {
-  if (isApiErrorBody(cause)) {
+export function describeApiError(
+  cause: unknown,
+  fallback = 'That did not save. Try again.',
+): string {
+  if (isApiErrorResponse(cause)) {
     const { code, message, details } = cause.error;
-    if (code === 'validation_failed' && details) {
-      const fields = Object.values(details).flat();
-      if (fields.length > 0) {
-        return fields.join(' ');
-      }
+    // We wrote this one; substituting the generic line for its code would replace
+    // an explanation with a guess — "your session expired" about preview mode, say.
+    if (cause.requestId === CLIENT_ORIGIN) {
+      return message || fallback;
+    }
+    if (code === 'validation_failed' && details?.length) {
+      // Every failing field is reported, not just the first, so show them all.
+      return details.map((detail) => detail.message).join(' ');
+    }
+    // forbidden and conflict carry a specific, actionable server message —
+    // "that person is already linked to another member" beats a generic line.
+    if (code === 'forbidden' || code === 'conflict') {
+      return message || BY_CODE[code];
     }
     return BY_CODE[code] ?? message ?? fallback;
   }

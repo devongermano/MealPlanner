@@ -1,20 +1,22 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Auth } from '../auth/auth';
+import { describeApiError } from '../errors/api-error';
 import {
   HOUSEHOLD_ROLES,
   ROLE_DESCRIPTIONS,
-  type HouseholdMember,
   type HouseholdRole,
-  type UpdateSelfInput,
+  type UpdateOwnMembershipRequest,
 } from '../household/household-api';
-import { HouseholdStore } from '../household/household-store';
-import { PERSON_NAME_RULE, isValidPersonName } from '../household/person-name';
-import { describeApiError } from '../errors/api-error';
+import { HouseholdStore, type HouseholdMemberRow } from '../household/household-store';
+import { PERSON_NAME_RULE, isValidPersonName, slugifyPersonName } from '../household/person-name';
 import { Alert } from '../ui/alert';
 import { PendingNote } from '../ui/pending-note';
 
-/** A placeholder is fully editable, a claimed member is role-only, you edit yourself. */
+/**
+ * What a row may edit. Only the display name is account-owned — a claimed member
+ * still has an editable role and plan identity.
+ */
 type MemberKind = 'placeholder' | 'claimed' | 'self';
 
 @Component({
@@ -56,30 +58,37 @@ export class Settings {
     }
     await this.guard(async () => {
       const { displayName, role, email } = this.memberForm.getRawValue();
-      await this.store.addMember({ displayName, role, email: email || null });
+      const personName = slugifyPersonName(displayName);
+      // Never sends userId: settings adds placeholders, same as the wizard.
+      await this.store.addMember({
+        displayName,
+        role,
+        ...(personName ? { personName } : {}),
+        ...(email ? { inviteEmail: email } : {}),
+      });
       this.memberForm.reset({ displayName: '', role: 'eater', email: '' });
     });
   }
 
   /**
-   * Which controls a row gets. The API decides this, not us: a placeholder is
-   * fully editable by a planner; a member who has an account owns their profile,
-   * so only their role can be changed; and your own row goes through the self
+   * Which controls a row gets. The API decides this, not us: only displayName
+   * and inviteEmail belong to a member's own account, so a claimed member still
+   * has an editable role and plan identity. Your own row goes through the self
    * route, which carries no role at all.
    */
-  protected memberKind(member: HouseholdMember): MemberKind {
+  protected memberKind(member: HouseholdMemberRow): MemberKind {
     if (member.isSelf) {
       return 'self';
     }
     return member.userId === null ? 'placeholder' : 'claimed';
   }
 
-  protected async changeRole(member: HouseholdMember, event: Event): Promise<void> {
+  protected async changeRole(member: HouseholdMemberRow, event: Event): Promise<void> {
     const role = (event.target as HTMLSelectElement).value as HouseholdRole;
     await this.guard(() => this.store.updateMember(member.id, { role }));
   }
 
-  protected async changeDisplayName(member: HouseholdMember, event: Event): Promise<void> {
+  protected async changeDisplayName(member: HouseholdMemberRow, event: Event): Promise<void> {
     const displayName = (event.target as HTMLInputElement).value.trim();
     if (!displayName) {
       this.invalidDisplayName.set(member.id);
@@ -94,7 +103,7 @@ export class Settings {
    * has no portions cooked for them, which is exactly what a planner who does not
    * eat looks like.
    */
-  protected async changePersonName(member: HouseholdMember, event: Event): Promise<void> {
+  protected async changePersonName(member: HouseholdMemberRow, event: Event): Promise<void> {
     const value = (event.target as HTMLInputElement).value.trim();
     if (value && !isValidPersonName(value)) {
       this.invalidPersonName.set(member.id);
@@ -105,13 +114,13 @@ export class Settings {
   }
 
   /** Your own profile goes through the self route; a placeholder's through the planner one. */
-  private saveProfile(member: HouseholdMember, patch: UpdateSelfInput): Promise<void> {
+  private saveProfile(member: HouseholdMemberRow, patch: UpdateOwnMembershipRequest): Promise<void> {
     return member.isSelf
       ? this.store.updateSelf(member.id, patch)
       : this.store.updateMember(member.id, patch);
   }
 
-  protected async removeMember(member: HouseholdMember): Promise<void> {
+  protected async removeMember(member: HouseholdMemberRow): Promise<void> {
     await this.guard(() => this.store.removeMember(member.id));
   }
 

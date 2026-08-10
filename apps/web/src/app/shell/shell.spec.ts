@@ -2,12 +2,17 @@ import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { FakeAuthBackend, fakeSession } from '../../testing/fake-auth-backend';
 import {
+  FAKE_USER_ID,
   FakeHouseholdApi,
   fakeHousehold,
   fakeMember,
 } from '../../testing/fake-household-api';
 import { AUTH_BACKEND } from '../auth/auth-backend';
-import { HOUSEHOLD_API, type Household, type HouseholdMember } from '../household/household-api';
+import {
+  HOUSEHOLD_API,
+  type HouseholdMemberView,
+  type HouseholdSummary,
+} from '../household/household-api';
 import { HouseholdStore } from '../household/household-store';
 import { Shell } from './shell';
 
@@ -15,8 +20,8 @@ const HOME = fakeHousehold('hh-1', 'The Germanos');
 const CABIN = fakeHousehold('hh-2', 'Cabin week');
 
 async function mount(
-  households: Household[],
-  members: HouseholdMember[],
+  households: HouseholdSummary[],
+  members: HouseholdMemberView[],
   backend = new FakeAuthBackend(fakeSession()),
 ): Promise<ComponentFixture<Shell>> {
   TestBed.configureTestingModule({
@@ -50,7 +55,7 @@ describe('Shell', () => {
   });
 
   it('shows the account and the active household', async () => {
-    const fixture = await mount([HOME], [fakeMember('mem-1', 'hh-1', 'Devon', 'planner', true)]);
+    const fixture = await mount([HOME], [fakeMember('mem-1', 'Devon', 'planner', FAKE_USER_ID)]);
 
     expect(text(fixture)).toContain('Devon');
     expect(query(fixture, '.household-name')?.textContent).toContain('The Germanos');
@@ -84,7 +89,7 @@ describe('Shell', () => {
 
   it('signs out, drops household state, and returns to the login page', async () => {
     const backend = new FakeAuthBackend(fakeSession());
-    const fixture = await mount([HOME], [fakeMember('mem-1', 'hh-1', 'Devon')], backend);
+    const fixture = await mount([HOME], [fakeMember('mem-1', 'Devon')], backend);
     const store = TestBed.inject(HouseholdStore);
     const navigate = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
 
