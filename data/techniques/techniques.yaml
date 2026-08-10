@@ -1,0 +1,366 @@
+schema_version: 0
+# techniques.yaml — the technique library (PRD §10 cook mode).
+# Every `operation` id referenced by data/methods-draft/*.yaml resolves here;
+# lint enforces no orphans in either direction. `video: null` is the placeholder
+# for owner-recorded clips (owned content, reused across every step naming the
+# operation).
+
+techniques:
+
+  # ---- knife & prep ----
+  dice:
+    name: Dice
+    one_line: Cut into even small cubes so everything cooks at the same rate.
+    how:
+      - Square off the vegetable so it sits flat and stable
+      - Cut even planks, then stack and cut into sticks
+      - Cut across the sticks into cubes, keeping sizes uniform
+      - Aim for roughly 1 cm unless the step says small (5 mm)
+    video: null
+  mince:
+    name: Mince
+    one_line: Chop as fine as a knife will take it, for aromatics that melt in.
+    how:
+      - Slice thin first — thin slices make fine mince fast
+      - Gather into a pile and rock the knife through repeatedly
+      - Steady the spine with your off hand, pivot the tip
+      - Scrape back into a pile and repeat until near-paste
+    video: null
+  chop:
+    name: Rough chop
+    one_line: Break into large even pieces where precision doesn't matter.
+    how:
+      - Halve or quarter to a size the next step needs
+      - Keep pieces roughly even so they cook together
+      - Don't fuss — this cut gets blended, braised, or roasted
+    video: null
+  slice:
+    name: Slice thin (against the grain)
+    one_line: Thin, even slices across the muscle fibers for tender meat.
+    how:
+      - Firm the meat in the freezer 15 minutes for cleaner slices
+      - Find the grain — the direction the fibers run
+      - Slice perpendicular to it, 3-5 mm, with long knife strokes
+      - Keep slices even so they sear in the same time
+    video: null
+  cube:
+    name: Cut into chunks
+    one_line: Large even chunks of meat for braising or frying.
+    how:
+      - Trim off large surface fat and silverskin
+      - Cut with the grain into thick slabs
+      - Cut slabs into even chunks the size the step names
+      - Even size matters more than shape — chunks cook together
+    video: null
+  grate:
+    name: Grate
+    one_line: Reduce to pulp or shreds on a box grater.
+    how:
+      - Use the large holes unless the step says fine
+      - Grate onto a board or into the mixing bowl directly
+      - Keep knuckles clear as the piece gets small; stop at the nub
+    video: null
+  smash:
+    name: Smash
+    one_line: Crush with the flat of a knife so seasoning gets into the cracks.
+    how:
+      - Lay the flat of a chef's knife on the cucumber or clove
+      - Strike firmly with your palm until it cracks and splits
+      - Tear or cut the smashed pieces into chunks
+      - Ragged edges are the point — they drink up dressing
+    video: null
+  rinse:
+    name: Rinse (rice)
+    one_line: Wash off surface starch so grains cook separate, not gluey.
+    how:
+      - Cover the rice with cold water in a bowl or its pot
+      - Agitate with your hand — the water goes cloudy
+      - Pour off and repeat until the water runs nearly clear
+      - Drain well in a sieve before cooking
+    video: null
+  soak:
+    name: Soak (dried chiles)
+    one_line: Rehydrate toasted chiles until soft enough to blend smooth.
+    how:
+      - Cover the toasted chiles with just-boiled water
+      - Weigh them down with a small plate so they stay submerged
+      - Soak until pliable, about 15 minutes
+      - Reserve a little soaking water to loosen the blend if needed
+    video: null
+  drain:
+    name: Salt and drain / drain dry
+    one_line: Pull water out (or off) so the dish isn't diluted.
+    how:
+      - For cucumbers, toss with salt and sit in a colander 15 minutes
+      - For boiled things, tip into the colander and let steam flash off
+      - Shake or press gently — surface water is the enemy of crisp and of dressing
+    video: null
+  marinate:
+    name: Marinate
+    one_line: Coat and rest so seasoning penetrates before heat.
+    how:
+      - Toss the protein with the marinade until every piece is coated
+      - Cover and refrigerate for the time the step gives
+      - Longer is not automatically better — acids can toughen shrimp
+      - Drain or reserve the marinade as the recipe directs
+    video: null
+  dredge:
+    name: Starch coating
+    one_line: Toss in cornstarch for a shell that crisps and grips sauce.
+    how:
+      - Pat the protein dry first — wet surfaces gum the starch
+      - Toss with the starch and seasoning until evenly dusted
+      - Shake off excess; a thin coat crisps, a thick one turns pasty
+      - Cook soon after coating, before it sweats through
+    video: null
+  blend:
+    name: Blend
+    one_line: Puree to the texture the step names — smooth sauce or coarse salsa.
+    how:
+      - Load soft and wet ingredients at the bottom, near the blades
+      - Start low, then increase speed; add reserved liquid to loosen
+      - For coarse salsa, pulse and stop early — check the texture
+      - Scrape down once mid-way for an even result
+    video: null
+  mix:
+    name: Mix / combine
+    one_line: Bring ingredients together evenly without overworking.
+    how:
+      - Combine in a bowl big enough to actually stir in
+      - For meat mixes, use your hands and stop at just-combined
+      - Overworking makes meatballs bouncy and doughs tough
+    video: null
+  whisk:
+    name: Whisk
+    one_line: Beat until uniform and slightly aerated.
+    how:
+      - Use a bowl with room to move the whisk freely
+      - Beat in wide loops until no streaks remain
+      - For eggs, fully blend whites and yolks with the salt
+    video: null
+  knead:
+    name: Mix a masa dough
+    one_line: Work fat and water into masa harina to a soft, cohesive dough.
+    how:
+      - Rub the lard into the dry masa until sandy
+      - Add warm salted water gradually, mixing with your hand
+      - Knead briefly until it holds together like playdough
+      - Too crumbly, add water; sticks to hands, add masa
+    video: null
+  shape:
+    name: Divide and shape
+    one_line: Portion a dough or mix into even units so they cook alike.
+    how:
+      - Divide by eye or scale into equal pieces
+      - Roll smooth between your palms (oil hands for meat mixes)
+      - Press or place as the step directs, spaced apart
+      - Uniform size is the whole game — they must finish together
+    video: null
+  rest:
+    name: Rest
+    one_line: Leave it alone — hydration and carryover do the work.
+    how:
+      - Cover so the surface doesn't dry out
+      - Do nothing for the stated time; set a timer
+      - For rice, resting off heat lets the steam finish the grains
+    video: null
+  portion:
+    name: Portion into containers
+    one_line: Weigh into the per-person containers the portioning matrix assigns.
+    how:
+      - Line up the labeled containers for this component
+      - Tare each container on the scale before filling
+      - Weigh to the gram target the cook plan gives (relaxed mode uses the printed household units)
+      - Cool uncovered a few minutes before lidding to avoid condensation
+    video: null
+
+  # ---- stove ----
+  toast:
+    name: Dry-toast
+    one_line: Heat in a dry pan until fragrant to wake up flavor.
+    how:
+      - Medium heat, no oil, single layer
+      - Keep things moving — fragrance yes, scorching no
+      - Chiles need seconds per side; grains a few minutes until chalky-smelling
+      - Pull off the hot pan as soon as they're done; they burn fast
+    video: null
+  brown:
+    name: Brown ground meat
+    one_line: Cook crumbled meat hot enough to color, not just gray out.
+    how:
+      - Get the fat shimmering before the meat goes in
+      - Spread it out and leave it alone until it releases and colors
+      - Break into crumbles with the spoon as it cooks
+      - Pour off excess fat only if the recipe says to
+    video: null
+  sear:
+    name: Sear
+    one_line: High heat, dry surface, no crowding — build a deep brown crust.
+    how:
+      - Pat the protein dry; wet meat steams instead of searing
+      - Heat the pan until the oil shimmers hard
+      - Lay pieces in with space between; work in batches
+      - Don't move them until they release freely and show color
+    video: null
+  saute:
+    name: Sweat / soften
+    one_line: Cook vegetables in fat over moderate heat until soft, not brown.
+    how:
+      - Medium heat, fat first, then the vegetables with a pinch of salt
+      - Stir now and then; salt pulls moisture and speeds softening
+      - Done when translucent and tender — lower the heat if browning
+    video: null
+  bloom:
+    name: Bloom aromatics
+    one_line: Give garlic, ginger, paste, or ground spices seconds in hot fat.
+    how:
+      - Add to the hot fat already in the pan
+      - Stir constantly — this takes 30-60 seconds, not minutes
+      - Fragrant and just colored is done; brown garlic is bitter
+      - Immediately add the next liquid to stop the cooking
+    video: null
+  simmer:
+    name: Simmer
+    one_line: Hold at a lazy bubble until tender or thickened.
+    how:
+      - Bring to a boil, then cut the heat until bubbles just break the surface
+      - Cover or not as the step says — covered holds liquid, open reduces
+      - Stir occasionally if starch or sugar could catch on the bottom
+      - Set a timer; check doneness at the low end of the range
+    video: null
+  boil:
+    name: Boil
+    one_line: Full rolling bubble, usually in well-salted water.
+    how:
+      - Use more water than looks necessary; salt it like the sea for pasta
+      - Cover to reach the boil faster, uncover to hold it
+      - Stir in the first minute so nothing sticks or clumps
+      - Start the timer when the water returns to the boil
+    video: null
+  poach:
+    name: Poach
+    one_line: Cook gently in barely-bubbling liquid so lean meat stays juicy.
+    how:
+      - Submerge the protein in the simmering liquid
+      - Drop to the barest quiver — hard boiling makes it stringy
+      - Cover and hold at that temperature for the stated time
+      - Check the thickest piece is cooked through before pulling
+    video: null
+  reduce:
+    name: Reduce to a glaze
+    one_line: Boil a sauce down until it thickens and coats a spoon.
+    how:
+      - Uncovered, medium-high — evaporation is the mechanism
+      - Stir more as it thickens; sugars scorch at the end
+      - Done when a spoon dragged through leaves a brief trail
+      - It thickens further off heat — stop a touch early
+    video: null
+  fry:
+    name: Pan-fry / shallow-fry
+    one_line: Cook in generous hot fat until crisp and golden.
+    how:
+      - Heat the oil until a test piece sizzles instantly
+      - Fry in batches — crowding drops the temperature and steams
+      - Turn for even color; regulate heat by sound and sizzle
+      - Drain on a rack, not paper, to keep the crust crisp
+    video: null
+  scramble:
+    name: Soft-scramble
+    one_line: Set eggs gently in large soft curds, pulled early.
+    how:
+      - Pour beaten eggs into the pan over medium-low
+      - Push slowly from the edges to the center as curds form
+      - Stop while still glossy — carryover finishes them
+      - Overcooked scramble weeps in the container; err early
+    video: null
+  glaze:
+    name: Toss through glaze
+    one_line: Coat cooked pieces in a thickened sauce right before packing.
+    how:
+      - Have the sauce at a simmer and the pieces still hot
+      - Add the pieces and fold or flip until evenly coated
+      - Work quickly — sitting in glaze softens a crisp crust
+    video: null
+  char:
+    name: Char
+    one_line: Blacken vegetables in spots for smoky depth.
+    how:
+      - Dry high heat — comal, cast iron, or the broiler
+      - Leave pieces unmoved until black patches form, then turn
+      - Blistered and blackened in spots, not burnt through
+      - Softened plus charred is done; the blender handles the rest
+    video: null
+  griddle:
+    name: Griddle
+    one_line: Cook flat breads on a dry hot surface, flipping once or twice.
+    how:
+      - Preheat the comal or skillet until a drop of water skates
+      - Cook the first side until set and spotted, then flip
+      - Gentle pressure with the spatula encourages puffing
+      - Stack finished rounds under a towel to stay soft
+    video: null
+  mash:
+    name: Mash
+    one_line: Crush to the coarse or smooth texture the dish wants.
+    how:
+      - Use a potato masher or fork, in the pan or bowl
+      - Work in the seasoning while mashing so it distributes
+      - Stop at the named texture — refried beans and guac want some chunk
+    video: null
+
+  # ---- oven ----
+  braise:
+    name: Braise
+    one_line: Cook tough cuts low, slow, covered, in liquid until shreddable.
+    how:
+      - Liquid should come partway up the meat, not cover it
+      - Lid on, into the low oven; the target is a bare sub-simmer
+      - Don't peek before the minimum time — heat loss adds an hour
+      - Done when a fork twists meat apart with no resistance
+    video: null
+  roast:
+    name: Roast
+    one_line: High dry oven heat for browning and cooked-through interiors.
+    how:
+      - Preheat fully — a cold start steams instead of browning
+      - Single layer with space; two pans beat one crowded pan
+      - Turn once when the underside is deeply colored
+      - Pull at deep golden, not blond; color is flavor
+    video: null
+  bake:
+    name: Bake on racks
+    one_line: Oven-crisp skin-on pieces elevated so air hits all sides.
+    how:
+      - Set wire racks over foil-lined sheet pans
+      - Space the pieces so they don't touch
+      - Flip once at the halfway mark for even crisping
+      - Done when the skin is browned and crackly, not just cooked
+    video: null
+  broil:
+    name: Broil / crisp
+    one_line: Direct top heat for fast browning and crispy edges.
+    how:
+      - Rack in the upper third, broiler fully preheated
+      - Spread food in a shallow even layer
+      - Watch constantly — broilers go from golden to burnt in seconds
+      - Rotate the pan if it browns unevenly
+    video: null
+
+  # ---- assembly ----
+  shred:
+    name: Shred cooked meat
+    one_line: Pull braised or poached meat into strands while warm.
+    how:
+      - Work while warm — cold meat resists shredding
+      - Pull apart with two forks, or gloved hands for big batches
+      - Discard bones, gristle, and spent aromatics as you go
+      - Fold the shreds back through the cooking liquid so they stay moist
+    video: null
+  toss:
+    name: Toss / dress
+    one_line: Combine so every piece gets its share of dressing or garnish.
+    how:
+      - Use a bowl with headroom — tossing needs space
+      - Add dressing gradually; you can add but not subtract
+      - Lift and turn from the bottom rather than stirring
+    video: null
