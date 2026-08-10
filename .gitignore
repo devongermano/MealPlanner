@@ -34,3 +34,9 @@ node_modules/
 .idea/
 *.egg-info/
 artifacts/
+
+# JS build/tooling outputs (Track C scaffolds)
+dist/
+.turbo/
+.angular/
+coverage/

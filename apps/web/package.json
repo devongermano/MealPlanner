@@ -1,0 +1,39 @@
+{
+  "name": "@mealplan/web",
+  "version": "0.1.0",
+  "description": "Angular web app skeleton — the collaborative loop (M2). Consumes generated types from @mealplan/contracts.",
+  "private": true,
+  "scripts": {
+    "ng": "ng",
+    "start": "ng serve",
+    "build": "ng build",
+    "watch": "ng build --watch --configuration development",
+    "test": "ng test --watch=false",
+    "lint": "ng lint"
+  },
+  "dependencies": {
+    "@angular/common": "22.1.1",
+    "@angular/compiler": "22.1.1",
+    "@angular/core": "22.1.1",
+    "@angular/forms": "22.1.1",
+    "@angular/platform-browser": "22.1.1",
+    "@angular/router": "22.1.1",
+    "@mealplan/contracts": "workspace:*",
+    "rxjs": "7.8.2",
+    "tslib": "2.8.1"
+  },
+  "devDependencies": {
+    "@angular-eslint/builder": "22.1.0",
+    "@angular/build": "22.1.3",
+    "@angular/cli": "22.1.3",
+    "@angular/compiler-cli": "22.1.1",
+    "@eslint/js": "10.0.1",
+    "angular-eslint": "22.1.0",
+    "eslint": "10.8.1",
+    "jsdom": "30.0.1",
+    "prettier": "3.9.6",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.62.1",
+    "vitest": "4.1.10"
+  }
+}

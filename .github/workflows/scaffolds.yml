@@ -1,0 +1,26 @@
+name: scaffolds
+
+on:
+  pull_request:
+    paths:
+      - "apps/**"
+      - "packages/contracts/**"
+      - "turbo.json"
+      - "pnpm-workspace.yaml"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/scaffolds.yml"
+
+jobs:
+  js:
+    name: build + test + lint (turbo)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4 # version read from root package.json "packageManager"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm turbo run build test lint typecheck
