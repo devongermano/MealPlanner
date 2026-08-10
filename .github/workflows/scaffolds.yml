@@ -7,6 +7,9 @@ on:
       - "packages/contracts/**"
       - "turbo.json"
       - "pnpm-workspace.yaml"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/scaffolds.yml"
 
 jobs:
   js:
