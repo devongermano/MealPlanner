@@ -1,0 +1,31 @@
+schema_version: 0
+component: scallion_ginger_oil
+steps:
+  - phase: prep
+    text: Slice the scallions fine and mince the ginger; pile in a heatproof bowl
+    station: prep
+    mode: active
+    duration_min: 6
+    operation: mince
+  - phase: cook
+    text: Heat the oil until shimmering
+    station: stove
+    mode: active
+    duration_min: 4
+  - phase: cook
+    text: Pour the hot oil over the scallions and ginger; stir in the salt
+    station: prep
+    mode: active
+    duration_min: 2
+    operation: bloom
+  - phase: finish
+    text: Cool completely
+    station: none
+    mode: passive
+    duration_min: 15
+  - phase: finish
+    text: Portion into jars
+    station: none
+    mode: active
+    duration_min: 2
+    operation: portion

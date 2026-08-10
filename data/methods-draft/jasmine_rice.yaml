@@ -1,0 +1,38 @@
+schema_version: 0
+component: jasmine_rice
+steps:
+  - phase: prep
+    text: Rinse the rice until the water runs clear; drain well
+    station: prep
+    mode: active
+    duration_min: 4
+    operation: rinse
+  - phase: cook
+    text: Combine the rice, water, oil, and salt and bring to a boil
+    station: stove
+    mode: active
+    duration_min: 3
+    operation: boil
+  - phase: cook
+    text: Cover and simmer on the lowest heat
+    station: stove
+    mode: passive
+    duration_min: 15
+    operation: simmer
+  - phase: cook
+    text: Rest off the heat, covered
+    station: none
+    mode: passive
+    duration_min: 10
+    operation: rest
+  - phase: finish
+    text: Fluff with a fork
+    station: prep
+    mode: active
+    duration_min: 2
+  - phase: finish
+    text: Portion into containers
+    station: none
+    mode: active
+    duration_min: 4
+    operation: portion
