@@ -26,12 +26,12 @@ load -> choose_menu(n=6, seed=0, iters=600, shortlist=8) -> build_week -> sessio
 
 | stage | median ms | min ms | max ms |
 |---|---|---|---|
-| load | 4.2 | 4.1 | 4.9 |
-| choose_menu | 70.7 | 68.7 | 73.8 |
-| build_week | 5,898.2 | 5,597.2 | 6,253.7 |
+| load | 4.0 | 3.9 | 4.1 |
+| choose_menu | 70.8 | 69.9 | 72.1 |
+| build_week | 5,758.5 | 5,710.3 | 6,109.3 |
 | session_plan | 0.1 | 0.1 | 0.1 |
 | purchase | 0.0 | 0.0 | 0.0 |
-| **pipeline total** | **5,972.1** | 5,673.5 | 6,328.6 |
+| **pipeline total** | **5,833.5** | 5,784.2 | 6,183.5 |
 
 ## Examples corpus — `mealplan week` pipeline
 
@@ -53,10 +53,62 @@ load -> doctor -> choose_menu(n=12, seed=0; CLI defaults) -> build_week -> sessi
 
 | stage | median ms | min ms | max ms |
 |---|---|---|---|
-| load | 27.9 | 26.8 | 29.4 |
-| doctor | 2,598.0 | 2,352.3 | 2,786.6 |
-| choose_menu | 1,592.0 | 1,565.4 | 1,657.4 |
-| build_week | 25,994.7 | 24,439.1 | 27,620.7 |
-| session_plan | 0.2 | 0.1 | 0.2 |
+| load | 28.2 | 27.0 | 29.6 |
+| doctor | 2,689.1 | 2,582.0 | 2,854.9 |
+| choose_menu | 1,589.2 | 1,583.3 | 1,608.0 |
+| build_week | 26,659.6 | 26,036.6 | 28,898.4 |
+| session_plan | 0.1 | 0.1 | 0.2 |
 | purchase | 0.0 | 0.0 | 0.0 |
-| **pipeline total** | **30,344.6** | 28,383.8 | 32,026.3 |
+| **pipeline total** | **30,966.3** | 30,356.3 | 33,252.2 |
+
+## Interactive primitives — tests/fixtures/solo_lifter
+
+One plate LP and one replate (day rebalance, §4.4) on the golden menu — the solves an interactive surface waits on (M1.5). Counts include the untimed golden menu setup.
+
+### LP-solve counts (deterministic; identical across all 5 runs)
+
+| stage | CBC invocations |
+|---|---|
+| menu-verify | 1 |
+| plate | 1 |
+| replate | 1 |
+| **total** | **3** |
+
+### Wall timings over 5 runs (recorded-only — never asserted in CI, PRD §8.5)
+
+| stage | median ms | min ms | max ms |
+|---|---|---|---|
+| plate | 20.6 | 18.6 | 22.2 |
+| replate | 20.5 | 19.4 | 22.5 |
+| **pipeline total** | **41.0** | 40.6 | 41.7 |
+
+## Lock round trip — tests/fixtures/solo_lifter (M1.3)
+
+`mealplan lock --n 6 --seed 0` (solve + write plans/<key>/) then `mealplan verify-plan` (hash check + re-solve from the embedded snapshot), through the real CLI with its default search parameters.
+
+### LP-solve counts (deterministic; identical across all 5 runs)
+
+| stage | CBC invocations |
+|---|---|
+| menu-verify | 2 |
+| plate | 608 |
+| **total** | **610** |
+
+### Wall timings over 5 runs (recorded-only — never asserted in CI, PRD §8.5)
+
+| stage | median ms | min ms | max ms |
+|---|---|---|---|
+| lock | 6,676.4 | 6,478.3 | 7,119.7 |
+| verify-plan | 6,928.7 | 6,435.6 | 7,327.9 |
+| **pipeline total** | **13,605.2** | 13,111.9 | 14,447.6 |
+
+## Targets (provisional) — M1.5, PRD §8.5
+
+Interactive-latency targets set FROM the measured medians above with **2x headroom**. All four are **provisional**: ratified only when a re-recorded baseline on the reference machine keeps them honest, and revised in a reviewed commit like every other number here. They are **never asserted in tests** — wall clocks stay out of CI (solve-count budgets are the deterministic CI guard).
+
+| interaction | measured median | provisional target (2x) |
+|---|---|---|
+| interactive single plate (plate LP, solo golden menu) | 20.6 ms | 41.1 ms |
+| replate — day rebalance (engine.replate, solo golden menu) | 20.5 ms | 41.0 ms |
+| full pipeline (`mealplan week` shape, examples corpus) | 30,966.3 ms | 61,932.6 ms |
+| lock round trip (`mealplan lock` + `mealplan verify-plan`, solo_lifter) | 13,605.2 ms | 27,210.4 ms |

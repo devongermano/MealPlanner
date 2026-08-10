@@ -817,10 +817,14 @@ def choose_menu(comps, ing, people, settings, n=10, seed=0, iters=4000,
         cur, _ = sc(sel)
         for _ in range(iters // 6):
             swappable = [i for i in sel if i not in must]
-            if not swappable:
+            outside = [i for i in ids if i not in sel]
+            # n == len(comps): the menu IS the whole library — nothing to
+            # swap in, so phase 1 is done (M1.4 minor A's neighbor: the
+            # just-fits case must work, never an empty-sequence traceback)
+            if not swappable or not outside:
                 break
             out = r2.choice(swappable)
-            inn = r2.choice([i for i in ids if i not in sel])
+            inn = r2.choice(outside)
             cand = [i for i in sel if i != out] + [inn]
             s2, _ = sc(cand)
             if s2 <= cur:

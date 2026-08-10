@@ -349,9 +349,18 @@ def render_eat_sheet(pname, person, comps, week, settings, menu, ing=None,
                 extra = "  — from freezer — thaw ahead"
             L.append(f"- {comps[c]['name']}: {qty}{extra}")
         L.append("")
+        # One decimal on the day total (M1.4 queued minor B): identical-
+        # looking lines must never disagree. The status is therefore
+        # computed from the SAME 1-decimal-rounded value that is displayed
+        # — exact totals straddling a band edge inside one 0.1g display
+        # bucket (e.g. 94.975 vs 95.000 against a 95.0 band edge) would
+        # otherwise render the same grams with different statuses. Status
+        # is a pure function of (shown, target, tol), so equal-looking
+        # lines are equal.
         for m in MACROS:
-            L.append(f"- {m}: {tot[m]:.0f}g of {t[m]}g target — "
-                     f"{_macro_status(tot[m], t[m], tol)}")
+            shown = round(tot[m], 1)
+            L.append(f"- {m}: {shown:.1f}g of {t[m]}g target — "
+                     f"{_macro_status(shown, t[m], tol)}")
         if mode == "relaxed":
             bars = day_error_bars(entries, comps)
             L.append("\n> If you eyeball it: "

@@ -1,0 +1,12 @@
+schema_version: 1
+# trio_split — n=3; library copied verbatim from solo_lifter. One "mix" ingredient per
+# component with grams == yield_g, so each component's derived per100 equals
+# the ingredient's macros exactly (purpose-built, tiny — LP speed matters).
+ingredients:
+  chicken_mix: {p: 23.0, f: 3.0,  c: 0.0,  perishable: false, pack_g: 500, keeps_days: 999, cost: 8.00, tags: []}
+  beef_mix:    {p: 18.0, f: 9.0,  c: 1.0,  perishable: false, pack_g: 500, keeps_days: 999, cost: 7.00, tags: []}
+  pork_mix:    {p: 19.0, f: 7.0,  c: 0.0,  perishable: false, pack_g: 500, keeps_days: 999, cost: 6.00, tags: []}
+  rice_mix:    {p: 2.0,  f: 0.5,  c: 30.0, perishable: false, pack_g: 900, keeps_days: 999, cost: 3.00, tags: []}
+  veg_mix:     {p: 2.0,  f: 0.3,  c: 5.0,  perishable: false, pack_g: 400, keeps_days: 999, cost: 3.00, tags: []}
+  oil_mix:     {p: 0.0,  f: 100.0, c: 0.0, perishable: false, pack_g: 500, keeps_days: 999, cost: 5.00, tags: []}
+  herb_mix:    {p: 2.0,  f: 30.0, c: 5.0,  perishable: false, pack_g: 200, keeps_days: 999, cost: 4.00, tags: []}

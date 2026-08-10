@@ -8,22 +8,89 @@ Commands:
     mealplan shop  [--menu a,b,c]    shopping list, purchase units, waste
     mealplan all                     everything, written to plan.md
     mealplan frontier                budget sweep: what each level buys
+    mealplan lock --date D           M1.3: solve + write the immutable locked
+                                     plan artifact under plans/<key>/
+    mealplan verify-plan PATH        M1.3: re-solve a locked plan from its
+                                     embedded snapshot; check hash + portions
 
 The library location is caller-supplied via --library (default: ./examples
 relative to the current directory — the package hardcodes NO repo paths, PRD P1).
+
+--json contract (M1.4, PRD §8.4): every command accepts --json. stdout then
+carries EXACTLY ONE JSON document::
+
+    {"schema": "mealplan/v2", "command": <name>, "ok": <bool>,
+     "result": {...}}        # or "error": {...} instead of "result"
+
+``result`` carries the SAME engine/costing structures the renderer consumes
+(P10: JSON-safe conversion only — serialize.jsonable — no reshaping). All
+human logs and warnings go to stderr. ``ok`` is true iff the exit code is 0.
+
+Exit codes (PRD §8.4) — "computed but infeasible" is a RESULT, not an error:
+    0   ok
+    2   computed but infeasible — the JSON document is still emitted, with
+        feasible flags and directional misses inside
+    3   validation / structured error (JSON error document carries the
+        complete all-errors issues list)
+    4   bad arguments (also used by argparse itself — never 2, which is
+        reserved for infeasibility)
+
+Non-json behavior is unchanged from M0/M1.1 for the pre-existing commands;
+the new lock/verify-plan commands use the §8.4 exit codes in both modes.
 """
 
 import argparse
 import datetime
+import json
 import sys
 from pathlib import Path
 
-from . import artifacts, instrument, io_yaml
+import yaml
+
+from . import artifacts, instrument, io_yaml, lockplan
 from .costing import (age_pantry, attribute, budget_ceiling, cooked_leftovers,
                       menu_cost, purchase, session_plan)
 from .engine import (available_on, build_week, choose_menu, from_freezer,
                      reset_solve_counts, score_menu, solve_counts)
+from .model import Pantry
+from .serialize import canonical_json, jsonable
 from .units import MACROS, fmt_miss, kcal_of
+
+EXIT_OK = 0
+EXIT_INFEASIBLE = 2      # computed-but-infeasible: a result, not an error
+EXIT_ERROR = 3           # validation / structured error
+EXIT_USAGE = 4           # bad arguments
+
+JSON_SCHEMA = "mealplan/v2"
+
+
+class CliError(Exception):
+    """Structured CLI error (PRD §8.4).
+
+    --json mode: rendered as the single JSON error document on stdout and
+    the process exits with ``exit_code`` (3 or 4). Non-json mode: the
+    pre-existing commands keep their historical ``sys.exit(message)``
+    behavior byte-for-byte; the NEW commands (lock, verify-plan) print the
+    message to stderr and exit with the contract code in both modes.
+    """
+
+    def __init__(self, code, message, exit_code=EXIT_ERROR, issues=None,
+                 details=None):
+        self.code = code
+        self.message = message
+        self.exit_code = exit_code
+        self.issues = list(issues or [])
+        self.details = details
+        super().__init__(message)
+
+
+class _Parser(argparse.ArgumentParser):
+    """argparse's default bad-argument exit code is 2 — which PRD §8.4
+    reserves for computed-but-infeasible. Bad arguments exit 4."""
+
+    def error(self, message):
+        self.print_usage(sys.stderr)
+        self.exit(EXIT_USAGE, f"{self.prog}: error: {message}\n")
 
 
 # --------------------------------------------------------------------------- #
@@ -200,12 +267,17 @@ def render(comps, ing, people, settings, menu, weeks, demand, docmsg, menuinfo,
 
 
 # --------------------------------------------------------------------------- #
-def frontier(comps, ing, people, settings, lo, hi, step, n, seed=0, must=None):
+def frontier(comps, ing, people, settings, lo, hi, step, n, seed=0, must=None,
+             echo=True, rows=None):
     """What does each budget level actually buy? This is the answer to
-    'how much variety can we afford' — a curve, not a number."""
-    print(f"{'budget':>8} {'spend':>8} {'dishes':>7} {'cuisines':>9} "
-          f"{'waste':>7} {'feasible':>9}")
-    print("-" * 54)
+    'how much variety can we afford' — a curve, not a number.
+
+    ``echo`` prints the historical table to stdout; pass ``rows`` (a list)
+    to also collect one structured dict per budget point (--json, M1.4 —
+    same numbers the table shows, no reshaping)."""
+    lines = [f"{'budget':>8} {'spend':>8} {'dishes':>7} {'cuisines':>9} "
+             f"{'waste':>7} {'feasible':>9}",
+             "-" * 54]
     seen_menus = {}
     for cap in range(lo, hi + 1, step):
         st = dict(settings)
@@ -214,9 +286,16 @@ def frontier(comps, ing, people, settings, lo, hi, step, n, seed=0, must=None):
                                               seed=seed, must=must)
         spend = menu_cost(comps, ing, menu, people=people, settings=st)
         mains = len([i for i in menu if comps[i]["role"] in ("main", "starch")])
-        print(f"{cap:>8} {spend:>8.0f} {mains:>7} {info['cuisines']:>9} "
-              f"{info['waste_perishable']:>6}g {'yes' if feas else 'NO':>9}")
+        lines.append(f"{cap:>8} {spend:>8.0f} {mains:>7} {info['cuisines']:>9} "
+                     f"{info['waste_perishable']:>6}g {'yes' if feas else 'NO':>9}")
         seen_menus[cap] = (menu, feas)
+        if rows is not None:
+            rows.append(dict(budget=cap, spend=spend, dishes=mains,
+                             cuisines=info["cuisines"],
+                             waste_perishable_g=info["waste_perishable"],
+                             feasible=feas, misses=broke, menu=menu))
+    if echo:
+        print("\n".join(lines))
     return seen_menus
 
 
@@ -229,9 +308,182 @@ def parse_budget(txt):
     return {"mode": "shared", "total": float(txt)}
 
 
+# --------------------------------------------------------------------------- #
+#  --json plumbing (M1.4)
+# --------------------------------------------------------------------------- #
+def _emit_json(command, ok, result=None, error=None):
+    """The ONE stdout write in --json mode: exactly one JSON document."""
+    doc = {"schema": JSON_SCHEMA, "command": command, "ok": bool(ok)}
+    if error is not None:
+        doc["error"] = error
+    else:
+        doc["result"] = jsonable(result)
+    print(json.dumps(doc, indent=2, allow_nan=False))
+
+
+def _issue_dicts(issues):
+    return [dict(code=i.code, where=i.where, message=i.message,
+                 severity=i.severity) for i in issues]
+
+
+# --------------------------------------------------------------------------- #
+#  shared pipeline pieces — used by the CLI path AND verify-plan's re-solve
+#  from a locked snapshot, so the two can never drift (P10)
+# --------------------------------------------------------------------------- #
+def _pantry_effects(pantry, ing, comps, settings, plan_date):
+    """M1.8 aging + cooked leftovers. Returns (pantry_eff, leftovers,
+    stock_warnings); warnings also go to stderr, never stdout."""
+    leftovers, stock_warns = [], []
+    if pantry is not None and (pantry.stock or pantry.cooked):
+        if plan_date is None:
+            raise CliError(
+                "date_required",
+                "--date YYYY-MM-DD is required when the pantry has "
+                "stock or cooked leftovers: stock aging and leftover "
+                "residual life are computed relative to the plan start "
+                "date, and the engine reads no wall clock (M1.8, "
+                "PRD §8.1)", EXIT_USAGE)
+        try:
+            pantry_eff, stock_warnings = age_pantry(pantry, ing, settings,
+                                                   plan_date)
+        except ValueError as e:
+            raise CliError("bad_pantry", str(e), EXIT_ERROR)
+        leftovers, leftover_warnings = cooked_leftovers(pantry, comps,
+                                                        settings, plan_date)
+        for w in stock_warnings + leftover_warnings:
+            print(f"[warning:{w['code']}] {w['message']}", file=sys.stderr)
+        pantry = pantry_eff
+        stock_warns = stock_warnings
+    return pantry, leftovers, stock_warns
+
+
+def _apply_overrides(comps, people, settings, budget, mass, exclude, force,
+                     bad_args_exit=EXIT_USAGE):
+    """Budget/mass/exclude/force overrides, exactly the historical order.
+    Returns the validated forced-component list."""
+    if budget:
+        settings["budget"] = parse_budget(budget)
+    if mass:
+        for kv in mass.split(","):
+            k, v = kv.split("=")
+            people[k]["max_daily_mass_g"] = float(v)
+    for cid in [x for x in (exclude or "").split(",") if x]:
+        comps.pop(cid, None)
+    # M0.5: --force is WIRED — forced components ride through choose_menu's
+    # ``must`` list; unknown ids (or ids just removed by --exclude) are a
+    # CLI error naming them.
+    forced = [x.strip() for x in (force or "").split(",") if x.strip()]
+    unknown_forced = [x for x in forced if x not in comps]
+    if unknown_forced:
+        raise CliError(
+            "unknown_component",
+            f"unknown components in --force: {', '.join(unknown_forced)}",
+            bad_args_exit)
+    return forced
+
+
+def _check_menu_size(n, comps, exit_code=EXIT_USAGE):
+    """Queued minor A: --n larger than the eligible library is a friendly
+    structured error naming both numbers — never a random.sample traceback."""
+    if n > len(comps):
+        raise CliError(
+            "n_exceeds_library",
+            f"--n {n} asks for a {n}-component menu but only {len(comps)} "
+            f"component{'s are' if len(comps) != 1 else ' is'} eligible "
+            "(after any --exclude) — lower --n, trim --exclude, or add "
+            "components to the library", exit_code)
+
+
+def _resolve_menu(comps, ing, people, settings, menu_arg, n, seed, force,
+                  timer, bad_args_exit=EXIT_USAGE):
+    """Explicit --menu (scored, feasibility not solved -> feasible=None) or
+    seeded choose_menu. Infeasibility advice goes to stderr (PRD §8.3)."""
+    if menu_arg:
+        menu = [x.strip() for x in menu_arg.split(",")]
+        unknown = [x for x in menu if x not in comps]
+        if unknown:
+            raise CliError("unknown_component",
+                           f"unknown components: {unknown}", bad_args_exit)
+        _, menuinfo = score_menu(comps, ing, menu, settings)
+        return menu, menuinfo, None, {}
+    _check_menu_size(n, comps, exit_code=bad_args_exit)
+    with timer.span("choose_menu"):
+        menu, menuinfo, feas, broke = choose_menu(comps, ing, people,
+                                                  settings, n=n,
+                                                  seed=seed, must=force)
+    if not feas:
+        print("!! best menu found is not feasible for everyone:", file=sys.stderr)
+        for who, miss in broke.items():
+            print(f"   {who}: {fmt_miss(miss)}", file=sys.stderr)
+        # PRD §8.3 playbook: cheapest STRUCTURAL fix first; loosening
+        # tolerance is the explicit last resort.
+        print("   -> add a component that fixes the gap (run `mealplan "
+              "doctor` — it names the class), raise --n, or move a cook "
+              "day. loosening tolerance in people.yaml is the LAST "
+              "resort: it redefines success instead of fixing the "
+              "plan.\n", file=sys.stderr)
+    return menu, menuinfo, feas, broke
+
+
+def _assemble(comps, people, settings, menu, seed, ing, leftovers, timer):
+    diag = {}      # P8: relaxation-ladder tiers surface in the rendered plan
+    with timer.span("build_week"):
+        weeks, demand = build_week(comps, people, settings, menu, seed=seed,
+                                   ing=ing, diag=diag, leftovers=leftovers)
+    with timer.span("session_plan"):
+        sp = session_plan(comps, ing, settings, weeks, leftovers=leftovers)
+    return weeks, demand, sp, diag
+
+
+def _solve_from_snapshot(snap, timer):
+    """Re-solve EXACTLY the pipeline `lock` ran, from a locked plan's
+    embedded inputs snapshot (M1.3 reproducibility). Every step reuses the
+    shared helpers above — the verify path cannot drift from the CLI path."""
+    lib_docs = snap["library"]
+    try:
+        ing, comps, people, settings = io_yaml.load_docs(
+            lib_docs["ingredients"], lib_docs["components"],
+            lib_docs["people"])
+    except io_yaml.ValidationError as e:
+        raise CliError("invalid_snapshot",
+                       f"snapshot library does not validate: {e}",
+                       EXIT_ERROR, issues=_issue_dicts(e.issues))
+    pantry = None
+    if snap.get("pantry") is not None:
+        issues = io_yaml.validate_pantry_doc(
+            snap["pantry"], known_ingredients=set(ing),
+            known_components=set(comps))
+        errors = [i for i in issues if i.severity == "error"]
+        if errors:
+            raise CliError("invalid_snapshot",
+                           "snapshot pantry does not validate",
+                           EXIT_ERROR, issues=_issue_dicts(issues))
+        pantry = Pantry.from_raw(snap["pantry"])
+    plan_date = datetime.date.fromisoformat(snap["plan_date"])
+    seed = snap["seed"]
+    ov = snap.get("overrides") or {}
+    pantry, leftovers, _ = _pantry_effects(pantry, ing, comps, settings,
+                                           plan_date)
+    force = _apply_overrides(comps, people, settings, ov.get("budget"),
+                             ov.get("mass"), ov.get("exclude"),
+                             ov.get("force"), bad_args_exit=EXIT_ERROR)
+    menu, menuinfo, feas, broke = _resolve_menu(
+        comps, ing, people, settings, ov.get("menu"), ov.get("n"), seed,
+        force, timer, bad_args_exit=EXIT_ERROR)
+    weeks, demand, sp, diag = _assemble(comps, people, settings, menu, seed,
+                                        ing, leftovers, timer)
+    return dict(menu=menu, menuinfo=menuinfo, feasible=feas, misses=broke,
+                weeks=weeks, demand=demand, sp=sp, diag=diag)
+
+
+# --------------------------------------------------------------------------- #
 def main(argv=None):
-    ap = argparse.ArgumentParser(prog="mealplan")
-    ap.add_argument("cmd", choices=["doctor", "menu", "week", "shop", "all", "frontier"])
+    ap = _Parser(prog="mealplan")
+    ap.add_argument("cmd", choices=["doctor", "menu", "week", "shop", "all",
+                                    "frontier", "lock", "verify-plan"])
+    ap.add_argument("plan", nargs="?", default=None, metavar="PLAN_YAML",
+                    help="verify-plan only: path to a locked "
+                         "plans/<key>/plan.yaml")
     ap.add_argument("--library", default=None, metavar="PATH",
                     help="library directory holding ingredients/components/people "
                          "yaml (default: ./examples)")
@@ -244,7 +496,9 @@ def main(argv=None):
                     help="plan start date (ISO). REQUIRED when the pantry "
                          "has stock or cooked leftovers — aging and residual "
                          "life are computed relative to it; the engine reads "
-                         "no wall clock (M1.8)")
+                         "no wall clock (M1.8). REQUIRED for lock: the "
+                         "artifact key is the primary trip date (PRD §8.2) "
+                         "= this date advanced by sorted(shop_days)[0] days")
     ap.add_argument("--diagnose", action="store_true",
                     help="also run the full doctor diagnostics before "
                          "week/menu/shop/all and include the report (§8.3: "
@@ -255,7 +509,10 @@ def main(argv=None):
                          "(default: %(default)s)")
     ap.add_argument("--menu", default=None)
     ap.add_argument("--seed", type=int, default=0)
-    ap.add_argument("--out", default="plan.md")
+    ap.add_argument("--out", default=None,
+                    help="week/all only: where the rendered plan is written "
+                         "(default: plan.md; ignored with --json — the JSON "
+                         "document on stdout IS the output)")
     ap.add_argument("--artifacts", default=None, metavar="DIR",
                     help="week/all only: also write the three human-readable "
                          "deliverables (M1.1, PRD §4.3 step 4) into DIR — "
@@ -267,6 +524,24 @@ def main(argv=None):
     ap.add_argument("--exclude", default="", help="components to keep off the menu")
     ap.add_argument("--force", default="", help="components that must be on the menu")
     ap.add_argument("--range", default="400:700:50", help="frontier sweep lo:hi:step")
+    ap.add_argument("--json", action="store_true",
+                    help="emit exactly one mealplan/v2 JSON document on "
+                         "stdout (M1.4, PRD §8.4); all human logs go to "
+                         "stderr. Exit codes: 0 ok, 2 computed-but-"
+                         "infeasible (document still emitted), 3 validation/"
+                         "structured error, 4 bad arguments")
+    ap.add_argument("--plans", default="plans", metavar="DIR",
+                    help="lock only: root directory for locked plan "
+                         "artifacts (default: ./plans — git-tracked data; "
+                         "the artifact IS the record). The plan lands in "
+                         "DIR/<primary-trip-date>/")
+    ap.add_argument("--supersede", action="store_true",
+                    help="lock only: if a plan already exists at the key, "
+                         "RENAME it to plan.superseded-<n>.yaml (content "
+                         "untouched — plans are immutable, PRD §8.1) and "
+                         "lock a new plan.yaml that names what it "
+                         "superseded. Without this flag an existing plan "
+                         "makes lock refuse (exit 3)")
     ap.add_argument("--stats", action="store_true",
                     help="after the command, print LP-solve counts by stage "
                          "and wall-clock stage timings to stderr (M0.14)")
@@ -277,7 +552,21 @@ def main(argv=None):
     reset_solve_counts()
     timer = instrument.StageTimer()
     try:
-        _run(a, timer)
+        try:
+            _run(a, timer)
+        except CliError as e:
+            if a.json:
+                err = {"code": e.code, "message": e.message,
+                       "issues": e.issues}
+                if e.details is not None:
+                    err["details"] = jsonable(e.details)
+                _emit_json(a.cmd, False, error=err)
+                raise SystemExit(e.exit_code)
+            if a.cmd in ("lock", "verify-plan"):
+                # new commands use the §8.4 exit codes in both modes
+                print(f"error: {e.message}", file=sys.stderr)
+                raise SystemExit(e.exit_code)
+            sys.exit(e.message)   # pre-M1.4 commands: behavior unchanged
     finally:
         if a.stats:
             print(instrument.format_stats(solve_counts(), timer.spans),
@@ -285,12 +574,17 @@ def main(argv=None):
 
 
 def _run(a, timer):
+    if a.cmd == "verify-plan":
+        _cmd_verify_plan(a, timer)
+        return
+
     lib = Path(a.library) if a.library else Path.cwd() / "examples"
     try:
         with timer.span("load"):
             ing, comps, people, settings = io_yaml.load(lib)
     except io_yaml.ValidationError as e:
-        sys.exit(str(e))
+        raise CliError("invalid_library", str(e), EXIT_ERROR,
+                       issues=_issue_dicts(e.issues))
     pantry = None
     if a.pantry:
         try:
@@ -298,92 +592,67 @@ def _run(a, timer):
                                          known_ingredients=set(ing),
                                          known_components=set(comps))
         except io_yaml.ValidationError as e:
-            sys.exit(str(e))
+            raise CliError("invalid_pantry", str(e), EXIT_ERROR,
+                           issues=_issue_dicts(e.issues))
     # M1.8: the plan start date is an explicit input — no wall-clock default
     plan_date = None
     if a.date:
         try:
             plan_date = datetime.date.fromisoformat(a.date)
         except ValueError:
-            sys.exit(f"--date must be an ISO date (YYYY-MM-DD), "
-                     f"got {a.date!r}")
-    leftovers, stock_warns = [], []
-    if pantry is not None and (pantry.stock or pantry.cooked):
-        if plan_date is None:
-            sys.exit("--date YYYY-MM-DD is required when the pantry has "
-                     "stock or cooked leftovers: stock aging and leftover "
-                     "residual life are computed relative to the plan start "
-                     "date, and the engine reads no wall clock (M1.8, "
-                     "PRD §8.1)")
-        try:
-            pantry_eff, stock_warnings = age_pantry(pantry, ing, settings,
-                                                    plan_date)
-        except ValueError as e:
-            sys.exit(str(e))
-        leftovers, leftover_warnings = cooked_leftovers(pantry, comps,
-                                                        settings, plan_date)
-        for w in stock_warnings + leftover_warnings:
-            print(f"[warning:{w['code']}] {w['message']}", file=sys.stderr)
-        pantry = pantry_eff
-        stock_warns = stock_warnings
-    if a.budget:
-        settings["budget"] = parse_budget(a.budget)
-    if a.mass:
-        for kv in a.mass.split(","):
-            k, v = kv.split("=")
-            people[k]["max_daily_mass_g"] = float(v)
-    for cid in [x for x in a.exclude.split(",") if x]:
-        comps.pop(cid, None)
-    # M0.5: --force is WIRED — forced components ride through choose_menu's
-    # ``must`` list; unknown ids (or ids just removed by --exclude) are a
-    # CLI error naming them.
-    force = [x.strip() for x in a.force.split(",") if x.strip()]
-    unknown_forced = [x for x in force if x not in comps]
-    if unknown_forced:
-        sys.exit(f"unknown components in --force: {', '.join(unknown_forced)}")
+            raise CliError("bad_date",
+                           f"--date must be an ISO date (YYYY-MM-DD), "
+                           f"got {a.date!r}", EXIT_USAGE)
+    if a.cmd == "lock" and plan_date is None:
+        raise CliError(
+            "date_required",
+            "--date YYYY-MM-DD is REQUIRED for lock: the artifact key is "
+            "the primary trip date — the plan start date advanced by "
+            "sorted(shop_days)[0] days (PRD §8.2) — and the engine reads "
+            "no wall clock", EXIT_USAGE)
+    pantry, leftovers, stock_warns = _pantry_effects(pantry, ing, comps,
+                                                     settings, plan_date)
+    force = _apply_overrides(comps, people, settings, a.budget, a.mass,
+                             a.exclude, a.force)
     if a.cmd == "frontier":
         lo, hi, st = (int(x) for x in a.range.split(":"))
+        _check_menu_size(a.n, comps)
+        rows = [] if a.json else None
         with timer.span("frontier"):
             frontier(comps, ing, people, settings, lo, hi, st, a.n,
-                     seed=a.seed, must=force)
+                     seed=a.seed, must=force, echo=not a.json, rows=rows)
+        if a.json:
+            _emit_json("frontier", True, result={"range": [lo, hi, st],
+                                                 "points": rows})
         return
     # M1.0 (§8.3): diagnostics run ON DEMAND — the doctor command and the
     # --diagnose flag — never implicitly before every write/render (the old
     # always-run cost was ~2.7s per command on the examples corpus).
-    docmsg = ""
+    docmsg, docdata = "", None
     if a.cmd == "doctor" or a.diagnose:
         from .engine import doctor as _doctor
         with timer.span("doctor"):
-            docmsg, _ = _doctor(comps, people, settings, ing=ing)
+            docmsg, docdata = _doctor(comps, people, settings, ing=ing)
 
     if a.cmd == "doctor":
-        print(docmsg)
+        if a.json:
+            _emit_json("doctor", True, result={"report": docmsg,
+                                               "data": docdata})
+        else:
+            print(docmsg)
         return
 
-    if a.menu:
-        menu = [x.strip() for x in a.menu.split(",")]
-        unknown = [x for x in menu if x not in comps]
-        if unknown:
-            sys.exit(f"unknown components: {unknown}")
-        _, menuinfo = score_menu(comps, ing, menu, settings)
-    else:
-        with timer.span("choose_menu"):
-            menu, menuinfo, feas, broke = choose_menu(comps, ing, people,
-                                                      settings, n=a.n,
-                                                      seed=a.seed, must=force)
-        if not feas:
-            print("!! best menu found is not feasible for everyone:", file=sys.stderr)
-            for who, miss in broke.items():
-                print(f"   {who}: {fmt_miss(miss)}", file=sys.stderr)
-            # PRD §8.3 playbook: cheapest STRUCTURAL fix first; loosening
-            # tolerance is the explicit last resort.
-            print("   -> add a component that fixes the gap (run `mealplan "
-                  "doctor` — it names the class), raise --n, or move a cook "
-                  "day. loosening tolerance in people.yaml is the LAST "
-                  "resort: it redefines success instead of fixing the "
-                  "plan.\n", file=sys.stderr)
+    menu, menuinfo, feas, broke = _resolve_menu(
+        comps, ing, people, settings, a.menu, a.n, a.seed, force, timer)
 
     if a.cmd == "menu":
+        if a.json:
+            _emit_json("menu", feas is not False,
+                       result={"menu": menu, "menu_info": menuinfo,
+                               "feasible": feas, "misses": broke})
+            if feas is False:
+                raise SystemExit(EXIT_INFEASIBLE)
+            return
         for i in menu:
             print(f"{i:24s} {comps[i]['cuisine']:9s} {comps[i]['role']}")
         print(f"\nactive {menuinfo['active_min']}min, "
@@ -391,24 +660,25 @@ def _run(a, timer):
               f"cuisines {menuinfo['cuisines']}")
         return
 
-    diag = {}      # P8: relaxation-ladder tiers surface in the rendered plan
-    with timer.span("build_week"):
-        weeks, demand = build_week(comps, people, settings, menu, seed=a.seed,
-                                   ing=ing, diag=diag, leftovers=leftovers)
-    with timer.span("session_plan"):
-        sp = session_plan(comps, ing, settings, weeks, leftovers=leftovers)
-    with timer.span("render"):
-        out = render(comps, ing, people, settings, menu, weeks, demand, docmsg,
-                     menuinfo, sp, pantry=pantry, diag=diag)
+    weeks, demand, sp, diag = _assemble(comps, people, settings, menu,
+                                        a.seed, ing, leftovers, timer)
+    batches = sp["batches"]
+    chosen = [i for i in menu if batches.get(i)]
+    rows, wp, wt = purchase(comps, ing, chosen, batches, pantry=pantry)
+    total = menu_cost(comps, ing, chosen, batches, pantry=pantry)
+
+    if a.cmd == "lock":
+        _cmd_lock(a, timer, lib=lib, settings=settings, plan_date=plan_date,
+                  comps=comps, ing=ing, people=people, menu=menu,
+                  menuinfo=menuinfo, feas=feas, broke=broke, weeks=weeks,
+                  sp=sp, diag=diag, pantry=pantry, stock_warns=stock_warns,
+                  rows=rows, total=total)
+        return
 
     # M1.1: the three human-readable deliverables (PRD §4.3 step 4).
     # Rendering only — every input below is an already-solved structure.
     if a.artifacts and a.cmd in ("week", "all"):
         with timer.span("artifacts"):
-            batches = sp["batches"]
-            chosen = [i for i in menu if batches.get(i)]
-            rows, _, _ = purchase(comps, ing, chosen, batches, pantry=pantry)
-            total = menu_cost(comps, ing, chosen, batches, pantry=pantry)
             meta = dict(seed=a.seed, library=str(lib),
                         date=a.date or "unspecified")
             files = artifacts.render_artifacts(
@@ -419,12 +689,151 @@ def _run(a, timer):
         print(f"[artifacts written to {a.artifacts}: "
               + ", ".join(p.name for p in written) + "]", file=sys.stderr)
 
+    if a.json:
+        result = {
+            "library": str(lib), "seed": a.seed, "date": a.date,
+            "menu": menu, "menu_info": menuinfo,
+            "feasible": feas, "misses": broke,
+            "purchase_rows": rows, "waste_perishable_g": wp,
+            "total_cost": total, "stock_warnings": stock_warns,
+        }
+        if a.cmd in ("week", "all"):
+            result.update(
+                weeks=weeks, demand=demand, session_plan=sp,
+                relax_tiers=(diag or {}).get("relax_tiers"))
+            if a.diagnose:
+                result["doctor"] = {"report": docmsg, "data": docdata}
+        _emit_json(a.cmd, feas is not False, result=result)
+        if feas is False:
+            raise SystemExit(EXIT_INFEASIBLE)
+        return
+
+    with timer.span("render"):
+        out = render(comps, ing, people, settings, menu, weeks, demand, docmsg,
+                     menuinfo, sp, pantry=pantry, diag=diag)
+
     if a.cmd == "shop":
         print(out.split("## Shopping list")[1])
         return
-    Path(a.out).write_text(out)
+    outpath = Path(a.out or "plan.md")
+    outpath.write_text(out)
     print(out)
-    print(f"\n\n[written to {a.out}]", file=sys.stderr)
+    print(f"\n\n[written to {outpath}]", file=sys.stderr)
+
+
+# --------------------------------------------------------------------------- #
+#  lock / verify-plan (M1.3, PRD §4.3 / §8.1 / §8.2)
+# --------------------------------------------------------------------------- #
+def _cmd_lock(a, timer, *, lib, settings, plan_date, comps, ing, people,
+              menu, menuinfo, feas, broke, weeks, sp, diag, pantry,
+              stock_warns, rows, total):
+    """Write the immutable locked plan artifact: plans/<key>/plan.yaml plus
+    the three M1.1 deliverables rendered alongside."""
+    key = lockplan.primary_trip_date(plan_date, settings)
+    raw_docs = io_yaml.load_raw_docs(lib)
+    pantry_doc = None
+    if a.pantry:
+        pantry_doc = yaml.safe_load(Path(a.pantry).read_text())
+    overrides = {"budget": a.budget, "mass": a.mass,
+                 "exclude": a.exclude or "", "force": a.force or "",
+                 "n": a.n, "menu": a.menu}
+    snapshot = lockplan.build_snapshot(raw_docs, pantry_doc, overrides,
+                                       a.seed, plan_date)
+    doc = lockplan.build_plan_doc(
+        snapshot, key, plan_date, menu, weeks, sp, feas, broke,
+        (diag or {}).get("relax_tiers"), stock_warns)
+    plan_dir = Path(a.plans) / key.isoformat()
+    with timer.span("lock"):
+        try:
+            path, superseded = lockplan.write_plan(plan_dir, doc,
+                                                   supersede=a.supersede)
+        except lockplan.LockExists as e:
+            raise CliError("plan_exists", str(e), EXIT_ERROR,
+                           details={"path": str(e.path)})
+        # the three deliverables land NEXT TO the plan — the plan dir is the
+        # complete record of the locked week
+        meta = dict(seed=a.seed, library=str(lib), date=plan_date.isoformat())
+        files = artifacts.render_artifacts(
+            comps, ing, people, settings, menu, weeks, sp, rows, total,
+            pantry=pantry, stock_warnings=stock_warns, diag=diag, meta=meta)
+        written = artifacts.write_artifacts(plan_dir, files)
+    result = {
+        "key": key.isoformat(), "plan_path": str(path),
+        "plan_dir": str(plan_dir), "inputs_sha256": doc["inputs_sha256"],
+        "supersedes": superseded, "menu": menu, "feasible": feas,
+        "misses": broke, "files": [p.name for p in written],
+    }
+    if a.json:
+        _emit_json("lock", feas is not False, result=result)
+    else:
+        print(f"locked plan {key.isoformat()} -> {path}")
+        print(f"inputs sha256: {doc['inputs_sha256']}")
+        if superseded:
+            print("superseded: " + ", ".join(superseded))
+        print("deliverables: " + ", ".join(p.name for p in written))
+        print(f"verify anytime: mealplan verify-plan {path}")
+    if feas is False:
+        raise SystemExit(EXIT_INFEASIBLE)
+
+
+def _cmd_verify_plan(a, timer):
+    """Re-solve a locked plan from its embedded snapshot and check the
+    inputs hash + menu + per-person portions + session plan (M1.3
+    reproducibility). A fresh lock verifies clean on the reference
+    environment; a tampered file or altered snapshot fails loudly
+    (exit 3) — including a hand-edited session_plan (batch counts and
+    cook minutes the household acts on), which is covered by neither
+    the inputs hash nor the portions check."""
+    if not a.plan:
+        raise CliError("missing_argument",
+                       "verify-plan requires the path to a locked plan: "
+                       "mealplan verify-plan plans/<key>/plan.yaml",
+                       EXIT_USAGE)
+    p = Path(a.plan)
+    if not p.exists():
+        raise CliError("missing_file", f"{p}: plan file not found",
+                       EXIT_ERROR)
+    try:
+        doc = lockplan.load_plan(p)
+    except (yaml.YAMLError, ValueError) as e:
+        raise CliError("bad_plan", str(e), EXIT_ERROR)
+    report = {"path": str(p), "key": doc.get("key"),
+              "inputs_sha256": doc["inputs_sha256"],
+              "hash_ok": None, "menu_ok": None, "portions_ok": None,
+              "session_plan_ok": None, "verified": False}
+    report["hash_ok"] = lockplan.check_hash(doc)
+    if not report["hash_ok"]:
+        raise CliError(
+            "verify_failed",
+            f"{p}: inputs hash mismatch — the embedded snapshot does not "
+            "hash to the recorded inputs_sha256; the snapshot or the hash "
+            "was altered after lock", EXIT_ERROR, details=report)
+    with timer.span("verify-plan"):
+        solved = _solve_from_snapshot(doc["inputs"], timer)
+    report["menu_ok"] = (canonical_json(solved["menu"])
+                         == canonical_json(doc["menu"]))
+    report["portions_ok"] = (canonical_json(solved["weeks"])
+                             == canonical_json(doc["portions"]))
+    report["session_plan_ok"] = (canonical_json(solved["sp"])
+                                 == canonical_json(doc["session_plan"]))
+    report["verified"] = (report["menu_ok"] and report["portions_ok"]
+                          and report["session_plan_ok"])
+    if not report["verified"]:
+        bad = [k for k in ("menu_ok", "portions_ok", "session_plan_ok")
+               if not report[k]]
+        raise CliError(
+            "verify_failed",
+            f"{p}: re-solve from the embedded snapshot diverges from the "
+            f"stored plan ({', '.join(bad)}) — the plan body was altered "
+            "after lock, or this is not the reference environment "
+            "(PRD §9 golden policy)", EXIT_ERROR, details=report)
+    if a.json:
+        _emit_json("verify-plan", True, result=report)
+    else:
+        print(f"verified: {p}")
+        print(f"inputs sha256 ok; menu, per-person portions and session "
+              f"plan reproduce from the embedded snapshot "
+              f"(seed {doc['inputs'].get('seed')})")
 
 
 if __name__ == "__main__":

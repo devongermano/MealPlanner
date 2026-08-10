@@ -34,9 +34,12 @@ node_modules/
 .idea/
 *.egg-info/
 artifacts/
-
 # JS build/tooling outputs (Track C scaffolds)
 dist/
 .turbo/
 .angular/
 coverage/
+
+# plans/ is deliberately NOT ignored (M1.3): locked plan artifacts are
+# git-tracked data — the artifact IS the record. Tests only ever write
+# plans under tmp_path.

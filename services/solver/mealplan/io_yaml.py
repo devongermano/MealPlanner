@@ -612,28 +612,44 @@ def load(library: str | os.PathLike):
     one ValidationError. Returns ``(ing, comps, people, settings)`` shaped
     exactly like the prototype's ``plan.load()``.
     """
+    docs = load_raw_docs(library)
+    return load_docs(docs["ingredients"], docs["components"],
+                     docs["people"])
+
+
+def load_raw_docs(library: str | os.PathLike) -> dict:
+    """Read the three library YAML files as RAW parsed documents (no
+    validation beyond YAML parse). Used by ``load`` and by the M1.3 locked
+    plan artifact, whose inputs snapshot embeds these documents verbatim.
+    Returns ``{"ingredients": doc, "components": doc, "people": doc}``."""
     lib = Path(library)
     docs, issues = {}, []
     for fname in ("ingredients.yaml", "components.yaml", "people.yaml"):
         path = lib / fname
+        kind = fname.split(".")[0]
         if not path.exists():
             issues.append(ValidationIssue(
                 "missing_file", str(path), "library file not found"))
-            docs[fname] = None
+            docs[kind] = None
             continue
         try:
-            docs[fname] = yaml.safe_load(path.read_text())
+            docs[kind] = yaml.safe_load(path.read_text())
         except yaml.YAMLError as e:
             issues.append(ValidationIssue(
                 "bad_yaml", str(path), f"YAML parse error: {e}"))
-            docs[fname] = None
+            docs[kind] = None
     if any(d is None for d in docs.values()):
         raise ValidationError(issues)
+    return docs
 
-    ing_doc = docs["ingredients.yaml"]
-    comp_doc = docs["components.yaml"]
-    ppl_doc = docs["people.yaml"]
 
+def load_docs(ing_doc, comp_doc, ppl_doc):
+    """Validate + build ``(ing, comps, people, settings)`` from in-memory
+    documents — the same validation and construction path as ``load``.
+    Split out for M1.3 verify-plan, which re-solves from the library
+    documents embedded in a locked plan's snapshot rather than from files.
+    """
+    issues = []
     issues += validate_ingredients_doc(ing_doc)
     known = set((ing_doc.get("ingredients") or {})
                 if isinstance(ing_doc, dict) else ())

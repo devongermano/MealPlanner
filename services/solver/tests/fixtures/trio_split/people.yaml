@@ -1,0 +1,30 @@
+schema_version: 1
+# trio_split — n=3 (M1.4 n-coverage: the 1..4 ladder needed a 3-person
+# rung). Library is the solo_lifter one verbatim (purpose-built, tiny — LP
+# speed matters); the three people spread a moderate kcal range with no
+# exclusions, so the fixture is clearly feasible and the test asserts
+# per-person structure presence, not solver luck.
+people:
+  ana:
+    targets: {protein: 150, fat: 65, carb: 250}
+    tolerance: 0.07
+    exclude: []
+    dislikes: []
+  bo:
+    targets: {protein: 120, fat: 55, carb: 200}
+    tolerance: 0.07
+    exclude: []
+    dislikes: []
+  cy:
+    targets: {protein: 95, fat: 45, carb: 160}
+    tolerance: 0.07
+    exclude: []
+    dislikes: []
+settings:
+  days: 7
+  active_min_budget: 400
+  batch_time_factor: 0.45
+  max_days_same_component: 4
+  max_batches_per_component: 4
+  cook_days: [0, 4]
+  shop_days: [0]

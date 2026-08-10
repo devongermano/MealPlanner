@@ -238,17 +238,35 @@ def test_eat_sheet_macro_totals_vs_targets_tolerance_status():
     # rice 555g: p 13.875 f 2.775 c 155.4 | stew 450g: p 90 f 22.5 c 22.5
     # tortilla 142g: p 11.36 f 9.94 c 71 -> tot p 115.2 f 35.2 c 248.9
     # targets 150/60/300 at ±5%: p short (-35), f short (-25), c short (-51)
+    # One decimal on the total (M1.4 queued minor B): whole-gram rendering
+    # let two identical-looking "141g" lines carry different statuses.
     out = render_eat_sheet("ada", PRECISE, COMPS, [dict(WEEK[0])], SET,
                            list(COMPS), ing=ING, meta=META)
-    assert "- protein: 115g of 150g target — -35g short" in out
-    assert "- fat: 35g of 60g target — -25g short" in out
-    assert "- carb: 249g of 300g target — -51g short" in out
+    assert "- protein: 115.2g of 150g target — -35g short" in out
+    assert "- fat: 35.2g of 60g target — -25g short" in out
+    assert "- carb: 248.9g of 300g target — -51g short" in out
     # a plate inside the band reads "hit"; one over reads "+Ng over"
     p2 = dict(PRECISE, targets={"protein": 115, "fat": 30, "carb": 250})
     out2 = render_eat_sheet("ada", p2, COMPS, [dict(WEEK[0])], SET,
                             list(COMPS), ing=ING, meta=META)
-    assert "- protein: 115g of 115g target — hit" in out2
-    assert "- fat: 35g of 30g target — +5g over" in out2
+    assert "- protein: 115.2g of 115g target — hit" in out2
+    assert "- fat: 35.2g of 30g target — +5g over" in out2
+
+
+def test_eat_sheet_identical_displayed_macros_never_disagree():
+    """Status is computed from the SAME 1-decimal value that is displayed:
+    exact totals straddling the ±tol band edge inside one 0.1g display
+    bucket (94.975 vs 95.000 against the 95.0 edge of a 100g target at
+    ±5%) must render the SAME line — never same grams, different status."""
+    person = dict(PRECISE, targets={"protein": 100, "fat": 60, "carb": 300})
+    lines = []
+    for rice_g in (199, 200):   # protein 94.975 vs 95.000 exactly
+        out = render_eat_sheet("ada", person, COMPS,
+                               [{"stew": 450, "rice": rice_g}], SET,
+                               list(COMPS), ing=ING, meta=META)
+        lines.append(next(l for l in out.splitlines()
+                          if l.startswith("- protein")))
+    assert lines[0] == lines[1] == "- protein: 95.0g of 100g target — hit"
 
 
 def test_eat_sheet_explained_hole_names_expired_components():
@@ -526,7 +544,7 @@ def test_mode_is_presentation_only_engine_still_solves_grams():
                            list(COMPS), ing=ING, meta=META)
     # same solved grams underneath: both sheets computed identical macro
     # totals from the same 340g
-    assert "- carb: 95g of 300g target" in prec
-    assert "- carb: 95g of 300g target" in rel
+    assert "- carb: 95.2g of 300g target" in prec
+    assert "- carb: 95.2g of 300g target" in rel
     # but rendered differently
     assert "**340g**" in prec and "about 2 cups" in rel

@@ -48,9 +48,9 @@ and eaten from M1 output. Targets are arbitrary by design (owner, 2026-08-09:
 - [x] M1.0 Sweep the Phase 5 deferred minors (`services/solver/PHASE5_FIXNOTES.md`, "Deferred minors" section)
 - [x] M1.1 The three deliverables as human-readable artifacts: shopping list, per-session cook plan with scaled recipes, per-day per-person eat sheets *(services/solver/mealplan/artifacts.py — rendering only, consumes engine/costing outputs verbatim; CLI `week`/`all --artifacts DIR`; seed+library+date footer on all three)*
 - [x] M1.2 Relaxed mode: household-unit rendering + widened tolerance profile with honest error bars *(person.mode enum, RELAXED_TOLERANCE=0.12 provisional default, component.household_unit validated; counts / half-units / friendly batch fractions on eat sheets only — engine still solves grams; error bars are worst-case aggregation of the rounding deltas actually applied, property-tested)*
-- [ ] M1.3 Locked-plan artifacts: immutable, inputs-hash (incl. seed + pantry), keyed by primary-trip date; open-format export
-- [ ] M1.4 n=1..4 exercised via fixtures; CLI `--json` contract versioned
-- [ ] M1.5 Interactive-latency targets set from M0 baselines (provisional labels)
+- [x] M1.3 Locked-plan artifacts: immutable, inputs-hash (incl. seed + pantry), keyed by primary-trip date; open-format export *(`mealplan lock --date D` writes plans/<primary-trip-date>/plan.yaml — verbatim inputs snapshot + sha256 over its canonical JSON, portions, session plan, empty veto_history reserved for M2 — plus the three M1.1 deliverables alongside; existing plan ⇒ refuse (exit 3) unless `--supersede` renames it byte-identically; `mealplan verify-plan` re-solves from the snapshot and checks hash + portions; mealplan/lockplan.py + serialize.py)*
+- [x] M1.4 n=1..4 exercised via fixtures; CLI `--json` contract versioned *(every command emits one `mealplan/v2` JSON envelope; §8.4 exit codes 0/2/3/4 — 2 = computed-but-infeasible with misses in-document, 3 carries the all-errors issues list, argparse rewired off 2; n-ladder solo_lifter/conflicting_exclusions/trio_split (new)/family_four; minors: friendly `--n`-exceeds-library error naming both numbers, one-decimal eat-sheet macro totals)*
+- [x] M1.5 Interactive-latency targets set from M0 baselines (provisional labels) *(BASELINES.md "Targets (provisional)": 2x headroom over recorded medians for single plate, replate, full pipeline, lock round trip; lock/verify-plan stages instrumented and measured by `make baseline`; never asserted in tests)*
 - [ ] M1.6 🥘 **Real-week gate:** founder household cooks and eats one week from M1 output
 - [x] M1.7 Per-person-scalable `serve_g` bounds (PRD §8.1, Appendix A confirmed defect "serve_g shared across divergent eaters"): **explicitly deferred from M0** in the Phase 5 review — `plate()` still applies one shared serve band per component to every eater (PRD Appendix B, item 2). Implement kcal-proportional scaling (provisional) or ratify dropping it, with the M1.6 real week as the measuring stick
 - [x] M1.8 Pantry aging + cooked leftovers (PRD §8.1): consume stock `acquired` dates (age reduces effective raw `keeps_days` — validated but unconsumed in M0, PRD Appendix B item 3); integrate pantry `cooked` list into availability (documented M1+ since M0.12)
@@ -64,7 +64,8 @@ Render/Turbo). Blocked-on-decisions: OQ-P1 (channel), PR-2/PR-3.
 - [ ] Contract-codegen pipeline: pydantic → OpenAPI/JSON Schema → generated `packages/contracts` TS, CI drift test — **blocks all other M2 API work**
 - [ ] Solver service: FastAPI wrapper, stateless, Render-private (`ARCHITECTURE.md`)
 - [ ] Service API (NestJS) wrapping solver; Supabase Auth (JWT verify in Nest); per-household isolation (authz in Nest, RLS safety net); transactional writes + audit trail; Postgres via Prisma (YAML stays interchange/fixture format)
-- [ ] Household setup flow; propose → veto → lock loop; deliverable views; day rebalance; pantry stock UI; responsive
+- [ ] Household setup flow; propose → veto → lock loop; deliverable views; day rebalance; pantry stock UI; responsive/PWA
+- [ ] Cook mode: full-screen tap-next timeline renderer (PRD §10) — timers, wake lock, offline locked plan; technique-library hooks (operation → explanation/video)
 - [ ] Browser-automation test of the two-account loop (dev dependency, outside pinned core)
 
 ## M3 — Operator layer & ingestion assist
